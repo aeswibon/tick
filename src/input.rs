@@ -8,10 +8,42 @@ use crate::api::{self, types::WorkflowTransition};
 use crate::app::{App, InputMode, TransitionCollect};
 use crate::view_mode::ViewMode;
 
+/// Shown in picker footers (⌘R on macOS; Ctrl+R elsewhere). Both work on macOS when the terminal reports modifiers.
+#[cfg(target_os = "macos")]
+pub const LOAD_MORE_USERS_KEYS_HINT: &str = "⌘R";
+#[cfg(not(target_os = "macos"))]
+pub const LOAD_MORE_USERS_KEYS_HINT: &str = "Ctrl+R";
+
+#[cfg(target_os = "macos")]
+pub const LOAD_MORE_USERS_USER_MODAL_HINT: &str =
+    "Type in footer to filter; ⌘R fetch more users into cache; Enter to select";
+#[cfg(not(target_os = "macos"))]
+pub const LOAD_MORE_USERS_USER_MODAL_HINT: &str =
+    "Type in footer to filter; Ctrl+R fetch more users into cache; Enter to select";
+
+#[cfg(target_os = "macos")]
+pub const LOAD_MORE_USERS_PICKER_FOOTER: &str =
+    "  j/k move  Enter pick  ⌘R add users  Esc cancel";
+#[cfg(not(target_os = "macos"))]
+pub const LOAD_MORE_USERS_PICKER_FOOTER: &str =
+    "  j/k move  Enter pick  Ctrl+R add users  Esc cancel";
+
+#[cfg(target_os = "macos")]
+pub const LOAD_MORE_USERS_FIELD_PICKER_FOOTER: &str =
+    "  Type in footer to filter  j/k move  Enter pick  ⌘R add users  Esc cancel";
+#[cfg(not(target_os = "macos"))]
+pub const LOAD_MORE_USERS_FIELD_PICKER_FOOTER: &str =
+    "  Type in footer to filter  j/k move  Enter pick  Ctrl+R add users  Esc cancel";
+
 /// Load more assignable users from Jira (merge into cache). Plain `r`/`R` are for filtering.
 fn load_more_users_key(key: &KeyEvent) -> bool {
-    key.modifiers.contains(KeyModifiers::CONTROL)
-        && matches!(key.code, KeyCode::Char('r') | KeyCode::Char('R'))
+    if !matches!(key.code, KeyCode::Char('r') | KeyCode::Char('R')) {
+        return false;
+    }
+    let mods = key.modifiers;
+    mods.contains(KeyModifiers::CONTROL)
+        || mods.contains(KeyModifiers::SUPER)
+        || mods.contains(KeyModifiers::META)
 }
 
 /// Returns `true` when the app should quit.
@@ -1116,12 +1148,23 @@ mod mention_tests {
     }
 
     #[test]
-    fn load_more_users_requires_ctrl_r() {
+    fn load_more_users_accepts_modifier_r() {
         assert!(load_more_users_key(&key(
             KeyCode::Char('r'),
             KeyModifiers::CONTROL
         )));
-        assert!(!load_more_users_key(&key(KeyCode::Char('r'), KeyModifiers::empty())));
+        assert!(load_more_users_key(&key(
+            KeyCode::Char('r'),
+            KeyModifiers::SUPER
+        )));
+        assert!(load_more_users_key(&key(
+            KeyCode::Char('r'),
+            KeyModifiers::META
+        )));
+        assert!(!load_more_users_key(&key(
+            KeyCode::Char('r'),
+            KeyModifiers::empty()
+        )));
         assert!(!load_more_users_key(&key(
             KeyCode::Char('R'),
             KeyModifiers::SHIFT

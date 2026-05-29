@@ -1,3 +1,4 @@
+use crate::input::LOAD_MORE_USERS_FIELD_PICKER_FOOTER;
 use ratatui::{
     layout::{Constraint, Rect},
     style::{Modifier, Style},
@@ -74,7 +75,7 @@ pub fn draw_field_picker(
     if !text_input_mode || user_field {
         lines.push(Line::from(""));
         let footer = if user_field {
-            "  Type in footer to filter  j/k move  Enter pick  Ctrl+R add users  Esc cancel"
+            LOAD_MORE_USERS_FIELD_PICKER_FOOTER
         } else {
             "  j/k move  Enter confirm  1-9  R refresh  Esc cancel"
         };
