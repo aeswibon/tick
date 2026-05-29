@@ -43,9 +43,7 @@ impl TransitionField {
         match self.kind {
             TransitionFieldKind::User => "Type in the footer to search, Enter to select",
             TransitionFieldKind::Date => "Enter a date in the footer (YYYY-MM-DD), then Enter",
-            TransitionFieldKind::DateTime => {
-                "Enter date/time in the footer, then Enter"
-            }
+            TransitionFieldKind::DateTime => "Enter date/time in the footer, then Enter",
             TransitionFieldKind::Boolean => "Select Yes or No",
             TransitionFieldKind::Number => "Enter a number in the footer, then Enter",
             TransitionFieldKind::Text => "Enter text in the footer below, then Enter",
@@ -264,6 +262,11 @@ fn field_needs_input(meta: &Value) -> bool {
 }
 
 /// When Jira omits `fields` on the list response, still prompt for resolution on Done/Close transitions.
+/// Extra GET with `transitionId` only when the list response had no field metadata.
+pub fn transition_needs_detail_fetch(transition: &crate::api::types::WorkflowTransition) -> bool {
+    transition.required_fields.is_empty()
+}
+
 pub fn infer_resolution_if_done_transition(
     transition_name: &str,
     to_status: &str,
@@ -325,11 +328,7 @@ pub fn field_for_error_key(key: &str, known: &[TransitionField]) -> TransitionFi
 
 fn infer_field_from_id(key: &str) -> TransitionField {
     let (kind, field_type, system) = match key {
-        "resolution" => (
-            TransitionFieldKind::Picker,
-            "resolution",
-            "resolution",
-        ),
+        "resolution" => (TransitionFieldKind::Picker, "resolution", "resolution"),
         "assignee" | "reporter" => (TransitionFieldKind::User, "user", key),
         "priority" => (TransitionFieldKind::Picker, "priority", "priority"),
         "fixVersions" | "components" => (TransitionFieldKind::Picker, "array", key),

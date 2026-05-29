@@ -295,9 +295,7 @@ async fn submit_input(app: &mut App) {
             let Some(field) = app.transition_field_current.clone() else {
                 return;
             };
-            if field.kind == TransitionFieldKind::User
-                && !app.transition_field_options.is_empty()
-            {
+            if field.kind == TransitionFieldKind::User && !app.transition_field_options.is_empty() {
                 let idx = app.transition_field_selected;
                 apply_transition_field_pick(app, idx).await;
                 return;
@@ -440,18 +438,38 @@ async fn apply_priority(app: &mut App, idx: usize) {
 }
 
 async fn refresh_transition_user_search(app: &mut App) {
+    if !app.transition_field_user_search {
+        return;
+    }
+    let query = app.input_buffer.trim();
+    if query.is_empty() {
+        app.transition_field_options.clear();
+        app.showing_transition_field = true;
+        app.transition_field_text_mode = true;
+        return;
+    }
+
+    app.transition_user_search_seq = app.transition_user_search_seq.wrapping_add(1);
+    let seq = app.transition_user_search_seq;
+    tokio::time::sleep(std::time::Duration::from_millis(280)).await;
+    if !app.transition_field_user_search || app.transition_user_search_seq != seq {
+        return;
+    }
+
     let Some(sel) = app.selected_ticket() else {
         return;
     };
     let Some(base_url) = app.site_base_url(&sel.site) else {
         return;
     };
-    let query = app.input_buffer.trim();
     let users = app
         .jira
         .search_assignable_users(&base_url, &sel.key, query)
         .await
         .unwrap_or_default();
+    if !app.transition_field_user_search || app.transition_user_search_seq != seq {
+        return;
+    }
     app.transition_field_options = users;
     app.transition_field_selected = app
         .transition_field_selected
@@ -664,16 +682,22 @@ async fn apply_transition(app: &mut App, idx: usize) {
 
     app.loading = true;
     app.loading_message = Some("Loading transition fields…".into());
-    if let Ok(detail) = app
-        .jira
-        .get_transition_detail(&base_url, &sel.key, &transition.id)
-        .await
-    {
+    let (detail, _) = tokio::join!(
+        async {
+            if transition_fields::transition_needs_detail_fetch(&transition) {
+                app.jira
+                    .get_transition_detail(&base_url, &sel.key, &transition.id)
+                    .await
+                    .ok()
+            } else {
+                None
+            }
+        },
+        app.jira.warm_site_field_catalogs(&base_url)
+    );
+    if let Some(detail) = detail {
         transition = detail;
     }
-    api::enrich_transition_fields(&app.jira, &base_url, &mut transition).await;
-    app.loading = false;
-    app.loading_message = None;
 
     if transition.required_fields.is_empty() {
         if let Some(res) = transition_fields::infer_resolution_if_done_transition(
@@ -681,9 +705,11 @@ async fn apply_transition(app: &mut App, idx: usize) {
             &transition.to_status,
         ) {
             transition.required_fields.push(res);
-            api::enrich_transition_fields(&app.jira, &base_url, &mut transition).await;
         }
     }
+    api::enrich_transition_fields(&app.jira, &base_url, &mut transition).await;
+    app.loading = false;
+    app.loading_message = None;
 
     if transition.required_fields.is_empty() {
         execute_transition_with(app, transition, HashMap::new()).await;
@@ -967,7 +993,10 @@ async fn start_status_picker(app: &mut App) {
 
     app.loading = true;
     app.loading_message = Some("Loading workflow transitions…".into());
-    let result = app.jira.get_workflow_transitions(&base_url, &sel.key).await;
+    let (result, _) = tokio::join!(
+        app.jira.get_workflow_transitions(&base_url, &sel.key),
+        app.jira.warm_site_field_catalogs(&base_url)
+    );
     app.loading = false;
     app.loading_message = None;
 

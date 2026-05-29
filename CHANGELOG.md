@@ -13,6 +13,7 @@ All notable changes to this project are documented in this file.
 ### Fixed
 
 - Required-field dialog now appears: re-fetch transition with `transitionId`, load resolutions from `/resolution`, infer Done/Close needs resolution, parse `errorMessages`, show modal for text fields
+- Fewer transition API calls: cache resolutions/priorities per site, parallel catalog preload, skip redundant `transitionId` fetch, debounce user search (280ms)
 
 ## [0.6.8] - 2026-05-29
 

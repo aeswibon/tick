@@ -29,6 +29,7 @@ pub struct JiraClient {
     pub debug: bool,
     account_ids: Mutex<HashMap<String, String>>,
     priorities: Mutex<HashMap<String, Vec<(String, String)>>>,
+    resolutions: Mutex<HashMap<String, Vec<(String, String)>>>,
 }
 
 impl JiraClient {
@@ -43,6 +44,7 @@ impl JiraClient {
             debug,
             account_ids: Mutex::new(HashMap::new()),
             priorities: Mutex::new(HashMap::new()),
+            resolutions: Mutex::new(HashMap::new()),
         }
     }
 
@@ -478,9 +480,15 @@ impl JiraClient {
             .ok_or_else(|| format!("Transition {transition_id} not returned by Jira for {key}"))
     }
 
-    /// Project resolutions (used when transition metadata omits allowedValues).
+    /// Project resolutions (cached per site for the session).
     pub async fn list_resolutions(&self, base_url: &str) -> Result<Vec<(String, String)>, String> {
-        let url = format!("{}/rest/api/3/resolution", base_url.trim_end_matches('/'));
+        let base = base_url.trim_end_matches('/');
+        if let Ok(cache) = self.resolutions.lock() {
+            if let Some(list) = cache.get(base) {
+                return Ok(list.clone());
+            }
+        }
+        let url = format!("{base}/rest/api/3/resolution");
         let resp = self.send(|| self.get(&url).send()).await?;
         if !resp.status().is_success() {
             return Err(format!(
@@ -490,7 +498,7 @@ impl JiraClient {
             ));
         }
         let data: serde_json::Value = resp.json().await.map_err(|e| format!("Parse error: {e}"))?;
-        Ok(data
+        let list: Vec<(String, String)> = data
             .as_array()
             .map(|arr| {
                 arr.iter()
@@ -501,7 +509,46 @@ impl JiraClient {
                     })
                     .collect()
             })
-            .unwrap_or_default())
+            .unwrap_or_default();
+        if let Ok(mut cache) = self.resolutions.lock() {
+            cache.insert(base.to_string(), list.clone());
+        }
+        Ok(list)
+    }
+
+    /// Preload resolution + priority catalogs (parallel, cached) before field prompts.
+    pub async fn warm_site_field_catalogs(&self, base_url: &str) {
+        let base = base_url.trim_end_matches('/');
+        let need_res = self
+            .resolutions
+            .lock()
+            .ok()
+            .is_none_or(|c| !c.contains_key(base));
+        let need_pri = self
+            .priorities
+            .lock()
+            .ok()
+            .is_none_or(|c| !c.contains_key(base));
+        if !need_res && !need_pri {
+            return;
+        }
+        let (res, pri) = tokio::join!(
+            async {
+                if need_res {
+                    self.list_resolutions(base_url).await.ok()
+                } else {
+                    None
+                }
+            },
+            async {
+                if need_pri {
+                    self.list_priorities(base_url).await.ok()
+                } else {
+                    None
+                }
+            }
+        );
+        let _ = (res, pri);
     }
 
     pub async fn transition_issue(
@@ -712,29 +759,43 @@ pub async fn enrich_transition_fields(
         .required_fields
         .iter()
         .any(|f| f.id == "resolution" && f.options.is_empty());
-    if needs_resolution {
-        if let Ok(opts) = client.list_resolutions(base_url).await {
-            for field in &mut transition.required_fields {
-                if field.id == "resolution" && field.options.is_empty() {
-                    field.options = opts.clone();
-                }
-            }
-        }
-    }
-
     let needs_priority = transition.required_fields.iter().any(|f| {
         (f.id == "priority" || f.system == "priority")
             && f.options.is_empty()
             && f.kind == transition_fields::TransitionFieldKind::Picker
     });
-    if needs_priority {
-        if let Ok(opts) = client.list_priorities(base_url).await {
-            for field in &mut transition.required_fields {
-                if (field.id == "priority" || field.system == "priority")
-                    && field.options.is_empty()
-                {
-                    field.options = opts.clone();
-                }
+    if !needs_resolution && !needs_priority {
+        return;
+    }
+
+    let (resolutions, priorities) = tokio::join!(
+        async {
+            if needs_resolution {
+                client.list_resolutions(base_url).await.ok()
+            } else {
+                None
+            }
+        },
+        async {
+            if needs_priority {
+                client.list_priorities(base_url).await.ok()
+            } else {
+                None
+            }
+        }
+    );
+
+    if let Some(opts) = resolutions {
+        for field in &mut transition.required_fields {
+            if field.id == "resolution" && field.options.is_empty() {
+                field.options = opts.clone();
+            }
+        }
+    }
+    if let Some(opts) = priorities {
+        for field in &mut transition.required_fields {
+            if (field.id == "priority" || field.system == "priority") && field.options.is_empty() {
+                field.options = opts.clone();
             }
         }
     }
