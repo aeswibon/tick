@@ -1,0 +1,128 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-13
+          - target: aarch64-apple-darwin
+            os: macos-14
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/tick dist/tick-${{ matrix.target }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tick-${{ matrix.target }}
+          path: dist/tick-${{ matrix.target }}
+
+  release:
+    name: Release
+    needs: build
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Checksums
+        run: |
+          for f in artifacts/*/tick-*; do
+            [ -f "$f" ] || continue
+            sha256sum "$f" >> CHECKSUMS.txt
+            echo "$f"
+          done
+
+      - name: Extract hashes
+        id: hashes
+        run: |
+          AMD64=$(sha256sum artifacts/tick-x86_64-apple-darwin/tick-x86_64-apple-darwin | cut -d' ' -f1)
+          ARM64=$(sha256sum artifacts/tick-aarch64-apple-darwin/tick-aarch64-apple-darwin | cut -d' ' -f1)
+          LINUX=$(sha256sum artifacts/tick-x86_64-unknown-linux-gnu/tick-x86_64-unknown-linux-gnu | cut -d' ' -f1)
+          echo "amd64=$AMD64" >> "$GITHUB_OUTPUT"
+          echo "arm64=$ARM64" >> "$GITHUB_OUTPUT"
+          echo "linux=$LINUX" >> "$GITHUB_OUTPUT"
+
+      - name: Homebrew formula
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          REPO="${{ github.repository }}"
+          REF="${{ github.ref_name }}"
+          AMD64_SHA="${{ steps.hashes.outputs.amd64 }}"
+          ARM64_SHA="${{ steps.hashes.outputs.arm64 }}"
+          LINUX_SHA="${{ steps.hashes.outputs.linux }}"
+
+          ruby -e '
+            formula = <<~FORMULA
+              class Tick < Formula
+                desc "Jira TUI dashboard for the terminal"
+                homepage "https://github.com/#{ENV["REPO"]}"
+                license "MIT"
+
+                on_macos do
+                  if Hardware::CPU.arm?
+                    url "https://github.com/#{ENV["REPO"]}/releases/download/#{ENV["REF"]}/tick-aarch64-apple-darwin"
+                    sha256 "#{ENV["ARM64_SHA"]}"
+                  else
+                    url "https://github.com/#{ENV["REPO"]}/releases/download/#{ENV["REF"]}/tick-x86_64-apple-darwin"
+                    sha256 "#{ENV["AMD64_SHA"]}"
+                  end
+                end
+
+                on_linux do
+                  url "https://github.com/#{ENV["REPO"]}/releases/download/#{ENV["REF"]}/tick-x86_64-unknown-linux-gnu"
+                  sha256 "#{ENV["LINUX_SHA"]}"
+                end
+
+                def install
+                  bin.install "tick"
+                end
+
+                test do
+                  system "#{bin}/tick", "--help"
+                end
+              end
+            FORMULA
+            File.write("tick.rb", formula)
+          '
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*/*
+            CHECKSUMS.txt
+            tick.rb
+          generate_release_notes: true
