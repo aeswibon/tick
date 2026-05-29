@@ -105,8 +105,75 @@ fn block_to_md(node: &Value) -> String {
                 .unwrap_or("Details");
             format!("**{title}**\n\n{}", children_to_md(node.get("content")))
         }
-        _ => String::new(),
+        Some("taskList") => task_list_to_md(node),
+        Some("decisionList") => decision_list_to_md(node),
+        Some("status") => status_to_md(node),
+        _ => unknown_block_to_md(node),
     }
+}
+
+fn unknown_block_to_md(node: &Value) -> String {
+    serde_json::to_string(node)
+        .map(|json| format!("```adf-json\n{json}\n```\n"))
+        .unwrap_or_default()
+}
+
+fn task_list_to_md(node: &Value) -> String {
+    let mut s = String::new();
+    if let Some(items) = node.get("content").and_then(|c| c.as_array()) {
+        for item in items {
+            if item.get("type").and_then(|t| t.as_str()) == Some("taskItem") {
+                s.push_str(&task_item_to_md(item));
+            }
+        }
+    }
+    s
+}
+
+fn task_item_to_md(item: &Value) -> String {
+    let done = item
+        .get("attrs")
+        .and_then(|a| a.get("state"))
+        .and_then(|s| s.as_str())
+        .is_some_and(|s| s.eq_ignore_ascii_case("DONE") || s.eq_ignore_ascii_case("COMPLETE"));
+    let mark = if done { "x" } else { " " };
+    let text = task_item_text(item);
+    format!("- [{mark}] {text}\n")
+}
+
+fn task_item_text(item: &Value) -> String {
+    item.get("content")
+        .and_then(|c| c.as_array())
+        .map(|arr| {
+            arr.iter()
+                .map(|n| block_to_md(n).trim().replace('\n', " "))
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .unwrap_or_default()
+}
+
+fn decision_list_to_md(node: &Value) -> String {
+    let mut s = String::new();
+    if let Some(items) = node.get("content").and_then(|c| c.as_array()) {
+        for item in items {
+            if item.get("type").and_then(|t| t.as_str()) == Some("decisionItem") {
+                let text = inline_children_to_md(item.get("content"));
+                s.push_str(&format!("- ◆ {text}\n"));
+            }
+        }
+    }
+    s
+}
+
+fn status_to_md(node: &Value) -> String {
+    let text = node
+        .get("attrs")
+        .and_then(|a| a.get("text"))
+        .and_then(|t| t.as_str())
+        .unwrap_or("status");
+    format!("[status: {text}]\n")
 }
 
 fn children_to_md(content: Option<&Value>) -> String {
@@ -275,9 +342,11 @@ fn inline_to_md(node: &Value) -> String {
             .to_string(),
         Some("hardBreak") => "\n".to_string(),
         Some("emoji") => node
-            .get("text")
+            .get("attrs")
+            .and_then(|a| a.get("text"))
             .and_then(|t| t.as_str())
             .map(String::from)
+            .or_else(|| node.get("text").and_then(|t| t.as_str()).map(String::from))
             .or_else(|| {
                 node.get("attrs")
                     .and_then(|a| a.get("shortName"))
@@ -285,6 +354,14 @@ fn inline_to_md(node: &Value) -> String {
                     .map(|s| format!(":{s}:"))
             })
             .unwrap_or_default(),
+        Some("status") => {
+            let text = node
+                .get("attrs")
+                .and_then(|a| a.get("text"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("status");
+            format!("[status: {text}]")
+        }
         Some("inlineCard") => node
             .get("attrs")
             .and_then(|a| a.get("url"))
@@ -342,6 +419,35 @@ mod tests {
         let md = to_markdown(&doc);
         assert!(md.contains("## Title"));
         assert!(md.contains("**bold**"));
+    }
+
+    #[test]
+    fn task_list_and_adf_json_fence() {
+        let doc = serde_json::json!({
+            "type": "doc",
+            "content": [{
+                "type": "taskList",
+                "content": [{
+                    "type": "taskItem",
+                    "attrs": { "state": "TODO" },
+                    "content": [{
+                        "type": "paragraph",
+                        "content": [{ "type": "text", "text": "Ship it" }]
+                    }]
+                }]
+            }]
+        });
+        let md = to_markdown(&doc);
+        assert!(md.contains("- [ ] Ship it"));
+
+        let layout = serde_json::json!({ "type": "layoutSection", "content": [] });
+        let md2 = to_markdown(&serde_json::json!({
+            "type": "doc",
+            "content": [layout.clone()]
+        }));
+        assert!(md2.contains("```adf-json"));
+        let back = crate::api::markdown::to_adf(&md2, &[]);
+        assert_eq!(back["content"][0], layout);
     }
 
     #[test]

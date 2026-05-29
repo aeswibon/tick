@@ -11,12 +11,12 @@
 | **0.6.4** | `O` — open issue from clipboard/key; multi-site API probe |
 | **0.6.5** | `cargo-deny` in CI; clippy fix for async ticket resolve |
 | **0.6.6** | [FEATURES.md](docs/FEATURES.md); offline header; open-ticket progress; API wiremock tests |
+| **0.6.7** | ADF round-trip (`adf-json` fences, lists, strike); mention restore on `D` |
 
 ## Next — product
 
 | Item | Notes |
 |------|------|
-| ADF round-trip polish | Exotic blocks on description edit |
 | Input/key handler tests | Still manual / integration |
 | Jira Server / Data Center | Out of scope unless demand |
 

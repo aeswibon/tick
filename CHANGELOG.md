@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.7] - 2026-05-29
+
+### Added
+
+- ADF round-trip: ` ```adf-json` fences preserve exotic Jira blocks through edit/save
+- Markdown import: strike, rules, blockquotes, code fences, ordered lists, task lists, h4–h6
+- Description edit (`D`) restores existing `@` mentions (account IDs) for save
+
+### Changed
+
+- ADF export: task lists, decision lists, status nodes, unknown blocks → fenced JSON
+
 ## [0.6.6] - 2026-05-29
 
 ### Added

@@ -279,11 +279,15 @@ In **comments** and **description** edit:
 
 Supported when editing:
 
-- `#` / `##` / `###` headings  
-- `-` bullet lists  
-- `**bold**`, `*italic*`, `` `code` ``  
+- `#`–`######` headings  
+- `-` bullet and `1.` ordered lists  
+- `- [ ]` / `- [x]` task lists (Jira checklists)  
+- `**bold**`, `*italic*`, `~~strike~~`, `` `code` ``  
 - `[label](url)` links  
-- `@mentions` via picker  
+- `>` blockquotes, `---` rules, ` ```lang ` code fences  
+- `@mentions` via picker (existing mentions restored when you press `D`)  
+
+Exotic Jira blocks round-trip via fenced **` ```adf-json`** sections (preserved verbatim on save).
 
 ### ADF display (read-only)
 
@@ -397,7 +401,7 @@ Treat cache and tokens as **sensitive** (issue summaries, credentials).
 ## 17. Limitations and known behavior
 
 - **Jira Cloud API only** — no Server/DC REST variants.  
-- **Description edit** — round-trip through markdown may simplify exotic ADF blocks.  
+- **Description edit** — exotic blocks outside markdown use ` ```adf-json` fences; edit those only if you know ADF.  
 - **Transition / priority / sprint pickers** — numeric shortcuts `1`–`9` only.  
 - **Windows** — clipboard/open/notify use platform tools (`clip`, `cmd`, PowerShell).  
 - **Concurrent UI** — long operations show `loading` in header/footer; issue lookup shows site count when probing multiple instances.

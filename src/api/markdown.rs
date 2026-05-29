@@ -1,59 +1,238 @@
-//! Minimal markdown → ADF for descriptions and comments.
+//! Markdown ↔ ADF for descriptions and comments.
 
 use super::adf::mention_node;
 use serde_json::{json, Value};
 
-/// Convert markdown text to an ADF document (headings, bullets, inline styles, @mentions).
-pub fn to_adf(text: &str, mentions: &[(String, String)]) -> Value {
-    let mut blocks: Vec<Value> = Vec::new();
-    let mut list_items: Vec<Value> = Vec::new();
+const ADF_JSON_FENCE: &str = "adf-json";
 
+/// Convert markdown text to an ADF document (headings, lists, inline styles, @mentions).
+pub fn to_adf(text: &str, mentions: &[(String, String)]) -> Value {
+    let mut parser = MdParser::new(mentions);
     for line in text.split('\n') {
+        parser.line(line);
+    }
+    parser.finish()
+}
+
+struct MdParser<'a> {
+    mentions: &'a [(String, String)],
+    blocks: Vec<Value>,
+    bullet_items: Vec<Value>,
+    ordered_items: Vec<Value>,
+    task_items: Vec<Value>,
+    fence: Option<FenceState>,
+    blockquote_lines: Vec<String>,
+}
+
+enum FenceState {
+    Code { lang: String, lines: Vec<String> },
+    AdfJson { lines: Vec<String> },
+}
+
+impl<'a> MdParser<'a> {
+    fn new(mentions: &'a [(String, String)]) -> Self {
+        Self {
+            mentions,
+            blocks: Vec::new(),
+            bullet_items: Vec::new(),
+            ordered_items: Vec::new(),
+            task_items: Vec::new(),
+            fence: None,
+            blockquote_lines: Vec::new(),
+        }
+    }
+
+    fn line(&mut self, line: &str) {
+        if let Some(state) = self.fence.take() {
+            self.continue_fence(state, line);
+            return;
+        }
+
+        if self.handle_fence_start(line) {
+            return;
+        }
+
+        self.flush_blockquote();
+
         if line.trim().is_empty() {
-            flush_bullet_list(&mut blocks, &mut list_items);
-            blocks.push(json!({ "type": "paragraph", "content": [] }));
-            continue;
+            self.flush_lists();
+            return;
+        }
+
+        if line.trim() == "---" {
+            self.flush_lists();
+            self.blocks.push(json!({ "type": "rule" }));
+            return;
+        }
+
+        if let Some(rest) = line
+            .strip_prefix('>')
+            .map(|s| s.strip_prefix(' ').unwrap_or(s))
+        {
+            self.flush_lists();
+            self.blockquote_lines.push(rest.to_string());
+            return;
         }
 
         if let Some((level, rest)) = parse_heading(line) {
-            flush_bullet_list(&mut blocks, &mut list_items);
-            blocks.push(json!({
+            self.flush_lists();
+            self.blocks.push(json!({
                 "type": "heading",
                 "attrs": { "level": level },
-                "content": parse_inline_markdown(rest, mentions),
+                "content": parse_inline_markdown(rest, self.mentions),
             }));
-            continue;
+            return;
+        }
+
+        if let Some(rest) = parse_task_item(line) {
+            self.flush_bullet_and_ordered();
+            self.task_items
+                .push(task_item_node(rest.0, rest.1, self.mentions));
+            return;
+        }
+
+        if let Some((n, rest)) = parse_ordered_item(line) {
+            self.flush_bullet_and_task();
+            self.ordered_items
+                .push(list_item_from_inline(n, rest, self.mentions));
+            return;
         }
 
         if let Some(rest) = line.strip_prefix("- ").or_else(|| line.strip_prefix("* ")) {
-            list_items.push(json!({
-                "type": "listItem",
-                "content": [{
-                    "type": "paragraph",
-                    "content": parse_inline_markdown(rest, mentions),
-                }],
-            }));
-            continue;
+            self.flush_ordered_and_task();
+            self.bullet_items
+                .push(list_item_from_inline(0, rest, self.mentions));
+            return;
         }
 
-        flush_bullet_list(&mut blocks, &mut list_items);
-        blocks.push(json!({
+        self.flush_lists();
+        self.blocks.push(json!({
             "type": "paragraph",
-            "content": parse_inline_markdown(line, mentions),
+            "content": parse_inline_markdown(line, self.mentions),
         }));
     }
 
-    flush_bullet_list(&mut blocks, &mut list_items);
-
-    if blocks.is_empty() {
-        blocks.push(json!({ "type": "paragraph", "content": [] }));
+    fn handle_fence_start(&mut self, line: &str) -> bool {
+        let trimmed = line.trim();
+        if trimmed == "```" {
+            self.flush_lists();
+            self.fence = Some(FenceState::Code {
+                lang: String::new(),
+                lines: Vec::new(),
+            });
+            return true;
+        }
+        if let Some(lang) = trimmed.strip_prefix("```") {
+            self.flush_lists();
+            if lang == ADF_JSON_FENCE {
+                self.fence = Some(FenceState::AdfJson { lines: Vec::new() });
+            } else {
+                self.fence = Some(FenceState::Code {
+                    lang: lang.to_string(),
+                    lines: Vec::new(),
+                });
+            }
+            return true;
+        }
+        false
     }
 
-    json!({
-        "type": "doc",
-        "version": 1,
-        "content": blocks,
-    })
+    fn continue_fence(&mut self, state: FenceState, line: &str) {
+        if line.trim() == "```" {
+            self.finish_fence(state);
+            return;
+        }
+        match state {
+            FenceState::Code { lang, mut lines } => {
+                lines.push(line.to_string());
+                self.fence = Some(FenceState::Code { lang, lines });
+            }
+            FenceState::AdfJson { mut lines } => {
+                lines.push(line.to_string());
+                self.fence = Some(FenceState::AdfJson { lines });
+            }
+        }
+    }
+
+    fn finish_fence(&mut self, state: FenceState) {
+        match state {
+            FenceState::Code { lang, lines } => {
+                let text = lines.join("\n");
+                let mut block = json!({
+                    "type": "codeBlock",
+                    "content": [{ "type": "text", "text": text }],
+                });
+                if !lang.is_empty() {
+                    block["attrs"] = json!({ "language": lang });
+                }
+                self.blocks.push(block);
+            }
+            FenceState::AdfJson { lines } => {
+                let raw = lines.join("\n");
+                if let Ok(node) = serde_json::from_str::<Value>(&raw) {
+                    self.blocks.push(node);
+                }
+            }
+        }
+    }
+
+    fn flush_blockquote(&mut self) {
+        if self.blockquote_lines.is_empty() {
+            return;
+        }
+        let inner: Vec<Value> = self
+            .blockquote_lines
+            .drain(..)
+            .map(|l| {
+                json!({
+                    "type": "paragraph",
+                    "content": parse_inline_markdown(&l, self.mentions),
+                })
+            })
+            .collect();
+        self.blocks.push(json!({
+            "type": "blockquote",
+            "content": inner,
+        }));
+    }
+
+    fn flush_bullet_and_ordered(&mut self) {
+        flush_bullet_list(&mut self.blocks, &mut self.bullet_items);
+        flush_ordered_list(&mut self.blocks, &mut self.ordered_items);
+    }
+
+    fn flush_bullet_and_task(&mut self) {
+        flush_bullet_list(&mut self.blocks, &mut self.bullet_items);
+        flush_task_list(&mut self.blocks, &mut self.task_items);
+    }
+
+    fn flush_ordered_and_task(&mut self) {
+        flush_ordered_list(&mut self.blocks, &mut self.ordered_items);
+        flush_task_list(&mut self.blocks, &mut self.task_items);
+    }
+
+    fn flush_lists(&mut self) {
+        self.flush_blockquote();
+        flush_bullet_list(&mut self.blocks, &mut self.bullet_items);
+        flush_ordered_list(&mut self.blocks, &mut self.ordered_items);
+        flush_task_list(&mut self.blocks, &mut self.task_items);
+    }
+
+    fn finish(mut self) -> Value {
+        self.flush_lists();
+        if let Some(state) = self.fence.take() {
+            self.finish_fence(state);
+        }
+        if self.blocks.is_empty() {
+            self.blocks
+                .push(json!({ "type": "paragraph", "content": [] }));
+        }
+        json!({
+            "type": "doc",
+            "version": 1,
+            "content": self.blocks,
+        })
+    }
 }
 
 fn flush_bullet_list(blocks: &mut Vec<Value>, items: &mut Vec<Value>) {
@@ -66,16 +245,76 @@ fn flush_bullet_list(blocks: &mut Vec<Value>, items: &mut Vec<Value>) {
     }));
 }
 
+fn flush_ordered_list(blocks: &mut Vec<Value>, items: &mut Vec<Value>) {
+    if items.is_empty() {
+        return;
+    }
+    blocks.push(json!({
+        "type": "orderedList",
+        "content": std::mem::take(items),
+    }));
+}
+
+fn flush_task_list(blocks: &mut Vec<Value>, items: &mut Vec<Value>) {
+    if items.is_empty() {
+        return;
+    }
+    blocks.push(json!({
+        "type": "taskList",
+        "content": std::mem::take(items),
+    }));
+}
+
+fn list_item_from_inline(_n: u32, rest: &str, mentions: &[(String, String)]) -> Value {
+    json!({
+        "type": "listItem",
+        "content": [{
+            "type": "paragraph",
+            "content": parse_inline_markdown(rest, mentions),
+        }],
+    })
+}
+
+fn task_item_node(checked: bool, rest: &str, mentions: &[(String, String)]) -> Value {
+    let state = if checked { "DONE" } else { "TODO" };
+    json!({
+        "type": "taskItem",
+        "attrs": { "localId": "", "state": state },
+        "content": [{
+            "type": "paragraph",
+            "content": parse_inline_markdown(rest, mentions),
+        }],
+    })
+}
+
+fn parse_task_item(line: &str) -> Option<(bool, &str)> {
+    let trimmed = line.trim_start();
+    if let Some(rest) = trimmed
+        .strip_prefix("- [x] ")
+        .or_else(|| trimmed.strip_prefix("- [X] "))
+    {
+        return Some((true, rest));
+    }
+    if let Some(rest) = trimmed.strip_prefix("- [ ] ") {
+        return Some((false, rest));
+    }
+    None
+}
+
+fn parse_ordered_item(line: &str) -> Option<(u32, &str)> {
+    let trimmed = line.trim_start();
+    let dot = trimmed.find(". ")?;
+    let num: u32 = trimmed[..dot].trim().parse().ok()?;
+    Some((num, &trimmed[dot + 2..]))
+}
+
 fn parse_heading(line: &str) -> Option<(u64, &str)> {
     let trimmed = line.trim_start();
-    if trimmed.starts_with("### ") {
-        return Some((3, trimmed.trim_start_matches("### ")));
-    }
-    if trimmed.starts_with("## ") {
-        return Some((2, trimmed.trim_start_matches("## ")));
-    }
-    if trimmed.starts_with("# ") {
-        return Some((1, trimmed.trim_start_matches("# ")));
+    for level in (1..=6).rev() {
+        let prefix = "#".repeat(level) + " ";
+        if let Some(rest) = trimmed.strip_prefix(&prefix) {
+            return Some((level as u64, rest));
+        }
     }
     None
 }
@@ -122,6 +361,7 @@ fn parse_styled_text(input: &str) -> Vec<Value> {
         for (pat, token) in [
             ("**", InlineToken::Bold),
             ("__", InlineToken::Bold),
+            ("~~", InlineToken::Strike),
             ("*", InlineToken::Italic),
             ("_", InlineToken::Italic),
             ("`", InlineToken::Code),
@@ -152,6 +392,15 @@ fn parse_styled_text(input: &str) -> Vec<Value> {
                     rest = tail;
                 } else {
                     nodes.push(text_node("**", None));
+                    rest = &rest[2..];
+                }
+            }
+            InlineToken::Strike => {
+                if let Some((inner, tail)) = take_wrapped(rest, "~~") {
+                    nodes.push(text_node(inner, Some("strike")));
+                    rest = tail;
+                } else {
+                    nodes.push(text_node("~~", None));
                     rest = &rest[2..];
                 }
             }
@@ -193,6 +442,7 @@ fn parse_styled_text(input: &str) -> Vec<Value> {
 enum InlineToken {
     Bold,
     Italic,
+    Strike,
     Code,
     Link,
 }
@@ -254,7 +504,7 @@ mod tests {
         let doc = to_adf("# Title\n\n- one\n- two", &[]);
         let content = doc["content"].as_array().unwrap();
         assert_eq!(content[0]["type"], "heading");
-        assert_eq!(content[2]["type"], "bulletList");
+        assert_eq!(content[1]["type"], "bulletList");
     }
 
     #[test]
@@ -278,5 +528,46 @@ mod tests {
                 .as_array()
                 .is_some_and(|m| m[0]["type"] == "link")
         }));
+    }
+
+    #[test]
+    fn strike_and_rule() {
+        let doc = to_adf("~~x~~\n\n---", &[]);
+        let content = doc["content"].as_array().unwrap();
+        assert_eq!(content[0]["content"][0]["marks"][0]["type"], "strike");
+        assert_eq!(content[1]["type"], "rule");
+    }
+
+    #[test]
+    fn code_fence_and_blockquote() {
+        let doc = to_adf("> quote\n\n```rs\nlet x = 1;\n```", &[]);
+        let content = doc["content"].as_array().unwrap();
+        assert_eq!(content[0]["type"], "blockquote");
+        assert_eq!(content[1]["type"], "codeBlock");
+        assert_eq!(content[1]["attrs"]["language"], "rs");
+    }
+
+    #[test]
+    fn ordered_and_task_lists() {
+        let doc = to_adf("1. first\n2. second\n\n- [ ] todo\n- [x] done", &[]);
+        let content = doc["content"].as_array().unwrap();
+        assert_eq!(content[0]["type"], "orderedList");
+        assert_eq!(content[1]["type"], "taskList");
+        assert_eq!(content[1]["content"][1]["attrs"]["state"], "DONE");
+    }
+
+    #[test]
+    fn adf_json_fence_round_trip() {
+        let exotic = serde_json::json!({
+            "type": "layoutSection",
+            "content": []
+        });
+        let md = format!(
+            "intro\n\n```adf-json\n{}\n```",
+            serde_json::to_string(&exotic).unwrap()
+        );
+        let doc = to_adf(&md, &[]);
+        assert_eq!(doc["content"][0]["type"], "paragraph");
+        assert_eq!(doc["content"][1], exotic);
     }
 }

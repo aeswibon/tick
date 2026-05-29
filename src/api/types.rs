@@ -189,28 +189,42 @@ pub(crate) fn extract_text(v: &serde_json::Value) -> Option<String> {
 
 /// Collect `@mention` labels from an ADF document (description or comment body).
 pub fn collect_mention_labels(doc: &serde_json::Value) -> Vec<String> {
-    let mut labels = Vec::new();
-    collect_mention_labels_rec(doc, &mut labels);
+    let mut labels: Vec<String> = collect_mentions(doc)
+        .into_iter()
+        .map(|(label, _)| label)
+        .collect();
     labels.sort();
     labels.dedup();
     labels
 }
 
-fn collect_mention_labels_rec(node: &serde_json::Value, out: &mut Vec<String>) {
+/// Collect `(display label, accountId)` for every ADF mention node.
+pub fn collect_mentions(doc: &serde_json::Value) -> Vec<(String, String)> {
+    let mut mentions = Vec::new();
+    collect_mentions_rec(doc, &mut mentions);
+    mentions
+}
+
+fn collect_mentions_rec(node: &serde_json::Value, out: &mut Vec<(String, String)>) {
     if let Some(obj) = node.as_object() {
         if obj.get("type").and_then(|t| t.as_str()) == Some("mention") {
-            if let Some(label) = obj
-                .get("attrs")
+            let attrs = obj.get("attrs");
+            let account_id = attrs
+                .and_then(|a| a.get("id"))
+                .and_then(|id| id.as_str())
+                .unwrap_or("");
+            let label = attrs
                 .and_then(|a| a.get("text"))
                 .and_then(|t| t.as_str())
                 .filter(|s| !s.is_empty())
-            {
-                out.push(label.to_string());
+                .unwrap_or("@user");
+            if !account_id.is_empty() || !label.is_empty() {
+                out.push((label.to_string(), account_id.to_string()));
             }
         }
         if let Some(content) = obj.get("content").and_then(|c| c.as_array()) {
             for child in content {
-                collect_mention_labels_rec(child, out);
+                collect_mentions_rec(child, out);
             }
         }
     }

@@ -556,7 +556,11 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
                     .unwrap_or_default();
                 app.input_mode = InputMode::EditDescription;
                 app.input_buffer = text;
-                app.input_mentions.clear();
+                app.input_mentions = ticket
+                    .description_adf
+                    .as_ref()
+                    .map(crate::api::types::collect_mentions)
+                    .unwrap_or_default();
                 clear_mention_picker(app);
             }
         }
