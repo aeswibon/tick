@@ -10,11 +10,18 @@ All notable changes to this project are documented in this file.
 - Typed transition fields: user search, boolean Yes/No, date/datetime, number
 - On validation failure, parse Jira `errors` and re-prompt for missing fields
 
+### Changed
+
+- Assignable users cached per issue; filter locally in footer (no per-keystroke API)
+- Load more users: **⌘R** (macOS) or **Ctrl+R**; plain `r`/`R` type into the filter
+- Refresh **merges** users into the cache (deduped by account id, up to 500 per issue)
+
 ### Fixed
 
 - Required-field dialog now appears: re-fetch transition with `transitionId`, load resolutions from `/resolution`, infer Done/Close needs resolution, parse `errorMessages`, show modal for text fields
 - Fewer transition API calls: cache resolutions/priorities per site, parallel catalog preload, skip redundant `transitionId` fetch
-- Assignable users cached per issue (up to 100); filter locally; **R** refreshes list (transition fields and `@` mentions)
+- User picker: `j`/`k`/arrows navigate the list instead of appending to footer search text
+- Keyboard enhancement flags enabled so Command (⌘) modifiers work in supported terminals
 
 ## [0.6.8] - 2026-05-29
 

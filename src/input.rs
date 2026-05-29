@@ -22,8 +22,7 @@ pub const LOAD_MORE_USERS_USER_MODAL_HINT: &str =
     "Type in footer to filter; Ctrl+R fetch more users into cache; Enter to select";
 
 #[cfg(target_os = "macos")]
-pub const LOAD_MORE_USERS_PICKER_FOOTER: &str =
-    "  j/k move  Enter pick  ⌘R add users  Esc cancel";
+pub const LOAD_MORE_USERS_PICKER_FOOTER: &str = "  j/k move  Enter pick  ⌘R add users  Esc cancel";
 #[cfg(not(target_os = "macos"))]
 pub const LOAD_MORE_USERS_PICKER_FOOTER: &str =
     "  j/k move  Enter pick  Ctrl+R add users  Esc cancel";
@@ -664,41 +663,67 @@ async fn apply_transition_field_pick(app: &mut App, idx: usize) {
     prompt_next_transition_field(app).await;
 }
 
+/// Whether a transition user-field key is handled by the picker (not footer typing).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TransitionUserFieldKeyAction {
+    Cancel,
+    LoadMoreUsers,
+    MoveUp,
+    MoveDown,
+    PickSelected,
+    PickIndex(usize),
+    PassToInput,
+}
+
+fn transition_user_field_key_action(
+    key: &KeyEvent,
+    has_options: bool,
+) -> TransitionUserFieldKeyAction {
+    match key.code {
+        KeyCode::Esc => TransitionUserFieldKeyAction::Cancel,
+        _ if load_more_users_key(key) => TransitionUserFieldKeyAction::LoadMoreUsers,
+        KeyCode::Up | KeyCode::Char('k') if has_options => TransitionUserFieldKeyAction::MoveUp,
+        KeyCode::Down | KeyCode::Char('j') if has_options => TransitionUserFieldKeyAction::MoveDown,
+        KeyCode::Enter if has_options => TransitionUserFieldKeyAction::PickSelected,
+        KeyCode::Char(n) if has_options && ('1'..='9').contains(&n) => {
+            TransitionUserFieldKeyAction::PickIndex((n as u8 - b'1') as usize)
+        }
+        _ => TransitionUserFieldKeyAction::PassToInput,
+    }
+}
+
 /// User field: picker keys (j/k, arrows, Ctrl+R, Enter) vs footer typing for filter text.
 /// Returns `true` when the key was handled here (not passed to the input buffer).
 async fn handle_transition_user_field_key(app: &mut App, key: &KeyEvent) -> bool {
-    let code = key.code;
     let has_options = !app.transition_field_options.is_empty();
-    match code {
-        KeyCode::Esc => {
+    match transition_user_field_key_action(key, has_options) {
+        TransitionUserFieldKeyAction::Cancel => {
             cancel_transition_collect(app);
             true
         }
-        _ if load_more_users_key(key) => {
+        TransitionUserFieldKeyAction::LoadMoreUsers => {
             refresh_transition_user_search(app, true).await;
             true
         }
-        KeyCode::Up | KeyCode::Char('k') if has_options => {
+        TransitionUserFieldKeyAction::MoveUp => {
             app.transition_field_selected = app.transition_field_selected.saturating_sub(1);
             true
         }
-        KeyCode::Down | KeyCode::Char('j') if has_options => {
+        TransitionUserFieldKeyAction::MoveDown => {
             if app.transition_field_selected + 1 < app.transition_field_options.len() {
                 app.transition_field_selected += 1;
             }
             true
         }
-        KeyCode::Enter if has_options => {
+        TransitionUserFieldKeyAction::PickSelected => {
             apply_transition_field_pick(app, app.transition_field_selected).await;
             true
         }
-        KeyCode::Char(n) if has_options && ('1'..='9').contains(&n) => {
-            let idx = (n as u8 - b'1') as usize;
+        TransitionUserFieldKeyAction::PickIndex(idx) => {
             apply_transition_field_pick(app, idx).await;
             true
         }
-        // Letters/digits go to footer filter; j/k reserved when a list is shown; Ctrl+R loads more.
-        _ => false,
+        TransitionUserFieldKeyAction::PassToInput => false,
     }
 }
 
@@ -1134,8 +1159,12 @@ async fn start_status_picker(app: &mut App) {
 }
 
 #[cfg(test)]
-mod mention_tests {
-    use super::{active_mention_query, load_more_users_key};
+mod key_tests {
+    use super::{
+        active_mention_query, load_more_users_key, mentions_enabled,
+        transition_user_field_key_action, TransitionUserFieldKeyAction,
+    };
+    use crate::app::InputMode;
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 
     fn key(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
@@ -1169,6 +1198,72 @@ mod mention_tests {
             KeyCode::Char('R'),
             KeyModifiers::SHIFT
         )));
+    }
+
+    #[test]
+    fn mentions_enabled_only_for_comment_and_description() {
+        assert!(mentions_enabled(InputMode::Comment));
+        assert!(mentions_enabled(InputMode::EditDescription));
+        assert!(!mentions_enabled(InputMode::None));
+        assert!(!mentions_enabled(InputMode::TransitionField));
+        assert!(!mentions_enabled(InputMode::EditSummary));
+    }
+
+    #[test]
+    fn transition_user_field_plain_r_passes_to_input() {
+        assert_eq!(
+            transition_user_field_key_action(&key(KeyCode::Char('r'), KeyModifiers::empty()), true),
+            TransitionUserFieldKeyAction::PassToInput
+        );
+        assert_eq!(
+            transition_user_field_key_action(&key(KeyCode::Char('R'), KeyModifiers::SHIFT), true),
+            TransitionUserFieldKeyAction::PassToInput
+        );
+    }
+
+    #[test]
+    fn transition_user_field_modifier_r_loads_more() {
+        assert_eq!(
+            transition_user_field_key_action(
+                &key(KeyCode::Char('r'), KeyModifiers::CONTROL),
+                false
+            ),
+            TransitionUserFieldKeyAction::LoadMoreUsers
+        );
+    }
+
+    #[test]
+    fn transition_user_field_j_k_only_when_options() {
+        assert_eq!(
+            transition_user_field_key_action(&key(KeyCode::Char('j'), KeyModifiers::empty()), true),
+            TransitionUserFieldKeyAction::MoveDown
+        );
+        assert_eq!(
+            transition_user_field_key_action(&key(KeyCode::Char('k'), KeyModifiers::empty()), true),
+            TransitionUserFieldKeyAction::MoveUp
+        );
+        assert_eq!(
+            transition_user_field_key_action(
+                &key(KeyCode::Char('j'), KeyModifiers::empty()),
+                false
+            ),
+            TransitionUserFieldKeyAction::PassToInput
+        );
+    }
+
+    #[test]
+    fn transition_user_field_numeric_pick() {
+        assert_eq!(
+            transition_user_field_key_action(&key(KeyCode::Char('3'), KeyModifiers::empty()), true),
+            TransitionUserFieldKeyAction::PickIndex(2)
+        );
+        assert_eq!(
+            transition_user_field_key_action(
+                &key(KeyCode::Char('3'), KeyModifiers::empty()),
+                false
+            ),
+            TransitionUserFieldKeyAction::PassToInput
+        );
     }
 
     #[test]

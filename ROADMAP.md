@@ -13,13 +13,21 @@
 | **0.6.6** | [FEATURES.md](docs/FEATURES.md); offline header; open-ticket progress; API wiremock tests |
 | **0.6.7** | ADF round-trip (`adf-json` fences, lists, strike); mention restore on `D` |
 | **0.6.8** | Status via workflow transitions; Jira validation errors; `T` alias |
+| **0.6.9** | Required transition fields (typed inputs); assignable-user cache; ⌘R/Ctrl+R load more |
 
 ## Next — product
 
 | Item | Notes |
 |------|------|
-| Input/key handler tests | Still manual / integration |
+| Richer transition fields | Multi-select, components, rich text (web UI today) |
+| User picker `j`/`k` vs typing | Names like “Jack” when list is open |
 | Jira Server / Data Center | Out of scope unless demand |
+
+## Next — quality
+
+| Item | Notes |
+|------|------|
+| Input/key handler tests | Expand coverage as new pickers/modals are added |
 
 ## Done — infrastructure
 

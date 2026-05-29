@@ -39,7 +39,7 @@ pub fn merge_users(
         by_id.insert(id.clone(), name.clone());
     }
     let mut out: Vec<_> = by_id.into_iter().collect();
-    out.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
+    out.sort_by_key(|a| a.1.to_lowercase());
     out.truncate(CACHE_MAX);
     out
 }
