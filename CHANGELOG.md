@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.2] - 2026-05-29
+
+### Added
+
+- Optional desktop notifications when background or scheduled refresh finds new issues (`notify_on_refresh = true`)
+- Background refresh re-runs after each completed fetch cycle
+
 ## [0.3.1] - 2026-05-29
 
 ### Added

@@ -4,6 +4,7 @@ use crate::cache::ViewCache;
 use crate::columns::Column;
 use crate::config::Config;
 use crate::fetch_status::FetchStatus;
+use crate::platform;
 use crate::theme::Theme;
 use crate::ticket_lock::{read_tickets, write_tickets};
 use crate::view_mode::ViewMode;
@@ -307,10 +308,19 @@ impl App {
     }
 
     pub async fn refresh_all(&mut self) {
-        self.do_refresh_all(ViewMode::all()).await;
+        self.do_refresh_all(ViewMode::all(), false).await;
     }
 
-    async fn do_refresh_all(&mut self, views: [ViewMode; 4]) {
+    pub async fn refresh_all_notify(&mut self) {
+        self.do_refresh_all(ViewMode::all(), true).await;
+    }
+
+    async fn do_refresh_all(&mut self, views: [ViewMode; 4], notify: bool) {
+        let previous_keys = if notify && self.config.notify_on_refresh {
+            ticket_keys(&read_tickets(&self.tickets))
+        } else {
+            Vec::new()
+        };
         self.loading = true;
         let (r0, r1, r2, r3) = tokio::join!(
             api::fetch_all(&self.jira, &self.config, self.config.jql_for(views[0])),
@@ -332,6 +342,7 @@ impl App {
         }
         if let Some(tickets) = active_tickets {
             self.apply_fetch_result(tickets, all_errors, true);
+            self.maybe_notify_new_tickets(&previous_keys, &read_tickets(&self.tickets));
         } else {
             self.status.set_site_warnings(all_errors);
         }
@@ -387,6 +398,7 @@ impl App {
                 if preserve_ui {
                     self.clamp_selection();
                 }
+                self.maybe_notify_new_tickets(&previous_keys, &read_tickets(&self.tickets));
             } else {
                 self.status.set_site_warnings(all_errors);
             }
@@ -496,10 +508,37 @@ impl App {
         }
         self.filtered_indices().len()
     }
+
+    fn maybe_notify_new_tickets(&self, previous_keys: &[String], tickets: &[Ticket]) {
+        if !self.config.notify_on_refresh {
+            return;
+        }
+        let new = tickets_new_since(previous_keys, tickets);
+        if new.is_empty() {
+            return;
+        }
+        let view = self.active_view.label();
+        let body = if new.len() == 1 {
+            format!("{} — {}", new[0].key, new[0].summary)
+        } else {
+            format!("{} new issues in {}", new.len(), view)
+        };
+        platform::notify("tick", &body);
+    }
 }
 
 fn ticket_keys(tickets: &[Ticket]) -> Vec<String> {
     tickets.iter().map(|t| t.key.clone()).collect()
+}
+
+fn tickets_new_since<'a>(previous: &[String], tickets: &'a [Ticket]) -> Vec<&'a Ticket> {
+    if previous.is_empty() {
+        return Vec::new();
+    }
+    tickets
+        .iter()
+        .filter(|t| !previous.contains(&t.key))
+        .collect()
 }
 
 fn same_ticket_keys(previous: &[String], tickets: &[Ticket]) -> bool {
@@ -632,10 +671,24 @@ mod tests {
             page_size: 7,
             theme: "default".into(),
             views: Default::default(),
+            notify_on_refresh: false,
             view_jql: Config::build_view_jql(&Default::default()),
         };
         let app = App::new(config, Theme::default(), false);
         assert_eq!(app.page_size, 7);
+    }
+
+    #[test]
+    fn tickets_new_since_skips_empty_baseline() {
+        let prev = vec!["A-1".into()];
+        let tickets = vec![
+            sample_ticket("A-1", "one", "Open"),
+            sample_ticket("A-2", "two", "Open"),
+        ];
+        let new = tickets_new_since(&prev, &tickets);
+        assert_eq!(new.len(), 1);
+        assert_eq!(new[0].key, "A-2");
+        assert!(tickets_new_since(&[], &tickets).is_empty());
     }
 
     #[test]
@@ -653,6 +706,7 @@ mod tests {
             page_size: 10,
             theme: "default".into(),
             views: Default::default(),
+            notify_on_refresh: false,
             view_jql: Config::build_view_jql(&Default::default()),
         };
         let theme = Theme::default();

@@ -95,6 +95,7 @@ base_url = "https://my-team.atlassian.net"
 | `sprint_field` | — | Per-site Jira field id for sprint column (see `tick --doctor`) |
 | `max_results` | `50` | Max tickets to fetch per site |
 | `page_size` | `10` | Tickets shown per table page |
+| `notify_on_refresh` | `false` | Desktop alert when a refresh finds new issues in the active view |
 | `theme` | `"default"` | Theme name (built-in or custom) |
 | `columns` | built-in default | Table column ids (see config comment) |
 | `sites` | — | List of Jira sites with `name` and `base_url` |

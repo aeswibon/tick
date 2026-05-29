@@ -38,6 +38,9 @@ pub struct Config {
     pub theme: String,
     #[serde(default)]
     pub views: ViewQueries,
+    /// Desktop notification when a background or scheduled refresh finds new issues.
+    #[serde(default)]
+    pub notify_on_refresh: bool,
     #[serde(skip)]
     pub view_jql: HashMap<ViewMode, String>,
 }
@@ -203,6 +206,7 @@ impl Config {
 max_results = 50
 page_size = 10
 theme = "default"
+# notify_on_refresh = true   # desktop alert when new issues appear on refresh
 
 # Optional custom JQL per view (defaults shown commented)
 # [views]
@@ -281,6 +285,22 @@ sites = []
         let mut cfg: Config = toml::from_str(raw).unwrap();
         cfg.view_jql = Config::build_view_jql(&cfg.views);
         assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn parses_notify_on_refresh() {
+        let raw = r#"
+email = "a@b.com"
+token = "secret"
+notify_on_refresh = true
+
+[[sites]]
+name = "one"
+base_url = "https://one.atlassian.net"
+"#;
+        let mut cfg: Config = toml::from_str(raw).unwrap();
+        cfg.view_jql = Config::build_view_jql(&cfg.views);
+        assert!(cfg.notify_on_refresh);
     }
 
     #[test]

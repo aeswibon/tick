@@ -574,6 +574,7 @@ mod fetch_integration {
             page_size: 10,
             theme: "default".into(),
             views: Default::default(),
+            notify_on_refresh: false,
             view_jql: Config::build_view_jql(&Default::default()),
         }
     }

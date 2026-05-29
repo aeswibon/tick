@@ -145,7 +145,9 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut should_quit = false;
     while !should_quit {
-        app.apply_pending_updates();
+        if app.apply_pending_updates() {
+            app.spawn_background_refresh();
+        }
         terminal.draw(|f| ui::draw::render(f, &app))?;
 
         if event::poll(Duration::from_millis(250))? {
@@ -157,7 +159,8 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         if app.last_refresh.elapsed() >= refresh_interval {
-            app.refresh_all().await;
+            app.refresh_all_notify().await;
+            app.spawn_background_refresh();
         }
     }
 
