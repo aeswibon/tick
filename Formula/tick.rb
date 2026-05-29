@@ -1,5 +1,5 @@
-# Homebrew formula for: brew tap <owner>/tick && brew install tick
-# Release workflow also publishes tick.rb on each GitHub release.
+# Template formula — published with checksums on each GitHub release as tick.rb.
+# Tap: https://github.com/aeswibon/homebrew-tick  →  brew tap aeswibon/tick && brew install tick
 class Tick < Formula
   desc "Jira TUI dashboard for the terminal"
   homepage "https://github.com/aeswibon/tick"
