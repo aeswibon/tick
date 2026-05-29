@@ -71,15 +71,15 @@ pub fn draw_field_picker(
         ]));
     }
 
-    if !text_input_mode {
+    if !text_input_mode || user_field {
         lines.push(Line::from(""));
+        let footer = if user_field {
+            "  Type in footer to filter  j/k move  Enter pick  R refresh  Esc cancel"
+        } else {
+            "  j/k move  Enter confirm  1-9  R refresh  Esc cancel"
+        };
         lines.push(Line::from(Span::styled(
-            "  j/k move  Enter confirm  1-9  R refresh  Esc cancel",
-            Style::default().fg(theme.border),
-        )));
-    } else if user_field && text_input_mode {
-        lines.push(Line::from(Span::styled(
-            "  R refresh user list from Jira",
+            footer,
             Style::default().fg(theme.border),
         )));
     }

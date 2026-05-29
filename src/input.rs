@@ -15,6 +15,15 @@ pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
         return false;
     }
 
+    if app.showing_transition_field && app.transition_field_user_search {
+        if handle_transition_user_field_key(app, code).await {
+            return false;
+        }
+    } else if app.showing_transition_field && !app.transition_field_text_mode {
+        handle_transition_field_key(app, code).await;
+        return false;
+    }
+
     if app.filtering {
         match code {
             KeyCode::Char(c) => app.filter.push(c),
@@ -77,11 +86,6 @@ pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
 
     if app.show_site_errors {
         handle_site_errors_key(app, code);
-        return false;
-    }
-
-    if app.showing_transition_field {
-        handle_transition_field_key(app, code).await;
         return false;
     }
 
@@ -511,7 +515,8 @@ async fn refresh_transition_user_search(app: &mut App, force_refresh: bool) {
         .transition_field_selected
         .min(app.transition_field_options.len().saturating_sub(1));
     app.showing_transition_field = true;
-    app.transition_field_text_mode = app.transition_field_options.is_empty();
+    // Keep footer active for filter text; list navigation uses j/k when options exist.
+    app.transition_field_text_mode = false;
 }
 
 fn cancel_transition_collect(app: &mut App) {
@@ -615,13 +620,44 @@ async fn apply_transition_field_pick(app: &mut App, idx: usize) {
     prompt_next_transition_field(app).await;
 }
 
-async fn handle_transition_field_key(app: &mut App, code: KeyCode) {
-    if app.transition_field_text_mode {
-        if matches!(code, KeyCode::Esc) {
+/// User field: picker keys (j/k, arrows, R, Enter) vs footer typing for filter text.
+/// Returns `true` when the key was handled here (not passed to the input buffer).
+async fn handle_transition_user_field_key(app: &mut App, code: KeyCode) -> bool {
+    let has_options = !app.transition_field_options.is_empty();
+    match code {
+        KeyCode::Esc => {
             cancel_transition_collect(app);
+            true
         }
-        return;
+        KeyCode::Char('r') | KeyCode::Char('R') => {
+            refresh_transition_user_search(app, true).await;
+            true
+        }
+        KeyCode::Up | KeyCode::Char('k') if has_options => {
+            app.transition_field_selected = app.transition_field_selected.saturating_sub(1);
+            true
+        }
+        KeyCode::Down | KeyCode::Char('j') if has_options => {
+            if app.transition_field_selected + 1 < app.transition_field_options.len() {
+                app.transition_field_selected += 1;
+            }
+            true
+        }
+        KeyCode::Enter if has_options => {
+            apply_transition_field_pick(app, app.transition_field_selected).await;
+            true
+        }
+        KeyCode::Char(n) if has_options && ('1'..='9').contains(&n) => {
+            let idx = (n as u8 - b'1') as usize;
+            apply_transition_field_pick(app, idx).await;
+            true
+        }
+        // Letters/digits go to footer filter; j/k/R reserved when a list is shown.
+        _ => false,
     }
+}
+
+async fn handle_transition_field_key(app: &mut App, code: KeyCode) {
     match code {
         KeyCode::Up | KeyCode::Char('k') => {
             app.transition_field_selected = app.transition_field_selected.saturating_sub(1);
@@ -639,9 +675,6 @@ async fn handle_transition_field_key(app: &mut App, code: KeyCode) {
             apply_transition_field_pick(app, idx).await;
         }
         KeyCode::Esc => cancel_transition_collect(app),
-        KeyCode::Char('r') | KeyCode::Char('R') => {
-            refresh_transition_user_search(app, true).await;
-        }
         _ => {}
     }
 }
