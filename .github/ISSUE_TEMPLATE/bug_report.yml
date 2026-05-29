@@ -14,7 +14,7 @@ body:
     id: version
     attributes:
       label: tick version
-      placeholder: "v0.5.0 or cargo run output"
+      placeholder: "v0.1.0 or cargo run output"
   - type: dropdown
     id: os
     attributes:
