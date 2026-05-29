@@ -1,10 +1,12 @@
 pub mod api;
 pub mod app;
+pub mod auth;
 pub mod cache;
 pub mod columns;
 pub mod config;
 pub mod fetch_status;
 pub mod input;
+pub mod oauth;
 pub mod platform;
 pub mod theme;
 pub mod ticket_lock;
@@ -14,7 +16,7 @@ pub mod view_mode;
 pub use view_mode::ViewMode;
 
 use app::App;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use config::Config;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},
@@ -28,30 +30,58 @@ use theme::Theme;
 #[derive(Parser)]
 #[command(name = "tick", about = "Jira ticket dashboard for the terminal")]
 pub struct Cli {
-    #[arg(long)]
+    #[command(subcommand)]
+    pub command: Option<TickCommand>,
+
+    #[arg(long, global = true)]
     pub init: bool,
 
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub doctor: bool,
 
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub debug: bool,
 
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub theme: Option<String>,
 
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub max_results: Option<u32>,
 
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub page_size: Option<u32>,
 
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub list_themes: bool,
 }
 
+#[derive(Subcommand)]
+pub enum TickCommand {
+    /// OAuth login / status / logout
+    Auth {
+        #[command(subcommand)]
+        action: AuthCommand,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum AuthCommand {
+    /// Browser login; stores tokens in ~/.config/tick/oauth.json
+    Login,
+    /// Show OAuth session status
+    Status,
+    /// Remove stored OAuth tokens
+    Logout,
+}
+
 pub async fn run_doctor(config: &Config) {
-    let client = api::JiraClient::new(&config.email, &config.token, false);
+    let client = match api::JiraClient::from_config(config, false).await {
+        Ok(c) => c,
+        Err(e) => {
+            println!("Auth error: {e}");
+            return;
+        }
+    };
     let probe_jql = "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC";
 
     for site in &config.sites {
@@ -117,6 +147,10 @@ pub async fn run_doctor(config: &Config) {
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
+    if let Some(TickCommand::Auth { action }) = cli.command {
+        return run_auth_command(action).await;
+    }
+
     if cli.init {
         Config::create_default_config().map_err(|e| format!("Config error: {}", e))?;
         return Ok(());
@@ -175,7 +209,12 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let mut app = App::new(config, theme, cli.debug);
+    let jira = std::sync::Arc::new(
+        api::JiraClient::from_config(&config, cli.debug)
+            .await
+            .map_err(|e| format!("Auth error: {e}"))?,
+    );
+    let mut app = App::new(config, theme, jira, cli.debug);
     let refresh_interval = Duration::from_secs(3 * 60 * 60);
     app.spawn_background_refresh();
 
@@ -207,6 +246,23 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         DisableMouseCapture
     )?;
     terminal.show_cursor()?;
+    Ok(())
+}
+
+async fn run_auth_command(action: AuthCommand) -> Result<(), Box<dyn std::error::Error>> {
+    match action {
+        AuthCommand::Login => {
+            let config = Config::load().map_err(|e| format!("Config error: {e}"))?;
+            oauth::login(&config.oauth).await?;
+        }
+        AuthCommand::Status => {
+            oauth::print_status().await?;
+        }
+        AuthCommand::Logout => {
+            oauth::delete_tokens()?;
+            println!("OAuth tokens removed.");
+        }
+    }
     Ok(())
 }
 

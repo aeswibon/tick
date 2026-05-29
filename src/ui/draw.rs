@@ -120,6 +120,11 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             format!(" Labels (comma-separated): {}_", app.input_buffer),
             app.theme.accent,
         )
+    } else if app.input_mode == crate::app::InputMode::EditDescription {
+        (
+            format!(" Description: {}_", app.input_buffer),
+            app.theme.accent,
+        )
     } else if app.loading {
         (" Loading...".into(), app.theme.loading_fg)
     } else if let Some(ref err) = app.status.action_error {
@@ -135,7 +140,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     } else {
         let mut left = " ? help  / filter  ! errors  j/k  s sort  y copy  t trans  [ ] scroll  ←/→ view  1-5 tabs  q quit".to_string();
         if app.detail_open {
-            left.push_str("  S/P/L/M fields  h/l tabs");
+            left.push_str("  S/P/L/M/D fields  h/l tabs");
         }
         let total = app.filtered_count();
         let row = if total == 0 { 0 } else { app.selected + 1 };

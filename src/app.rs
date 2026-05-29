@@ -87,6 +87,7 @@ pub enum InputMode {
     Worklog,
     EditSummary,
     EditLabels,
+    EditDescription,
 }
 
 struct FilterCache {
@@ -144,9 +145,8 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(config: Config, theme: Theme, debug: bool) -> Self {
+    pub fn new(config: Config, theme: Theme, jira: Arc<JiraClient>, debug: bool) -> Self {
         let cache = ViewCache::open();
-        let jira = Arc::new(JiraClient::new(&config.email, &config.token, debug));
         let columns = Column::resolve(config.columns.as_deref());
         let page_size = config.page_size as usize;
 
@@ -738,6 +738,36 @@ fn compute_filtered_indices(tickets: &[Ticket], filter: &str, sort_mode: SortMod
 mod tests {
     use super::*;
     use crate::api::types::Ticket;
+    use crate::theme::Theme;
+    use std::sync::Arc;
+
+    fn test_jira() -> Arc<JiraClient> {
+        Arc::new(JiraClient::new("a@b.com", "t", false))
+    }
+
+    fn test_config(page_size: u32) -> Config {
+        Config {
+            email: "a@b.com".into(),
+            token: "t".into(),
+            sites: vec![crate::config::Site {
+                name: "acme".into(),
+                base_url: "https://acme.atlassian.net".into(),
+                sprint_field: None,
+                board_id: None,
+                boards: Default::default(),
+            }],
+            columns: None,
+            max_results: 50,
+            page_size,
+            theme: "default".into(),
+            views: Default::default(),
+            notify_on_refresh: false,
+            auth: Default::default(),
+            oauth: Default::default(),
+            view_jql: Config::build_view_jql(&Default::default()),
+        }
+    }
+
     fn sample_ticket(key: &str, summary: &str, status: &str) -> Ticket {
         Ticket {
             key: key.into(),
@@ -792,25 +822,7 @@ mod tests {
 
     #[test]
     fn config_page_size_is_scroll_step() {
-        let config = Config {
-            email: "a@b.com".into(),
-            token: "t".into(),
-            sites: vec![crate::config::Site {
-                name: "acme".into(),
-                base_url: "https://acme.atlassian.net".into(),
-                sprint_field: None,
-                board_id: None,
-                boards: Default::default(),
-            }],
-            columns: None,
-            max_results: 50,
-            page_size: 7,
-            theme: "default".into(),
-            views: Default::default(),
-            notify_on_refresh: false,
-            view_jql: Config::build_view_jql(&Default::default()),
-        };
-        let app = App::new(config, Theme::default(), false);
+        let app = App::new(test_config(7), Theme::default(), test_jira(), false);
         assert_eq!(app.page_size, 7);
     }
 
@@ -829,26 +841,8 @@ mod tests {
 
     #[test]
     fn virtualized_viewport_slices_filtered_list() {
-        let config = Config {
-            email: "a@b.com".into(),
-            token: "t".into(),
-            sites: vec![crate::config::Site {
-                name: "acme".into(),
-                base_url: "https://acme.atlassian.net".into(),
-                sprint_field: None,
-                board_id: None,
-                boards: Default::default(),
-            }],
-            columns: None,
-            max_results: 50,
-            page_size: 10,
-            theme: "default".into(),
-            views: Default::default(),
-            notify_on_refresh: false,
-            view_jql: Config::build_view_jql(&Default::default()),
-        };
         let theme = Theme::default();
-        let mut app = App::new(config, theme, false);
+        let mut app = App::new(test_config(10), theme, test_jira(), false);
         *write_tickets(&app.tickets) = (0..5)
             .map(|i| sample_ticket(&format!("T-{i}"), "x", "Open"))
             .collect();
@@ -862,28 +856,7 @@ mod tests {
 
     #[test]
     fn scroll_page_down_advances_offset() {
-        let mut app = App::new(
-            Config {
-                email: "a@b.com".into(),
-                token: "t".into(),
-                sites: vec![crate::config::Site {
-                    name: "acme".into(),
-                    base_url: "https://acme.atlassian.net".into(),
-                    sprint_field: None,
-                    board_id: None,
-                    boards: Default::default(),
-                }],
-                columns: None,
-                max_results: 50,
-                page_size: 2,
-                theme: "default".into(),
-                views: Default::default(),
-                notify_on_refresh: false,
-                view_jql: Config::build_view_jql(&Default::default()),
-            },
-            Theme::default(),
-            false,
-        );
+        let mut app = App::new(test_config(2), Theme::default(), test_jira(), false);
         *write_tickets(&app.tickets) = (0..6)
             .map(|i| sample_ticket(&format!("T-{i}"), "x", "Open"))
             .collect();

@@ -98,6 +98,11 @@ async fn submit_input(app: &mut App) {
             let labels = crate::app::parse_labels_input(&buffer);
             app.jira.update_labels(&base_url, &sel.key, &labels).await
         }
+        InputMode::EditDescription => {
+            app.jira
+                .update_description(&base_url, &sel.key, &buffer)
+                .await
+        }
         InputMode::None => return,
     };
 
@@ -360,6 +365,13 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         }
         KeyCode::Char('M') if app.detail_open => {
             start_sprint_picker(app).await;
+        }
+        KeyCode::Char('D') if app.detail_open => {
+            if let Some(ticket) = app.selected_ticket_entry() {
+                let text = ticket.description.clone().unwrap_or_default();
+                app.input_mode = InputMode::EditDescription;
+                app.input_buffer = text;
+            }
         }
         KeyCode::Char('g') => app.go_to_first(),
         KeyCode::Char('G') => app.go_to_last(),

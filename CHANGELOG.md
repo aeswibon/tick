@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.5.0] - 2026-05-29
+
+### Added
+
+- Atlassian OAuth 2.0: `tick auth login`, `auth status`, `auth logout` and `auth = "oauth"` in config
+- Edit issue description from detail pane (`D`) — plain text saved as ADF
+- Documentation: [docs/USER_GUIDE.md](docs/USER_GUIDE.md), [CONFIGURATION.md](docs/CONFIGURATION.md), [OAUTH.md](docs/OAUTH.md), [KEYBINDINGS.md](docs/KEYBINDINGS.md)
+
+### Changed
+
+- Jira HTTP client uses unified auth (API token or OAuth bearer)
+
 ## [0.4.4] - 2026-05-29
 
 ### Added

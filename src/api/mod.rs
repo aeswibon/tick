@@ -2,6 +2,7 @@ pub mod adf;
 pub mod agile;
 pub mod types;
 
+use crate::auth::Auth;
 use crate::config::Config;
 use reqwest::Client;
 use types::*;
@@ -11,8 +12,7 @@ use std::sync::Mutex;
 
 pub struct JiraClient {
     pub http: Client,
-    pub email: String,
-    pub token: String,
+    auth: Auth,
     pub debug: bool,
     account_ids: Mutex<HashMap<String, String>>,
     priorities: Mutex<HashMap<String, Vec<(String, String)>>>,
@@ -20,14 +20,42 @@ pub struct JiraClient {
 
 impl JiraClient {
     pub fn new(email: &str, token: &str, debug: bool) -> Self {
+        Self::with_auth(Auth::basic(email, token), debug)
+    }
+
+    pub fn with_auth(auth: Auth, debug: bool) -> Self {
         Self {
             http: Client::new(),
-            email: email.to_string(),
-            token: token.to_string(),
+            auth,
             debug,
             account_ids: Mutex::new(HashMap::new()),
             priorities: Mutex::new(HashMap::new()),
         }
+    }
+
+    pub async fn from_config(config: &Config, debug: bool) -> Result<Self, String> {
+        let auth = config.resolve_auth().await?;
+        Ok(Self::with_auth(auth, debug))
+    }
+
+    pub fn email(&self) -> &str {
+        self.auth.email()
+    }
+
+    fn authed(&self, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        self.auth.apply(req)
+    }
+
+    pub(crate) fn get(&self, url: &str) -> reqwest::RequestBuilder {
+        self.authed(self.http.get(url))
+    }
+
+    pub(crate) fn put(&self, url: &str) -> reqwest::RequestBuilder {
+        self.authed(self.http.put(url))
+    }
+
+    pub(crate) fn post(&self, url: &str) -> reqwest::RequestBuilder {
+        self.authed(self.http.post(url))
     }
 
     pub async fn list_priorities(&self, base_url: &str) -> Result<Vec<(String, String)>, String> {
@@ -39,9 +67,7 @@ impl JiraClient {
         }
         let url = format!("{base}/rest/api/3/priority");
         let resp = self
-            .http
             .get(&url)
-            .basic_auth(&self.email, Some(&self.token))
             .send()
             .await
             .map_err(|e| format!("HTTP error: {}", e))?;
@@ -108,6 +134,17 @@ impl JiraClient {
             .await
     }
 
+    pub async fn update_description(
+        &self,
+        base_url: &str,
+        key: &str,
+        text: &str,
+    ) -> Result<(), String> {
+        let body = adf::plain_text_to_description(text);
+        self.update_fields(base_url, key, serde_json::json!({ "description": body }))
+            .await
+    }
+
     async fn update_fields(
         &self,
         base_url: &str,
@@ -120,9 +157,7 @@ impl JiraClient {
             key
         );
         let resp = self
-            .http
             .put(&url)
-            .basic_auth(&self.email, Some(&self.token))
             .json(&serde_json::json!({ "fields": fields }))
             .send()
             .await
@@ -146,9 +181,7 @@ impl JiraClient {
         }
         let url = format!("{base}/rest/api/3/myself");
         let resp = self
-            .http
             .get(&url)
-            .basic_auth(&self.email, Some(&self.token))
             .send()
             .await
             .map_err(|e| format!("HTTP error: {}", e))?;
@@ -204,9 +237,7 @@ impl JiraClient {
             key
         );
         let resp = self
-            .http
             .put(&url)
-            .basic_auth(&self.email, Some(&self.token))
             .json(&serde_json::json!({
                 "fields": { "assignee": assignee },
             }))
@@ -247,9 +278,7 @@ impl JiraClient {
             }
 
             let resp = self
-                .http
                 .post(&url)
-                .basic_auth(&self.email, Some(&self.token))
                 .json(&body)
                 .send()
                 .await
@@ -286,9 +315,7 @@ impl JiraClient {
     ) -> Result<Vec<(String, String)>, String> {
         let url = format!("{}/rest/api/3/field", base_url.trim_end_matches('/'));
         let resp = self
-            .http
             .get(&url)
-            .basic_auth(&self.email, Some(&self.token))
             .send()
             .await
             .map_err(|e| format!("HTTP error: {}", e))?;
@@ -358,9 +385,7 @@ impl JiraClient {
         }
 
         let resp = self
-            .http
             .post(&url)
-            .basic_auth(&self.email, Some(&self.token))
             .json(&serde_json::json!({
                 "issueIdsOrKeys": ids,
                 "fields": fields,
@@ -396,9 +421,7 @@ impl JiraClient {
             key
         );
         let resp = self
-            .http
             .get(&url)
-            .basic_auth(&self.email, Some(&self.token))
             .send()
             .await
             .map_err(|e| format!("HTTP error: {}", e))?;
@@ -443,9 +466,7 @@ impl JiraClient {
             key
         );
         let resp = self
-            .http
             .post(&url)
-            .basic_auth(&self.email, Some(&self.token))
             .json(&serde_json::json!({
                 "transition": { "id": transition_id }
             }))
@@ -470,9 +491,7 @@ impl JiraClient {
             key
         );
         let resp = self
-            .http
             .post(&url)
-            .basic_auth(&self.email, Some(&self.token))
             .json(&serde_json::json!({
                 "body": adf::plain_text_body(body),
             }))
@@ -503,9 +522,7 @@ impl JiraClient {
             key
         );
         let resp = self
-            .http
             .post(&url)
-            .basic_auth(&self.email, Some(&self.token))
             .json(&serde_json::json!({ "timeSpent": time_spent }))
             .send()
             .await
@@ -588,6 +605,8 @@ mod fetch_integration {
             theme: "default".into(),
             views: Default::default(),
             notify_on_refresh: false,
+            auth: Default::default(),
+            oauth: Default::default(),
             view_jql: Config::build_view_jql(&Default::default()),
         }
     }
@@ -684,6 +703,22 @@ mod field_updates {
         let client = JiraClient::new("u@example.com", "token", false);
         client
             .update_priority(&server.uri(), "DEMO-1", "High")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn update_description_sends_put() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("PUT"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/DEMO-1"))
+            .respond_with(wiremock::ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        client
+            .update_description(&server.uri(), "DEMO-1", "Hello\n\nWorld")
             .await
             .unwrap();
     }

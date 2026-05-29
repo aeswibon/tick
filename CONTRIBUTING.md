@@ -26,7 +26,7 @@ cargo test --all-targets
 ## Pull request guidelines
 
 - Keep changes scoped to one concern when possible.
-- Update README and help text if behavior or keybindings change.
+- Update [README.md](README.md), [docs/](docs/), and help text if behavior or keybindings change.
 - Add or extend tests for parsing, config, and non-UI logic.
 
 ## Releases

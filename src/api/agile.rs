@@ -34,9 +34,7 @@ impl JiraClient {
         let base = base_url.trim_end_matches('/');
         let url = format!("{base}/rest/agile/1.0/board?maxResults=50");
         let resp = self
-            .http
             .get(&url)
-            .basic_auth(&self.email, Some(&self.token))
             .send()
             .await
             .map_err(|e| format!("HTTP error: {}", e))?;
@@ -110,9 +108,7 @@ impl JiraClient {
         let base = base_url.trim_end_matches('/');
         let url = format!("{base}/rest/agile/1.0/board?projectKeyOrId={project_key}");
         let resp = self
-            .http
             .get(&url)
-            .basic_auth(&self.email, Some(&self.token))
             .send()
             .await
             .map_err(|e| format!("HTTP error: {}", e))?;
@@ -147,9 +143,7 @@ impl JiraClient {
         let base = base_url.trim_end_matches('/');
         let url = format!("{base}/rest/agile/1.0/board/{board_id}/sprint?state=active,future");
         let resp = self
-            .http
             .get(&url)
-            .basic_auth(&self.email, Some(&self.token))
             .send()
             .await
             .map_err(|e| format!("HTTP error: {}", e))?;
@@ -191,9 +185,7 @@ impl JiraClient {
             base_url.trim_end_matches('/')
         );
         let resp = self
-            .http
             .post(&url)
-            .basic_auth(&self.email, Some(&self.token))
             .json(&serde_json::json!({ "issues": issue_keys }))
             .send()
             .await
@@ -219,9 +211,7 @@ impl JiraClient {
             base_url.trim_end_matches('/')
         );
         let resp = self
-            .http
             .post(&url)
-            .basic_auth(&self.email, Some(&self.token))
             .json(&serde_json::json!({ "issues": issue_keys }))
             .send()
             .await

@@ -4,7 +4,28 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::api::agile::BoardConfig;
+use crate::auth::Auth;
 use crate::view_mode::ViewMode;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum AuthMethod {
+    #[default]
+    Token,
+    Oauth,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct OAuthSettings {
+    #[serde(default)]
+    pub client_id: String,
+    #[serde(default = "default_oauth_redirect")]
+    pub redirect_uri: String,
+}
+
+fn default_oauth_redirect() -> String {
+    "http://127.0.0.1:8765/callback".to_string()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Site {
@@ -68,6 +89,10 @@ pub struct Config {
     /// Desktop notification when a background or scheduled refresh finds new issues.
     #[serde(default)]
     pub notify_on_refresh: bool,
+    #[serde(default)]
+    pub auth: AuthMethod,
+    #[serde(default)]
+    pub oauth: OAuthSettings,
     #[serde(skip)]
     pub view_jql: HashMap<ViewMode, String>,
 }
@@ -105,10 +130,22 @@ impl Config {
             .map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
         let mut config: Config =
             toml::from_str(&contents).map_err(|e| format!("Invalid config: {}", e))?;
-        config.token = Self::resolve_token(&config.token)?;
+        if config.auth == AuthMethod::Token {
+            config.token = Self::resolve_token(&config.token)?;
+        }
         config.view_jql = Self::build_view_jql(&config.views);
         config.validate()?;
         Ok(config)
+    }
+
+    pub async fn resolve_auth(&self) -> Result<Auth, String> {
+        match self.auth {
+            AuthMethod::Token => {
+                let token = Self::resolve_token(&self.token)?;
+                Ok(Auth::basic(&self.email, &token))
+            }
+            AuthMethod::Oauth => crate::oauth::load_auth(&self.oauth).await,
+        }
     }
 
     /// TICK_TOKEN env → ~/.config/tick/token file → config.toml `token`
@@ -186,8 +223,11 @@ impl Config {
         if self.email.trim().is_empty() {
             return Err("config: email must not be empty".into());
         }
-        if self.token.trim().is_empty() {
-            return Err("config: token must not be empty".into());
+        if self.auth == AuthMethod::Oauth {
+            let path = crate::oauth::token_path()?;
+            if !path.exists() {
+                return Err("OAuth not configured: run `tick auth login`".into());
+            }
         }
         if self.page_size == 0 {
             return Err("config: page_size must be at least 1".into());
@@ -235,6 +275,10 @@ max_results = 50
 page_size = 10   # rows to scroll with [ and ]
 theme = "default"
 # notify_on_refresh = true   # desktop alert when new issues appear on refresh
+# auth = "oauth"             # or "token" (default); see docs/OAUTH.md
+# [oauth]
+# client_id = "your-atlassian-oauth-app-id"
+# redirect_uri = "http://127.0.0.1:8765/callback"
 
 # Optional custom JQL per view (defaults shown commented)
 # [views]
