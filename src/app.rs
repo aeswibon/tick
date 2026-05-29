@@ -1,13 +1,14 @@
-use crate::api::{self, types::CachedView, JiraClient};
 use crate::api::types::Ticket;
+use crate::api::{self, types::CachedView, JiraClient};
 use crate::columns::Column;
 use crate::config::Config;
 use crate::fetch_status::FetchStatus;
 use crate::theme::Theme;
 use crate::ticket_lock::{read_tickets, write_tickets};
+use crate::view_mode::ViewMode;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::cell::RefCell;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 
@@ -76,78 +77,6 @@ impl DetailTab {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ViewMode {
-    MyIssues,
-    Updated,
-    Mentions,
-    Watching,
-}
-
-impl ViewMode {
-    pub fn jql(&self) -> &'static str {
-        match self {
-            ViewMode::MyIssues => {
-                "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
-            }
-            ViewMode::Updated => {
-                "assignee = currentUser() AND statusCategory != Done AND updated >= -7d ORDER BY updated DESC"
-            }
-            ViewMode::Mentions => {
-                "comment ~ currentUser() AND statusCategory != Done ORDER BY updated DESC"
-            }
-            ViewMode::Watching => {
-                "watcher = currentUser() AND statusCategory != Done ORDER BY updated DESC"
-            }
-        }
-    }
-
-    pub fn next(self) -> Self {
-        match self {
-            ViewMode::MyIssues => ViewMode::Updated,
-            ViewMode::Updated => ViewMode::Mentions,
-            ViewMode::Mentions => ViewMode::Watching,
-            ViewMode::Watching => ViewMode::MyIssues,
-        }
-    }
-
-    pub fn prev(self) -> Self {
-        match self {
-            ViewMode::MyIssues => ViewMode::Watching,
-            ViewMode::Updated => ViewMode::MyIssues,
-            ViewMode::Mentions => ViewMode::Updated,
-            ViewMode::Watching => ViewMode::Mentions,
-        }
-    }
-
-    pub fn label(&self) -> &'static str {
-        match self {
-            ViewMode::MyIssues => "Assigned",
-            ViewMode::Updated => "Updated",
-            ViewMode::Mentions => "Mentions",
-            ViewMode::Watching => "Watched",
-        }
-    }
-
-    pub fn cache_key(&self) -> &'static str {
-        match self {
-            ViewMode::MyIssues => "assigned",
-            ViewMode::Updated => "updated",
-            ViewMode::Mentions => "mentions",
-            ViewMode::Watching => "watched",
-        }
-    }
-
-    pub fn all() -> [ViewMode; 4] {
-        [
-            ViewMode::MyIssues,
-            ViewMode::Updated,
-            ViewMode::Mentions,
-            ViewMode::Watching,
-        ]
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum InputMode {
     None,
@@ -176,12 +105,17 @@ pub struct App {
     pub detail_tab: DetailTab,
     pub show_help: bool,
     pub showing_transitions: bool,
+    pub transition_selected: usize,
     pub transition_options: Vec<(String, String)>,
+    pub show_site_errors: bool,
+    pub site_error_scroll: usize,
+    pub live_data: bool,
     pub filter: String,
     pub filtering: bool,
     pub sort_mode: SortMode,
     pub input_mode: InputMode,
     pub input_buffer: String,
+    #[allow(dead_code)]
     pub debug: bool,
     pub current_page: usize,
     pub page_size: usize,
@@ -217,7 +151,11 @@ impl App {
             detail_tab: DetailTab::Details,
             show_help: false,
             showing_transitions: false,
+            transition_selected: 0,
             transition_options: Vec::new(),
+            show_site_errors: false,
+            site_error_scroll: 0,
+            live_data: false,
             filter: String::new(),
             filtering: false,
             sort_mode: SortMode::Default,
@@ -272,6 +210,7 @@ impl App {
         if let Some(cached) = self.view_cache.get(&self.active_view).cloned() {
             write_tickets(&self.tickets).clone_from(&cached);
             self.loading = false;
+            self.live_data = false;
             self.invalidate_filter_cache();
         }
     }
@@ -306,7 +245,7 @@ impl App {
         if total == 0 {
             1
         } else {
-            (total + self.page_size - 1) / self.page_size
+            total.div_ceil(self.page_size)
         }
     }
 
@@ -344,13 +283,15 @@ impl App {
         }
         write_tickets(&self.tickets).clone_from(&tickets);
         self.invalidate_filter_cache();
+        if !tickets.is_empty() || no_errors {
+            self.live_data = true;
+        }
     }
 
     pub async fn refresh(&mut self) {
         self.loading = true;
-        let jql = self.active_view.jql();
-        let (tickets, errors) =
-            api::fetch_all(&self.jira, &self.config, jql).await;
+        let jql = self.config.jql_for(self.active_view);
+        let (tickets, errors) = api::fetch_all(&self.jira, &self.config, jql).await;
         self.view_cache.insert(self.active_view, tickets.clone());
         self.save_cache(self.active_view);
         self.apply_fetch_result(tickets, errors);
@@ -367,10 +308,10 @@ impl App {
     async fn do_refresh_all(&mut self, views: [ViewMode; 4]) {
         self.loading = true;
         let (r0, r1, r2, r3) = tokio::join!(
-            api::fetch_all(&self.jira, &self.config, views[0].jql()),
-            api::fetch_all(&self.jira, &self.config, views[1].jql()),
-            api::fetch_all(&self.jira, &self.config, views[2].jql()),
-            api::fetch_all(&self.jira, &self.config, views[3].jql()),
+            api::fetch_all(&self.jira, &self.config, self.config.jql_for(views[0])),
+            api::fetch_all(&self.jira, &self.config, self.config.jql_for(views[1])),
+            api::fetch_all(&self.jira, &self.config, self.config.jql_for(views[2])),
+            api::fetch_all(&self.jira, &self.config, self.config.jql_for(views[3])),
         );
         let results = [r0, r1, r2, r3];
         let mut all_errors = Vec::new();
@@ -402,10 +343,10 @@ impl App {
         let views = ViewMode::all();
         tokio::spawn(async move {
             let (r0, r1, r2, r3) = tokio::join!(
-                api::fetch_all(&jira, &config, views[0].jql()),
-                api::fetch_all(&jira, &config, views[1].jql()),
-                api::fetch_all(&jira, &config, views[2].jql()),
-                api::fetch_all(&jira, &config, views[3].jql()),
+                api::fetch_all(&jira, &config, config.jql_for(views[0])),
+                api::fetch_all(&jira, &config, config.jql_for(views[1])),
+                api::fetch_all(&jira, &config, config.jql_for(views[2])),
+                api::fetch_all(&jira, &config, config.jql_for(views[3])),
             );
             let results = vec![
                 (views[0], r0.0, r0.1),
@@ -456,6 +397,7 @@ impl App {
         if let Some(cached) = self.view_cache.get(&mode).cloned() {
             write_tickets(&self.tickets).clone_from(&cached);
             self.loading = false;
+            self.live_data = false;
             self.invalidate_filter_cache();
             self.current_page = 0;
             self.selected = 0;
@@ -466,6 +408,7 @@ impl App {
                     write_tickets(&self.tickets).clone_from(&cached.tickets);
                     self.view_cache.insert(mode, cached.tickets);
                     self.loading = false;
+                    self.live_data = false;
                     self.invalidate_filter_cache();
                     self.current_page = 0;
                     self.selected = 0;
@@ -537,11 +480,7 @@ impl App {
     }
 }
 
-fn compute_filtered_indices(
-    tickets: &[Ticket],
-    filter: &str,
-    sort_mode: SortMode,
-) -> Vec<usize> {
+fn compute_filtered_indices(tickets: &[Ticket], filter: &str, sort_mode: SortMode) -> Vec<usize> {
     let mut indices: Vec<usize> = if filter.is_empty() {
         (0..tickets.len()).collect()
     } else {
@@ -557,6 +496,9 @@ fn compute_filtered_indices(
                     || t.issue_type.to_lowercase().contains(&q)
                     || t.site.to_lowercase().contains(&q)
                     || t.priority.to_lowercase().contains(&q)
+                    || t.parent_key
+                        .as_ref()
+                        .is_some_and(|p| p.to_lowercase().contains(&q))
             })
             .map(|(i, _)| i)
             .collect()
@@ -638,6 +580,8 @@ mod tests {
             columns: None,
             max_results: 50,
             theme: "default".into(),
+            views: Default::default(),
+            view_jql: Config::build_view_jql(&Default::default()),
         };
         let theme = Theme::default();
         let mut app = App::new(config, theme, false);

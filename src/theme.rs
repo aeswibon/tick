@@ -5,13 +5,21 @@ use std::fs;
 use std::path::Path;
 
 const fn c(hex: u32) -> Color {
-    Color::Rgb(((hex >> 16) & 0xFF) as u8, ((hex >> 8) & 0xFF) as u8, (hex & 0xFF) as u8)
+    Color::Rgb(
+        ((hex >> 16) & 0xFF) as u8,
+        ((hex >> 8) & 0xFF) as u8,
+        (hex & 0xFF) as u8,
+    )
 }
 
 fn parse_hex(s: &str) -> Color {
     let s = s.trim_start_matches('#');
     if let Ok(v) = u32::from_str_radix(s, 16) {
-        Color::Rgb(((v >> 16) & 0xFF) as u8, ((v >> 8) & 0xFF) as u8, (v & 0xFF) as u8)
+        Color::Rgb(
+            ((v >> 16) & 0xFF) as u8,
+            ((v >> 8) & 0xFF) as u8,
+            (v & 0xFF) as u8,
+        )
     } else {
         Color::Reset
     }
@@ -52,7 +60,9 @@ impl ThemeColors {
     pub fn merge_into(self, base: &mut Theme) {
         macro_rules! apply {
             ($field:ident) => {
-                if let Some(v) = self.$field { base.$field = parse_hex(&v); }
+                if let Some(v) = self.$field {
+                    base.$field = parse_hex(&v);
+                }
             };
         }
         apply!(accent);
@@ -68,12 +78,24 @@ impl ThemeColors {
         apply!(detail_label);
         apply!(detail_value);
         apply!(detail_border);
-        if let Some(v) = self.status_green { base.priority_p3 = parse_hex(&v); }
-        if let Some(v) = self.status_yellow { base.loading_fg = parse_hex(&v); }
-        if let Some(v) = self.status_red { base.error_fg = parse_hex(&v); }
-        if let Some(v) = self.status_blue_gray { base.detail_border = parse_hex(&v); }
-        if let Some(v) = self.status_brown { base.priority_p2 = parse_hex(&v); }
-        if let Some(v) = self.status_warm_red { base.priority_p1 = parse_hex(&v); }
+        if let Some(v) = self.status_green {
+            base.priority_p3 = parse_hex(&v);
+        }
+        if let Some(v) = self.status_yellow {
+            base.loading_fg = parse_hex(&v);
+        }
+        if let Some(v) = self.status_red {
+            base.error_fg = parse_hex(&v);
+        }
+        if let Some(v) = self.status_blue_gray {
+            base.detail_border = parse_hex(&v);
+        }
+        if let Some(v) = self.status_brown {
+            base.priority_p2 = parse_hex(&v);
+        }
+        if let Some(v) = self.status_warm_red {
+            base.priority_p1 = parse_hex(&v);
+        }
         apply!(priority_p1);
         apply!(priority_p2);
         apply!(priority_p3);
@@ -246,13 +268,19 @@ impl Theme {
         }
         let themes_dir = dirs::config_dir()
             .ok_or_else(|| "Cannot determine config directory".to_string())?
-            .join("tick").join("themes");
+            .join("tick")
+            .join("themes");
         let path = themes_dir.join(format!("{}.toml", name));
         if path.exists() {
             Self::from_file(&path)
         } else {
             let names: Vec<&str> = builtin.keys().copied().collect();
-            Err(format!("Theme '{}' not found. Available: {} | Or create ~/.config/tick/themes/{}.toml", name, names.join(", "), name))
+            Err(format!(
+                "Theme '{}' not found. Available: {} | Or create ~/.config/tick/themes/{}.toml",
+                name,
+                names.join(", "),
+                name
+            ))
         }
     }
 
@@ -281,10 +309,15 @@ impl Theme {
     }
 
     pub fn selected_style(&self) -> Style {
-        Style::default().bg(self.selected_bg).add_modifier(Modifier::BOLD)
+        Style::default()
+            .bg(self.selected_bg)
+            .add_modifier(Modifier::BOLD)
     }
 
     pub fn header_style(&self) -> Style {
-        Style::default().fg(self.header_fg).bg(self.header_bg).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(self.header_fg)
+            .bg(self.header_bg)
+            .add_modifier(Modifier::BOLD)
     }
 }

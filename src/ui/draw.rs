@@ -6,7 +6,8 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{App, ViewMode};
+use crate::app::App;
+use crate::view_mode::ViewMode;
 
 pub fn render(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
@@ -38,6 +39,9 @@ pub fn render(f: &mut Frame, app: &App) {
     if app.showing_transitions {
         super::transitions::draw_transitions(f, app, f.area());
     }
+    if app.show_site_errors {
+        super::errors::draw_site_errors(f, app, f.area());
+    }
 
     render_footer(f, app, footer_area);
 }
@@ -46,7 +50,14 @@ fn render_header(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     let count = app.filtered_count();
     let sites = app.sites_str();
     let mins = app.last_refresh.elapsed().as_secs() / 60;
-    let right_text = format!(" {count} tickets | refresh {mins}m ago");
+    let mode = if app.loading {
+        "loading"
+    } else if !app.live_data {
+        "cached"
+    } else {
+        "live"
+    };
+    let right_text = format!(" {count} tickets | {mode} | refresh {mins}m ago");
 
     let header_chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -97,10 +108,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     let (footer_text, fg_color) = if app.filtering {
         (format!(" Filter: {}_", app.filter), app.theme.accent)
     } else if app.input_mode == crate::app::InputMode::Comment {
-        (
-            format!(" Comment: {}_", app.input_buffer),
-            app.theme.accent,
-        )
+        (format!(" Comment: {}_", app.input_buffer), app.theme.accent)
     } else if app.input_mode == crate::app::InputMode::Worklog {
         (
             format!(" Worklog (e.g. 30m): {}_", app.input_buffer),
@@ -112,11 +120,14 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         (format!(" Error: {err}"), app.theme.error_fg)
     } else if app.status.has_warnings() {
         (
-            format!(" Warning:{}", app.status.format_warnings(72)),
+            format!(
+                " {} site error(s) — press ! for details",
+                app.status.site_warnings.len()
+            ),
             app.theme.loading_fg,
         )
     } else {
-        let mut left = " ? help  / filter  j/k  s sort  y copy  t trans  c comment  w worklog  [ ] page  ←/→ view  1-4 tabs  q quit".to_string();
+        let mut left = " ? help  / filter  ! errors  j/k  s sort  y copy  t trans  [ ] page  ←/→ view  1-4 tabs  q quit".to_string();
         if app.detail_open {
             left.push_str("  h/l tabs");
         }

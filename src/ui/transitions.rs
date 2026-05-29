@@ -1,3 +1,4 @@
+use crate::app::App;
 use ratatui::{
     layout::{Constraint, Rect},
     style::{Modifier, Style},
@@ -5,7 +6,6 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
-use crate::app::App;
 
 pub fn draw_transitions(f: &mut Frame, app: &App, area: Rect) {
     let popup = centered_rect(50, app.transition_options.len() as u16 + 4, area);
@@ -15,25 +15,48 @@ pub fn draw_transitions(f: &mut Frame, app: &App, area: Rect) {
     let dv = app.theme.detail_value;
 
     let mut lines = vec![
-        Line::from(Span::styled(" Select transition", Style::default().fg(dl).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled(
+            " Select transition",
+            Style::default().fg(dl).add_modifier(Modifier::BOLD),
+        )),
         Line::from(""),
     ];
 
     for (i, (_, name)) in app.transition_options.iter().enumerate() {
+        let selected = i == app.transition_selected;
+        let num_style = if selected {
+            Style::default()
+                .fg(app.theme.accent)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(app.theme.priority_p1)
+        };
+        let name_style = if selected {
+            Style::default().fg(dv).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(dv)
+        };
+        let marker = if selected { "›" } else { " " };
         lines.push(Line::from(vec![
-            Span::styled(format!("  {}. ", i + 1), Style::default().fg(app.theme.priority_p1)),
-            Span::styled(name, Style::default().fg(dv)),
+            Span::raw(format!(" {marker} ")),
+            Span::styled(format!("{}. ", i + 1), num_style),
+            Span::styled(name.as_str(), name_style),
         ]));
     }
 
     lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled("  Esc to cancel", Style::default().fg(app.theme.border))));
+    lines.push(Line::from(Span::styled(
+        "  j/k move  Enter confirm  1-9  Esc cancel",
+        Style::default().fg(app.theme.border),
+    )));
 
     let popup_widget = Paragraph::new(Text::from(lines))
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title(" Transition ")
-            .border_style(Style::default().fg(app.theme.detail_border)))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Transition ")
+                .border_style(Style::default().fg(app.theme.detail_border)),
+        )
         .wrap(Wrap { trim: false });
 
     f.render_widget(popup_widget, popup);

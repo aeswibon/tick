@@ -31,10 +31,7 @@ pub fn draw_table(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
                 Style::default().fg(app.theme.row_fg)
             };
 
-            let cells: Vec<Cell> = columns
-                .iter()
-                .map(|col| col.cell(t, &app.theme))
-                .collect();
+            let cells: Vec<Cell> = columns.iter().map(|col| col.cell(t, &app.theme)).collect();
 
             Row::new(cells).style(row_style)
         })
@@ -44,7 +41,10 @@ pub fn draw_table(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         .iter()
         .map(|col| {
             let w = col.width_hint();
-            if matches!(col, Column::Status | Column::Assignee | Column::Reporter | Column::Summary) {
+            if matches!(
+                col,
+                Column::Status | Column::Assignee | Column::Reporter | Column::Summary
+            ) {
                 Constraint::Min(w)
             } else {
                 Constraint::Length(w)

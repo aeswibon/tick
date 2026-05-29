@@ -37,7 +37,7 @@ pub fn open_url(url: &str) -> std::io::Result<()> {
 pub fn copy_to_clipboard(text: &str) -> bool {
     #[cfg(target_os = "macos")]
     {
-        return spawn_stdin("pbcopy", &[], text);
+        spawn_stdin("pbcopy", &[], text)
     }
     #[cfg(target_os = "linux")]
     {

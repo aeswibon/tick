@@ -25,6 +25,10 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             asset: tick-x86_64-unknown-linux-gnu
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            asset: tick-x86_64-pc-windows-msvc.exe
+            ext: .exe
 
     steps:
       - name: Checkout
@@ -45,11 +49,19 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Package
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
         run: |
           mkdir -p dist
           cp "target/${{ matrix.target }}/release/tick" "dist/${{ matrix.asset }}"
           chmod 755 "dist/${{ matrix.asset }}"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/tick.exe" "dist/${{ matrix.asset }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -89,9 +101,11 @@ jobs:
           AMD64=$(sha256sum artifacts/tick-x86_64-apple-darwin | cut -d' ' -f1)
           ARM64=$(sha256sum artifacts/tick-aarch64-apple-darwin | cut -d' ' -f1)
           LINUX=$(sha256sum artifacts/tick-x86_64-unknown-linux-gnu | cut -d' ' -f1)
+          WINDOWS=$(sha256sum artifacts/tick-x86_64-pc-windows-msvc.exe | cut -d' ' -f1)
           echo "amd64=$AMD64" >> "$GITHUB_OUTPUT"
           echo "arm64=$ARM64" >> "$GITHUB_OUTPUT"
           echo "linux=$LINUX" >> "$GITHUB_OUTPUT"
+          echo "windows=$WINDOWS" >> "$GITHUB_OUTPUT"
 
       - name: Homebrew formula
         env:

@@ -66,12 +66,16 @@ Edit the generated file at `~/.config/tick/config.toml`:
 
 ```toml
 email = "you@example.com"
-token = "your-atlassian-api-token"
+# token in config.toml, or ~/.config/tick/token, or TICK_TOKEN env
 max_results = 50
 theme = "default"
 
+# Optional custom JQL per view
+# [views]
+# assigned = "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
+
 # Optional: customize table columns (default: site, key, type, status, priority, age, due, assignee, reporter)
-# columns = ["site", "key", "summary", "status", "assignee"]
+# columns = ["site", "key", "parent", "summary", "status", "assignee"]
 
 [[sites]]
 name = "my-team"
@@ -81,17 +85,18 @@ base_url = "https://my-team.atlassian.net"
 | Option | Default | Description |
 |--------|---------|-------------|
 | `email` | — | Your Atlassian account email |
-| `token` | — | [Atlassian API token](https://id.atlassian.com/manage-profile/security/api-tokens) |
+| `token` | file / env | [Atlassian API token](https://id.atlassian.com/manage-profile/security/api-tokens); also `~/.config/tick/token` or `TICK_TOKEN` |
+| `[views]` | built-in JQL | Override JQL for Assigned, Updated, Mentions, Watched |
 | `max_results` | `50` | Max tickets to fetch per site |
 | `theme` | `"default"` | Theme name (built-in or custom) |
 | `columns` | built-in default | Table column ids (see config comment) |
 | `sites` | — | List of Jira sites with `name` and `base_url` |
 
-Column ids: `site`, `key`, `type`, `status`, `priority`, `age`, `due`, `assignee`, `reporter`, `summary`.
+Column ids: `site`, `key`, `type`, `status`, `priority`, `age`, `due`, `assignee`, `reporter`, `parent`, `summary`.
 
 ### Credentials
 
-`token` is stored in plain text in `~/.config/tick/config.toml` (standard for CLI tools). Use a dedicated [Atlassian API token](https://id.atlassian.com/manage-profile/security/api-tokens) with minimal scope and restrict file permissions (`chmod 600`).
+Provide a token via **one** of: `TICK_TOKEN` env, `~/.config/tick/token`, or `token` in `config.toml`. Use a dedicated [Atlassian API token](https://id.atlassian.com/manage-profile/security/api-tokens) with minimal scope and restrict file permissions (`chmod 600` on the token file).
 
 ### Theme from config
 
@@ -126,9 +131,11 @@ tick --init              # Create default config file
 | `y` | Copy ticket key to clipboard |
 | `o` | Open ticket in browser |
 | `e` | Open config in editor |
-| `t` | Transition ticket status |
+| `t` | Transition ticket status (j/k in picker) |
 | `c` | Add comment (detail pane open) |
 | `w` | Log work time (detail pane open) |
+| `a` / `u` | Assign to me / unassign (detail pane open) |
+| `!` | Toggle site error overlay |
 | `h` / `l` | Previous / next detail tab (Details → Description → Comments) |
 | `←` / `→` or `Tab` / `Shift+Tab` | Cycle view tab |
 | `1` / `2` / `3` / `4` | Jump to Assigned / Updated / Mentions / Watched |

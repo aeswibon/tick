@@ -14,10 +14,12 @@ pub enum Column {
     Due,
     Assignee,
     Reporter,
+    Parent,
     Summary,
 }
 
 impl Column {
+    #[allow(dead_code)]
     pub fn id(self) -> &'static str {
         match self {
             Self::Site => "site",
@@ -29,6 +31,7 @@ impl Column {
             Self::Due => "due",
             Self::Assignee => "assignee",
             Self::Reporter => "reporter",
+            Self::Parent => "parent",
             Self::Summary => "summary",
         }
     }
@@ -44,6 +47,7 @@ impl Column {
             Self::Due => "Due",
             Self::Assignee => "Assignee",
             Self::Reporter => "Reporter",
+            Self::Parent => "Parent",
             Self::Summary => "Summary",
         }
     }
@@ -59,6 +63,7 @@ impl Column {
             "due" | "duedate" => Some(Self::Due),
             "assignee" => Some(Self::Assignee),
             "reporter" => Some(Self::Reporter),
+            "parent" | "epic" => Some(Self::Parent),
             "summary" => Some(Self::Summary),
             _ => None,
         }
@@ -113,6 +118,10 @@ impl Column {
             }
             Self::Assignee => Cell::from(Span::raw(ticket.assignee.clone())),
             Self::Reporter => Cell::from(Span::raw(ticket.reporter.clone())),
+            Self::Parent => {
+                let text = ticket.parent_key.as_deref().unwrap_or("-");
+                Cell::from(Span::raw(text.to_string()))
+            }
             Self::Summary => Cell::from(Span::raw(ticket.summary.clone())),
         }
     }
@@ -128,6 +137,7 @@ impl Column {
             Self::Due => 12,
             Self::Assignee => 12,
             Self::Reporter => 12,
+            Self::Parent => 12,
             Self::Summary => 24,
         }
     }

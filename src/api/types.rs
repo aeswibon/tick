@@ -144,11 +144,15 @@ pub(crate) fn extract_text(v: &serde_json::Value) -> Option<String> {
                         parts.push(text);
                     }
                 }
-                if parts.is_empty() { None } else { Some(parts.join("\n")) }
-            } else if let Some(text) = m.get("text").and_then(|t| t.as_str()) {
-                Some(text.to_string())
+                if parts.is_empty() {
+                    None
+                } else {
+                    Some(parts.join("\n"))
+                }
             } else {
-                None
+                m.get("text")
+                    .and_then(|t| t.as_str())
+                    .map(|text| text.to_string())
             }
         }
         _ => None,
@@ -164,18 +168,28 @@ impl Ticket {
         let description_adf = issue.fields.description.clone();
         let description = description_adf.as_ref().and_then(extract_text);
 
-        let all_comments: Vec<CommentEntry> = issue.fields.comment
+        let all_comments: Vec<CommentEntry> = issue
+            .fields
+            .comment
             .as_ref()
-            .map(|c| c.comments.iter().map(|cmt| {
-                CommentEntry {
-                    author: cmt.author.as_ref().map(|a| a.display_name.clone()).unwrap_or_default(),
-                    created: cmt.created.clone(),
-                    body: cmt.body.clone(),
-                }
-            }).collect())
+            .map(|c| {
+                c.comments
+                    .iter()
+                    .map(|cmt| CommentEntry {
+                        author: cmt
+                            .author
+                            .as_ref()
+                            .map(|a| a.display_name.clone())
+                            .unwrap_or_default(),
+                        created: cmt.created.clone(),
+                        body: cmt.body.clone(),
+                    })
+                    .collect()
+            })
             .unwrap_or_default();
 
-        let latest_comment = all_comments.last()
+        let latest_comment = all_comments
+            .last()
             .and_then(|c| c.body.as_ref())
             .and_then(extract_text);
 
@@ -185,11 +199,26 @@ impl Ticket {
             issue_type: issue.fields.issue_type.name,
             status: issue.fields.status.name,
             status_color: issue.fields.status.status_category.color_name,
-            priority: issue.fields.priority.as_ref().map(|p| p.name.clone()).unwrap_or_default(),
+            priority: issue
+                .fields
+                .priority
+                .as_ref()
+                .map(|p| p.name.clone())
+                .unwrap_or_default(),
             ageing_days,
             due_date: issue.fields.duedate,
-            assignee: issue.fields.assignee.as_ref().map(|u| u.display_name.clone()).unwrap_or_default(),
-            reporter: issue.fields.reporter.as_ref().map(|u| u.display_name.clone()).unwrap_or_default(),
+            assignee: issue
+                .fields
+                .assignee
+                .as_ref()
+                .map(|u| u.display_name.clone())
+                .unwrap_or_default(),
+            reporter: issue
+                .fields
+                .reporter
+                .as_ref()
+                .map(|u| u.display_name.clone())
+                .unwrap_or_default(),
             summary: issue.fields.summary,
             link: format!("{}/browse/{}", base_url.trim_end_matches('/'), issue.key),
             description,
@@ -197,7 +226,11 @@ impl Ticket {
             latest_comment,
             all_comments,
             parent_key: issue.fields.parent.as_ref().map(|p| p.key.clone()),
-            parent_summary: issue.fields.parent.as_ref().map(|p| p.fields.summary.clone()),
+            parent_summary: issue
+                .fields
+                .parent
+                .as_ref()
+                .map(|p| p.fields.summary.clone()),
         }
     }
 }
@@ -243,9 +276,15 @@ mod tests {
                         color_name: "yellow".into(),
                     },
                 },
-                priority: Some(JiraNamed { name: "High".into() }),
-                assignee: Some(JiraUser { display_name: "Alice".into() }),
-                reporter: Some(JiraUser { display_name: "Bob".into() }),
+                priority: Some(JiraNamed {
+                    name: "High".into(),
+                }),
+                assignee: Some(JiraUser {
+                    display_name: "Alice".into(),
+                }),
+                reporter: Some(JiraUser {
+                    display_name: "Bob".into(),
+                }),
                 duedate: Some(NaiveDate::from_ymd_opt(2026, 6, 1).unwrap()),
                 created: "2026-01-15T10:00:00.000+0000".into(),
                 project: JiraProject { key: "PROJ".into() },

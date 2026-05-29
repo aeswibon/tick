@@ -1,6 +1,7 @@
 pub mod adf;
-pub mod draw;
-mod table;
 pub mod detail;
+pub mod draw;
+pub mod errors;
 pub mod help;
+mod table;
 pub mod transitions;

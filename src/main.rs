@@ -8,6 +8,7 @@ mod platform;
 mod theme;
 mod ticket_lock;
 mod ui;
+mod view_mode;
 
 use app::App;
 use clap::Parser;
@@ -20,6 +21,7 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{io, time::Duration};
 use theme::Theme;
+pub use view_mode::ViewMode;
 
 #[derive(Parser)]
 #[command(name = "tick", about = "Jira ticket dashboard for the terminal")]
@@ -106,10 +108,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     let theme_name = cli.theme.clone().unwrap_or_else(|| config.theme.clone());
-    let theme = Theme::resolve(&theme_name).map_err(|e| {
-        disable_raw_mode().ok();
-        e
-    })?;
+    let theme = match Theme::resolve(&theme_name) {
+        Ok(t) => t,
+        Err(e) => {
+            disable_raw_mode().ok();
+            return Err(e.into());
+        }
+    };
 
     let mut app = App::new(config, theme, cli.debug);
     let refresh_interval = Duration::from_secs(3 * 60 * 60);

@@ -22,7 +22,8 @@ impl FetchStatus {
         !self.site_warnings.is_empty()
     }
 
-    /// Footer text for site-level partial failures (truncated for narrow terminals).
+    /// Truncated site-warning text (used in tests; UI uses the error overlay).
+    #[allow(dead_code)]
     pub fn format_warnings(&self, max_len: usize) -> String {
         if self.site_warnings.is_empty() {
             return String::new();
@@ -35,12 +36,17 @@ impl FetchStatus {
         let prefix = format!(
             " {} site{} failed:",
             self.site_warnings.len(),
-            if self.site_warnings.len() == 1 { "" } else { "s" }
+            if self.site_warnings.len() == 1 {
+                ""
+            } else {
+                "s"
+            }
         );
         truncate(&format!("{prefix} {body}"), max_len)
     }
 }
 
+#[allow(dead_code)]
 fn truncate(s: &str, max_len: usize) -> String {
     if s.chars().count() <= max_len {
         return s.to_string();

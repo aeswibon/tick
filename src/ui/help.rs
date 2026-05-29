@@ -1,3 +1,4 @@
+use crate::app::App;
 use ratatui::{
     layout::{Constraint, Rect},
     style::{Modifier, Style},
@@ -5,22 +6,30 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
-use crate::app::App;
 
 pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
     let popup = centered_rect(60, 75, area);
     f.render_widget(Clear, popup);
 
     let lines = vec![
-        Line::from(Span::styled(" Help", Style::default().add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled(
+            " Help",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
         Line::from(""),
-        Line::from(Span::styled(" Navigation", Style::default().add_modifier(Modifier::UNDERLINED))),
+        Line::from(Span::styled(
+            " Navigation",
+            Style::default().add_modifier(Modifier::UNDERLINED),
+        )),
         Line::from("  j/k  or  Up/Down      Move selection"),
         Line::from("  [ / ]                  Previous / next page"),
         Line::from("  g / G                  Go to first / last page"),
         Line::from("  1 / 2 / 3 / 4          Jump to view tab"),
         Line::from(""),
-        Line::from(Span::styled(" Actions", Style::default().add_modifier(Modifier::UNDERLINED))),
+        Line::from(Span::styled(
+            " Actions",
+            Style::default().add_modifier(Modifier::UNDERLINED),
+        )),
         Line::from("  Enter                  Toggle detail pane"),
         Line::from("  Esc                    Close pane / help / overlay"),
         Line::from("  r                      Refresh tickets"),
@@ -28,29 +37,45 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
         Line::from("  y                      Copy ticket key to clipboard"),
         Line::from("  e                      Open config file in editor"),
         Line::from(""),
-        Line::from(Span::styled(" Detail Pane", Style::default().add_modifier(Modifier::UNDERLINED))),
+        Line::from(Span::styled(
+            " Detail Pane",
+            Style::default().add_modifier(Modifier::UNDERLINED),
+        )),
         Line::from("  h / l                  Prev / next detail tab"),
         Line::from(""),
-        Line::from(Span::styled(" View", Style::default().add_modifier(Modifier::UNDERLINED))),
+        Line::from(Span::styled(
+            " View",
+            Style::default().add_modifier(Modifier::UNDERLINED),
+        )),
         Line::from("  ?                      Toggle this help"),
         Line::from("  /                      Filter tickets"),
         Line::from("  s                      Cycle sort mode"),
         Line::from("  ← / →                  Cycle view (pane closed)"),
         Line::from("  Tab / Shift+Tab        Cycle view (pane closed)"),
         Line::from(""),
-        Line::from(Span::styled(" Jira Actions", Style::default().add_modifier(Modifier::UNDERLINED))),
+        Line::from(Span::styled(
+            " Jira Actions",
+            Style::default().add_modifier(Modifier::UNDERLINED),
+        )),
         Line::from("  t                      Transition ticket status"),
         Line::from("  c                      Add comment"),
         Line::from("  w                      Log work time"),
+        Line::from("  a / u                  Assign to me / unassign (detail open)"),
+        Line::from("  !                      Toggle site error overlay"),
         Line::from(""),
-        Line::from(Span::styled(" General", Style::default().add_modifier(Modifier::UNDERLINED))),
+        Line::from(Span::styled(
+            " General",
+            Style::default().add_modifier(Modifier::UNDERLINED),
+        )),
         Line::from("  q                      Quit"),
     ];
 
     let help = Paragraph::new(Text::from(lines))
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title(" Keybindings "))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Keybindings "),
+        )
         .wrap(Wrap { trim: false })
         .style(Style::default());
 

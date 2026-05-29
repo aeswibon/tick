@@ -1,6 +1,7 @@
 use crossterm::event::KeyCode;
 
-use crate::app::{App, InputMode, ViewMode};
+use crate::app::{App, InputMode};
+use crate::view_mode::ViewMode;
 
 /// Returns `true` when the app should quit.
 pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
@@ -35,12 +36,34 @@ pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
         return false;
     }
 
+    if app.show_site_errors {
+        handle_site_errors_key(app, code);
+        return false;
+    }
+
     if app.showing_transitions {
         handle_transition_key(app, code).await;
         return false;
     }
 
     handle_normal_key(app, code).await
+}
+
+fn handle_site_errors_key(app: &mut App, code: KeyCode) {
+    let count = app.status.site_warnings.len();
+    match code {
+        KeyCode::Esc | KeyCode::Char('!') => {
+            app.show_site_errors = false;
+            app.site_error_scroll = 0;
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.site_error_scroll = app.site_error_scroll.saturating_sub(1);
+        }
+        KeyCode::Down | KeyCode::Char('j') if app.site_error_scroll + 1 < count => {
+            app.site_error_scroll += 1;
+        }
+        _ => {}
+    }
 }
 
 async fn submit_input(app: &mut App) {
@@ -71,30 +94,50 @@ async fn submit_input(app: &mut App) {
 
 async fn handle_transition_key(app: &mut App, code: KeyCode) {
     match code {
-        KeyCode::Char(n) if n >= '1' && n <= '9' => {
-            let idx = (n as u8 - b'1') as usize;
-            if idx < app.transition_options.len() {
-                let (trans_id, _) = app.transition_options[idx].clone();
-                let Some(sel) = app.selected_ticket() else {
-                    return;
-                };
-                let Some(base_url) = app.site_base_url(&sel.site) else {
-                    return;
-                };
-                match app.jira.transition_issue(&base_url, &sel.key, &trans_id).await {
-                    Ok(()) => {
-                        app.showing_transitions = false;
-                        app.refresh_all().await;
-                    }
-                    Err(e) => {
-                        app.status.set_action_error(e);
-                        app.showing_transitions = false;
-                    }
-                }
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.transition_selected = app.transition_selected.saturating_sub(1);
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if app.transition_selected + 1 < app.transition_options.len() {
+                app.transition_selected += 1;
             }
+        }
+        KeyCode::Enter => {
+            apply_transition(app, app.transition_selected).await;
+        }
+        KeyCode::Char(n) if ('1'..='9').contains(&n) => {
+            let idx = (n as u8 - b'1') as usize;
+            apply_transition(app, idx).await;
         }
         KeyCode::Esc => app.showing_transitions = false,
         _ => {}
+    }
+}
+
+async fn apply_transition(app: &mut App, idx: usize) {
+    if idx >= app.transition_options.len() {
+        return;
+    }
+    let (trans_id, _) = app.transition_options[idx].clone();
+    let Some(sel) = app.selected_ticket() else {
+        return;
+    };
+    let Some(base_url) = app.site_base_url(&sel.site) else {
+        return;
+    };
+    match app
+        .jira
+        .transition_issue(&base_url, &sel.key, &trans_id)
+        .await
+    {
+        Ok(()) => {
+            app.showing_transitions = false;
+            app.refresh_all().await;
+        }
+        Err(e) => {
+            app.status.set_action_error(e);
+            app.showing_transitions = false;
+        }
     }
 }
 
@@ -140,6 +183,11 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             app.show_help = false;
             app.detail_open = false;
             app.showing_transitions = false;
+            app.show_site_errors = false;
+        }
+        KeyCode::Char('!') if app.status.has_warnings() => {
+            app.show_site_errors = !app.show_site_errors;
+            app.site_error_scroll = 0;
         }
         KeyCode::Char('?') => {
             app.show_help = !app.show_help;
@@ -192,6 +240,12 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             app.input_mode = InputMode::Worklog;
             app.input_buffer.clear();
         }
+        KeyCode::Char('a') if app.detail_open => {
+            assign_to_me(app).await;
+        }
+        KeyCode::Char('u') if app.detail_open => {
+            unassign_ticket(app).await;
+        }
         KeyCode::Char('g') => {
             app.current_page = 0;
             app.selected = 0;
@@ -204,6 +258,41 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
     false
 }
 
+async fn assign_to_me(app: &mut App) {
+    let Some(sel) = app.selected_ticket() else {
+        return;
+    };
+    let Some(base_url) = app.site_base_url(&sel.site) else {
+        app.status.set_action_error("Unknown site for ticket");
+        return;
+    };
+    match app.jira.current_user_account_id(&base_url).await {
+        Ok(account_id) => match app
+            .jira
+            .assign_to_account(&base_url, &sel.key, &account_id)
+            .await
+        {
+            Ok(()) => app.refresh_all().await,
+            Err(e) => app.status.set_action_error(e),
+        },
+        Err(e) => app.status.set_action_error(e),
+    }
+}
+
+async fn unassign_ticket(app: &mut App) {
+    let Some(sel) = app.selected_ticket() else {
+        return;
+    };
+    let Some(base_url) = app.site_base_url(&sel.site) else {
+        app.status.set_action_error("Unknown site for ticket");
+        return;
+    };
+    match app.jira.unassign(&base_url, &sel.key).await {
+        Ok(()) => app.refresh_all().await,
+        Err(e) => app.status.set_action_error(e),
+    }
+}
+
 async fn start_transition_picker(app: &mut App) {
     let Some(sel) = app.selected_ticket() else {
         return;
@@ -214,6 +303,7 @@ async fn start_transition_picker(app: &mut App) {
     match app.jira.get_transition_options(&base_url, &sel.key).await {
         Ok(options) if !options.is_empty() => {
             app.transition_options = options;
+            app.transition_selected = 0;
             app.showing_transitions = true;
         }
         Ok(_) => app.status.set_action_error("No transitions available"),
