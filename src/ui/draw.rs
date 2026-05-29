@@ -42,6 +42,9 @@ pub fn render(f: &mut Frame, app: &mut App) {
     if app.showing_priorities {
         super::priorities::draw_priorities(f, app, f.area());
     }
+    if app.showing_sprints {
+        super::sprints::draw_sprints(f, app, f.area());
+    }
     if app.show_site_errors {
         super::errors::draw_site_errors(f, app, f.area());
     }
@@ -132,15 +135,15 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     } else {
         let mut left = " ? help  / filter  ! errors  j/k  s sort  y copy  t trans  [ ] scroll  ←/→ view  1-4 tabs  q quit".to_string();
         if app.detail_open {
-            left.push_str("  S/P/L summary/priority/labels  h/l tabs");
+            left.push_str("  S/P/L/M fields  h/l tabs");
         }
         let total = app.filtered_count();
         let row = if total == 0 { 0 } else { app.selected + 1 };
+        let cache = app.cache_age_suffix();
         let right = format!(
-            " {} | {row}/{total} | Sort: {} | {} tickets",
+            " {} | {row}/{total} | Sort: {}{cache}",
             app.active_view.label(),
             app.sort_mode.label(),
-            total
         );
         (format!("{left:<72}{right}"), app.theme.footer_fg)
     };

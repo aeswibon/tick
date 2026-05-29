@@ -10,14 +10,14 @@ Open-source Jira TUI (`aeswibon/tick`).
 - **v0.3.2:** Desktop notify on new issues (`notify_on_refresh`), recurring background fetch
 - **v0.4.0:** Virtualized table, theme gallery + `--list-themes`
 - **v0.4.1:** Edit labels (`L`), cache age in header when offline
+- **v0.4.2:** Sprint/backlog move (`M`), cache age in footer
 
 ## Next
 
 | Item | Target |
 |------|--------|
-| Sprint membership moves | backlog |
 | OAuth | on demand |
-| Per-view stale indicator in footer | backlog |
+| Multi-board / project sprint config | backlog |
 
 ## Out of scope
 

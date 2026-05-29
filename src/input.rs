@@ -51,6 +51,11 @@ pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
         return false;
     }
 
+    if app.showing_sprints {
+        handle_sprint_key(app, code).await;
+        return false;
+    }
+
     handle_normal_key(app, code).await
 }
 
@@ -121,6 +126,55 @@ async fn handle_transition_key(app: &mut App, code: KeyCode) {
         }
         KeyCode::Esc => app.showing_transitions = false,
         _ => {}
+    }
+}
+
+async fn handle_sprint_key(app: &mut App, code: KeyCode) {
+    match code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.sprint_selected = app.sprint_selected.saturating_sub(1);
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if app.sprint_selected + 1 < app.sprint_options.len() {
+                app.sprint_selected += 1;
+            }
+        }
+        KeyCode::Enter => {
+            apply_sprint_move(app, app.sprint_selected).await;
+        }
+        KeyCode::Char(n) if ('1'..='9').contains(&n) => {
+            let idx = (n as u8 - b'1') as usize;
+            apply_sprint_move(app, idx).await;
+        }
+        KeyCode::Esc => app.showing_sprints = false,
+        _ => {}
+    }
+}
+
+async fn apply_sprint_move(app: &mut App, idx: usize) {
+    if idx >= app.sprint_options.len() {
+        return;
+    }
+    let (target_id, _) = app.sprint_options[idx].clone();
+    let Some(sel) = app.selected_ticket() else {
+        return;
+    };
+    let Some(base_url) = app.site_base_url(&sel.site) else {
+        return;
+    };
+    match app
+        .jira
+        .move_issue_to_sprint_target(&base_url, &sel.key, &target_id)
+        .await
+    {
+        Ok(()) => {
+            app.showing_sprints = false;
+            app.refresh_all().await;
+        }
+        Err(e) => {
+            app.status.set_action_error(e);
+            app.showing_sprints = false;
+        }
     }
 }
 
@@ -225,6 +279,7 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             app.detail_open = false;
             app.showing_transitions = false;
             app.showing_priorities = false;
+            app.showing_sprints = false;
             app.show_site_errors = false;
         }
         KeyCode::Char('!') if app.status.has_warnings() => {
@@ -302,6 +357,9 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
                 app.input_buffer = ticket.labels.join(", ");
             }
         }
+        KeyCode::Char('M') if app.detail_open => {
+            start_sprint_picker(app).await;
+        }
         KeyCode::Char('g') => app.go_to_first(),
         KeyCode::Char('G') => app.go_to_last(),
         KeyCode::Tab => app.switch_to(app.active_view.next()).await,
@@ -368,6 +426,32 @@ async fn start_priority_picker(app: &mut App) {
             app.showing_priorities = true;
         }
         Ok(_) => app.status.set_action_error("No priorities available"),
+        Err(e) => app.status.set_action_error(e),
+    }
+}
+
+async fn start_sprint_picker(app: &mut App) {
+    let Some(ticket) = app.selected_ticket_entry() else {
+        return;
+    };
+    let Some(base_url) = app.site_base_url(&ticket.site) else {
+        return;
+    };
+    let project = ticket.project_key_for_api().to_string();
+    match app.jira.list_sprint_targets(&base_url, &project).await {
+        Ok(options) if options.len() > 1 => {
+            let current = ticket.sprint_name.as_deref().unwrap_or("");
+            app.sprint_options = options;
+            app.sprint_selected = app
+                .sprint_options
+                .iter()
+                .position(|(_, name)| name.contains(current) && !current.is_empty())
+                .unwrap_or(0);
+            app.showing_sprints = true;
+        }
+        Ok(_) => app
+            .status
+            .set_action_error("No sprints available for this project"),
         Err(e) => app.status.set_action_error(e),
     }
 }

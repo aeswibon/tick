@@ -117,6 +117,9 @@ pub struct App {
     pub showing_priorities: bool,
     pub priority_selected: usize,
     pub priority_options: Vec<(String, String)>,
+    pub showing_sprints: bool,
+    pub sprint_selected: usize,
+    pub sprint_options: Vec<(String, String)>,
     pub show_site_errors: bool,
     pub site_error_scroll: usize,
     pub live_data: bool,
@@ -167,6 +170,9 @@ impl App {
             showing_priorities: false,
             priority_selected: 0,
             priority_options: Vec::new(),
+            showing_sprints: false,
+            sprint_selected: 0,
+            sprint_options: Vec::new(),
             show_site_errors: false,
             site_error_scroll: 0,
             live_data: false,
@@ -237,6 +243,15 @@ impl App {
 
     pub fn sync_view_fetched_at(&mut self, mode: ViewMode) {
         self.view_fetched_at = self.cache.fetched_at_for(mode);
+    }
+
+    pub fn cache_age_suffix(&self) -> String {
+        if self.live_data || self.loading {
+            return String::new();
+        }
+        self.view_fetched_at
+            .map(|at| format!(" · {}", format_cache_age(at)))
+            .unwrap_or_default()
     }
 
     pub fn refresh_status_label(&self) -> String {
@@ -726,6 +741,7 @@ mod tests {
             parent_summary: None,
             labels: vec![],
             sprint_name: None,
+            project_key: String::new(),
         }
     }
 

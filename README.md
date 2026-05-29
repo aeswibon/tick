@@ -152,7 +152,7 @@ tick --init              # Create default config file
 | `c` | Add comment (detail pane open) |
 | `w` | Log work time (detail pane open) |
 | `a` / `u` | Assign to me / unassign (detail pane open) |
-| `S` / `P` / `L` | Edit summary / priority / labels (detail pane open) |
+| `S` / `P` / `L` / `M` | Edit summary / priority / labels / move sprint (detail open) |
 | `!` | Toggle site error overlay |
 | `h` / `l` | Previous / next detail tab (Details → Description → Comments) |
 | `←` / `→` or `Tab` / `Shift+Tab` | Cycle view tab |

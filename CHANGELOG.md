@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.2] - 2026-05-29
+
+### Added
+
+- Move issue to sprint or backlog from detail pane (`M`) via Jira Agile API
+- Footer shows cache age when viewing stale data (e.g. `Sort: default · 2h ago`)
+
 ## [0.4.1] - 2026-05-29
 
 ### Added

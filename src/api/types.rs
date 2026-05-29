@@ -30,6 +30,12 @@ pub struct Ticket {
     pub parent_summary: Option<String>,
     pub labels: Vec<String>,
     pub sprint_name: Option<String>,
+    #[serde(default)]
+    pub project_key: String,
+}
+
+pub(crate) fn project_key_from_issue_key(key: &str) -> &str {
+    key.rfind('-').map_or(key, |i| &key[..i])
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -179,6 +185,14 @@ pub(crate) fn extract_sprint_name(value: &serde_json::Value) -> Option<String> {
 }
 
 impl Ticket {
+    pub fn project_key_for_api(&self) -> &str {
+        if !self.project_key.is_empty() {
+            &self.project_key
+        } else {
+            project_key_from_issue_key(&self.key)
+        }
+    }
+
     pub fn from_bulk_fetch(
         issue: BulkFetchIssue,
         site_name: &str,
@@ -258,6 +272,7 @@ impl Ticket {
             labels: issue.fields.labels.clone().unwrap_or_default(),
             sprint_name: sprint_field
                 .and_then(|field| issue.fields.custom.get(field).and_then(extract_sprint_name)),
+            project_key: issue.fields.project.key.clone(),
         }
     }
 }
@@ -266,6 +281,12 @@ impl Ticket {
 mod tests {
     use super::*;
     use chrono::NaiveDate;
+
+    #[test]
+    fn project_key_from_issue_key_parses_prefix() {
+        assert_eq!(project_key_from_issue_key("DEMO-1"), "DEMO");
+        assert_eq!(project_key_from_issue_key("MY-PROJ-42"), "MY-PROJ");
+    }
 
     #[test]
     fn extract_text_from_plain_string() {

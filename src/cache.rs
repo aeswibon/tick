@@ -94,6 +94,7 @@ mod tests {
             parent_summary: None,
             labels: vec![],
             sprint_name: None,
+            project_key: String::new(),
         }
     }
 
