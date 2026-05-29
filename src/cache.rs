@@ -81,6 +81,8 @@ mod tests {
             all_comments: vec![],
             parent_key: None,
             parent_summary: None,
+            labels: vec![],
+            sprint_name: None,
         }
     }
 

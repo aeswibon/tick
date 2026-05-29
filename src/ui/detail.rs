@@ -143,6 +143,26 @@ pub fn draw_detail(f: &mut Frame, app: &App, area: Rect) {
                 }
             }
 
+            if !ticket.labels.is_empty() {
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        format!("{:<12}", "Labels:"),
+                        Style::default().fg(dl).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(ticket.labels.join(", "), Style::default().fg(dv)),
+                ]));
+            }
+
+            if let Some(ref sprint) = ticket.sprint_name {
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        format!("{:<12}", "Sprint:"),
+                        Style::default().fg(dl).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(sprint.clone(), Style::default().fg(dv)),
+                ]));
+            }
+
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
                 "Summary",

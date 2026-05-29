@@ -269,10 +269,53 @@ impl JiraClient {
         Ok(all_ids)
     }
 
+    pub async fn find_sprint_fields(
+        &self,
+        base_url: &str,
+    ) -> Result<Vec<(String, String)>, String> {
+        let url = format!("{}/rest/api/3/field", base_url.trim_end_matches('/'));
+        let resp = self
+            .http
+            .get(&url)
+            .basic_auth(&self.email, Some(&self.token))
+            .send()
+            .await
+            .map_err(|e| format!("HTTP error: {}", e))?;
+        if !resp.status().is_success() {
+            return Err(format!(
+                "Field API {}: {}",
+                resp.status(),
+                resp.text().await.unwrap_or_default()
+            ));
+        }
+        let data: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| format!("Parse error: {}", e))?;
+        let list = data
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|f| {
+                        let id = f["id"].as_str()?;
+                        let name = f["name"].as_str()?;
+                        if name.to_lowercase().contains("sprint") {
+                            Some((id.to_string(), name.to_string()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        Ok(list)
+    }
+
     pub async fn bulk_fetch(
         &self,
         base_url: &str,
         ids: &[String],
+        sprint_field: Option<&str>,
     ) -> Result<Vec<BulkFetchIssue>, String> {
         if ids.is_empty() {
             return Ok(Vec::new());
@@ -282,7 +325,7 @@ impl JiraClient {
             "{}/rest/api/3/issue/bulkfetch",
             base_url.trim_end_matches('/')
         );
-        let fields = [
+        let mut fields = vec![
             "issuetype",
             "status",
             "priority",
@@ -295,7 +338,13 @@ impl JiraClient {
             "description",
             "comment",
             "parent",
+            "labels",
         ];
+        if let Some(sf) = sprint_field {
+            if !fields.contains(&sf) {
+                fields.push(sf);
+            }
+        }
 
         let resp = self
             .http
@@ -487,10 +536,16 @@ pub async fn fetch_all(
             }
         };
 
-        match client.bulk_fetch(&site.base_url, &ids).await {
+        let sprint_field = site.sprint_field.as_deref();
+        match client.bulk_fetch(&site.base_url, &ids, sprint_field).await {
             Ok(issues) => {
                 for issue in issues {
-                    all.push(Ticket::from_bulk_fetch(issue, &site.name, &site.base_url));
+                    all.push(Ticket::from_bulk_fetch(
+                        issue,
+                        &site.name,
+                        &site.base_url,
+                        sprint_field,
+                    ));
                 }
             }
             Err(e) => errors.push(format!("{}: {}", site.name, e)),
@@ -512,6 +567,7 @@ mod fetch_integration {
             sites: vec![Site {
                 name: "test".into(),
                 base_url: base_url.into(),
+                sprint_field: None,
             }],
             columns: None,
             max_results: 50,
@@ -553,7 +609,8 @@ mod fetch_integration {
                             "reporter": { "displayName": "Bob" },
                             "created": "2026-01-01T00:00:00.000+0000",
                             "project": { "key": "DEMO" },
-                            "summary": "Hello"
+                            "summary": "Hello",
+                            "labels": ["bug", "ui"]
                         }
                     }]
                 })),
@@ -571,6 +628,7 @@ mod fetch_integration {
         assert_eq!(tickets[0].key, "DEMO-1");
         assert_eq!(tickets[0].site, "test");
         assert_eq!(tickets[0].summary, "Hello");
+        assert_eq!(tickets[0].labels, vec!["bug", "ui"]);
     }
 }
 

@@ -532,6 +532,10 @@ fn compute_filtered_indices(tickets: &[Ticket], filter: &str, sort_mode: SortMod
                     || t.parent_key
                         .as_ref()
                         .is_some_and(|p| p.to_lowercase().contains(&q))
+                    || t.labels.iter().any(|l| l.to_lowercase().contains(&q))
+                    || t.sprint_name
+                        .as_ref()
+                        .is_some_and(|s| s.to_lowercase().contains(&q))
             })
             .map(|(i, _)| i)
             .collect()
@@ -588,7 +592,19 @@ mod tests {
             all_comments: vec![],
             parent_key: None,
             parent_summary: None,
+            labels: vec![],
+            sprint_name: None,
         }
+    }
+
+    #[test]
+    fn filter_matches_labels() {
+        let mut t1 = sample_ticket("A-1", "one", "Open");
+        t1.labels = vec!["backend".into()];
+        let t2 = sample_ticket("A-2", "two", "Open");
+        let tickets = vec![t1, t2];
+        let idx = compute_filtered_indices(&tickets, "backend", SortMode::Default);
+        assert_eq!(idx, vec![0]);
     }
 
     #[test]
@@ -609,6 +625,7 @@ mod tests {
             sites: vec![crate::config::Site {
                 name: "acme".into(),
                 base_url: "https://acme.atlassian.net".into(),
+                sprint_field: None,
             }],
             columns: None,
             max_results: 50,
@@ -629,6 +646,7 @@ mod tests {
             sites: vec![crate::config::Site {
                 name: "acme".into(),
                 base_url: "https://acme.atlassian.net".into(),
+                sprint_field: None,
             }],
             columns: None,
             max_results: 50,

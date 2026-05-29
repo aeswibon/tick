@@ -1,5 +1,6 @@
 use chrono::NaiveDate;
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CachedView {
@@ -27,6 +28,8 @@ pub struct Ticket {
     pub all_comments: Vec<CommentEntry>,
     pub parent_key: Option<String>,
     pub parent_summary: Option<String>,
+    pub labels: Vec<String>,
+    pub sprint_name: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -74,6 +77,9 @@ pub struct JiraFields {
     pub description: Option<serde_json::Value>,
     pub comment: Option<JiraComments>,
     pub parent: Option<JiraParent>,
+    pub labels: Option<Vec<String>>,
+    #[serde(flatten)]
+    pub custom: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -159,8 +165,26 @@ pub(crate) fn extract_text(v: &serde_json::Value) -> Option<String> {
     }
 }
 
+pub(crate) fn extract_sprint_name(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::String(s) if !s.is_empty() => Some(s.clone()),
+        serde_json::Value::Object(m) => m
+            .get("name")
+            .and_then(|n| n.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from),
+        serde_json::Value::Array(arr) => arr.iter().find_map(extract_sprint_name),
+        _ => None,
+    }
+}
+
 impl Ticket {
-    pub fn from_bulk_fetch(issue: BulkFetchIssue, site_name: &str, base_url: &str) -> Self {
+    pub fn from_bulk_fetch(
+        issue: BulkFetchIssue,
+        site_name: &str,
+        base_url: &str,
+        sprint_field: Option<&str>,
+    ) -> Self {
         let ageing_days = NaiveDate::parse_from_str(&issue.fields.created[..10], "%Y-%m-%d")
             .map(|d| (chrono::Utc::now().date_naive() - d).num_days())
             .unwrap_or(0);
@@ -231,6 +255,9 @@ impl Ticket {
                 .parent
                 .as_ref()
                 .map(|p| p.fields.summary.clone()),
+            labels: issue.fields.labels.clone().unwrap_or_default(),
+            sprint_name: sprint_field
+                .and_then(|field| issue.fields.custom.get(field).and_then(extract_sprint_name)),
         }
     }
 }
@@ -292,14 +319,68 @@ mod tests {
                 description: Some(serde_json::json!("Plain description")),
                 comment: None,
                 parent: None,
+                labels: Some(vec!["backend".into(), "urgent".into()]),
+                custom: HashMap::new(),
             },
         };
-        let ticket = Ticket::from_bulk_fetch(issue, "acme", "https://acme.atlassian.net");
+        let ticket = Ticket::from_bulk_fetch(issue, "acme", "https://acme.atlassian.net", None);
         assert_eq!(ticket.key, "PROJ-1");
         assert_eq!(ticket.site, "acme");
         assert_eq!(ticket.status, "In Progress");
         assert_eq!(ticket.assignee, "Alice");
         assert_eq!(ticket.description.as_deref(), Some("Plain description"));
         assert!(ticket.link.contains("PROJ-1"));
+        assert_eq!(ticket.labels, vec!["backend", "urgent"]);
+    }
+
+    #[test]
+    fn extract_sprint_from_object_and_array() {
+        let obj = serde_json::json!({ "name": "Sprint 1" });
+        assert_eq!(extract_sprint_name(&obj), Some("Sprint 1".into()));
+        let arr = serde_json::json!([{ "name": "Sprint 2" }]);
+        assert_eq!(extract_sprint_name(&arr), Some("Sprint 2".into()));
+    }
+
+    #[test]
+    fn ticket_maps_custom_sprint_field() {
+        let mut custom = HashMap::new();
+        custom.insert(
+            "customfield_10020".into(),
+            serde_json::json!({ "name": "Board Sprint" }),
+        );
+        let issue = BulkFetchIssue {
+            key: "X-1".into(),
+            fields: JiraFields {
+                issue_type: JiraNamed {
+                    name: "Task".into(),
+                },
+                status: JiraStatus {
+                    name: "Open".into(),
+                    status_category: JiraStatusCategory {
+                        key: "new".into(),
+                        color_name: "blue".into(),
+                    },
+                },
+                priority: None,
+                assignee: None,
+                reporter: None,
+                duedate: None,
+                created: "2026-01-01T00:00:00.000+0000".into(),
+                project: JiraProject { key: "X".into() },
+                summary: "S".into(),
+                description: None,
+                comment: None,
+                parent: None,
+                labels: None,
+                custom,
+            },
+        };
+        let ticket = Ticket::from_bulk_fetch(
+            issue,
+            "acme",
+            "https://acme.atlassian.net",
+            Some("customfield_10020"),
+        );
+        assert_eq!(ticket.sprint_name.as_deref(), Some("Board Sprint"));
     }
 }

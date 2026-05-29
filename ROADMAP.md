@@ -1,45 +1,26 @@
 # tick roadmap
 
-Open-source Jira TUI (`aeswibon/tick`). Priorities are ordered for impact vs effort.
+Open-source Jira TUI (`aeswibon/tick`).
 
-## v0.1.x — Stabilize ✅
+## Shipped
 
-## v0.2 — Quality & portability ✅
+- **v0.1–v0.2:** Releases, CI, custom JQL, error overlay, token file, page_size, lib/cache refactor, Homebrew tap + auto-bump
+- **v0.3.0:** Edit summary (`S`) and priority (`P`) from detail pane
+- **v0.3.1:** Labels + sprint column/filter, doctor sprint field hints
 
-CI, Windows binary, custom JQL, error overlay, token file/env, page_size, lib.rs, cache module, Homebrew tap + auto-bump (`HOMEBREW_TAP_TOKEN`).
+## Next
 
-## v0.3 — Power-user workflow
-
-**Goal:** Daily Jira from the terminal without opening the browser.
-
-| Item | Status |
+| Item | Target |
 |------|--------|
-| Assign / unassign (`a` / `u`) | Done |
-| Parent column / filter | Done |
-| Keyboard-driven transition picker | Done |
-| Edit summary / priority (`S` / `P`) | Done (v0.3.0) |
-| Labels column + filter | Planned (v0.3.1) |
-| Sprint column + view JQL examples | Planned (v0.3.1) |
-| Desktop notification on refresh | Planned (v0.3.2) |
+| Desktop notification on refresh | v0.3.2 |
+| Virtualized table (500+ rows) | v0.4 |
+| Theme gallery | v0.4 |
+| Label/sprint membership edits | backlog |
+| OAuth | on demand |
 
-## v0.4 — Scale & polish
+## Out of scope
 
-| Item | Status |
-|------|--------|
-| Virtualized table | Planned |
-| Stronger offline UX | Partial (cache + keep on fetch fail) |
-| Theme gallery in repo | Planned |
-| OAuth | Planned (on demand) |
-
-## Community & governance
-
-Issue templates, SECURITY.md, CHANGELOG — done.
-
-## Out of scope (for now)
-
-- Jira Server / Data Center
-- Web UI or mobile client
-- Real-time WebSocket sync
+Jira Server/DC, web UI, WebSocket sync.
 
 ---
 

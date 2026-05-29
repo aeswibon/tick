@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.1] - 2026-05-29
+
+### Added
+
+- Labels column and `/` filter match on label text
+- Optional sprint column via per-site `sprint_field` in config
+- `tick --doctor` lists sprint field candidates for each site
+- Sprint view JQL examples in config template and README
+
 ## [0.3.0] - 2026-05-29
 
 ### Added

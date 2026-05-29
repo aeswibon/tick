@@ -9,6 +9,9 @@ use crate::view_mode::ViewMode;
 pub struct Site {
     pub name: String,
     pub base_url: String,
+    /// Jira field id for sprint (e.g. customfield_10020). Use `tick --doctor` to discover.
+    #[serde(default)]
+    pub sprint_field: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -207,13 +210,15 @@ theme = "default"
 # updated = "assignee = currentUser() AND statusCategory != Done AND updated >= -7d ORDER BY updated DESC"
 # mentions = "comment ~ currentUser() AND statusCategory != Done ORDER BY updated DESC"
 # watched = "watcher = currentUser() AND statusCategory != Done ORDER BY updated DESC"
+# sprint = "sprint in openSprints() AND assignee = currentUser() ORDER BY updated DESC"
 
-# Optional table columns (ids: site, key, type, status, priority, age, due, assignee, reporter, summary, parent)
-# columns = ["site", "key", "type", "status", "priority", "age", "due", "assignee", "reporter"]
+# Optional table columns (ids: site, key, type, status, priority, age, due, assignee, reporter, parent, labels, sprint, summary)
+# columns = ["site", "key", "labels", "sprint", "summary", "status", "assignee"]
 
 [[sites]]
 name = "my-team"
 base_url = "https://my-team.atlassian.net"
+# sprint_field = "customfield_10020"   # run: tick --doctor
 "#;
         fs::write(&path, default).map_err(|e| format!("Cannot write {}: {}", path.display(), e))?;
         println!("Default config created at {}", path.display());

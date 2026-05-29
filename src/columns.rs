@@ -15,6 +15,8 @@ pub enum Column {
     Assignee,
     Reporter,
     Parent,
+    Labels,
+    Sprint,
     Summary,
 }
 
@@ -32,6 +34,8 @@ impl Column {
             Self::Assignee => "assignee",
             Self::Reporter => "reporter",
             Self::Parent => "parent",
+            Self::Labels => "labels",
+            Self::Sprint => "sprint",
             Self::Summary => "summary",
         }
     }
@@ -48,6 +52,8 @@ impl Column {
             Self::Assignee => "Assignee",
             Self::Reporter => "Reporter",
             Self::Parent => "Parent",
+            Self::Labels => "Labels",
+            Self::Sprint => "Sprint",
             Self::Summary => "Summary",
         }
     }
@@ -64,6 +70,8 @@ impl Column {
             "assignee" => Some(Self::Assignee),
             "reporter" => Some(Self::Reporter),
             "parent" | "epic" => Some(Self::Parent),
+            "labels" | "label" => Some(Self::Labels),
+            "sprint" => Some(Self::Sprint),
             "summary" => Some(Self::Summary),
             _ => None,
         }
@@ -122,6 +130,18 @@ impl Column {
                 let text = ticket.parent_key.as_deref().unwrap_or("-");
                 Cell::from(Span::raw(text.to_string()))
             }
+            Self::Labels => {
+                let text = if ticket.labels.is_empty() {
+                    "-".to_string()
+                } else {
+                    ticket.labels.join(", ")
+                };
+                Cell::from(Span::raw(text))
+            }
+            Self::Sprint => {
+                let text = ticket.sprint_name.as_deref().unwrap_or("-");
+                Cell::from(Span::raw(text.to_string()))
+            }
             Self::Summary => Cell::from(Span::raw(ticket.summary.clone())),
         }
     }
@@ -138,6 +158,8 @@ impl Column {
             Self::Assignee => 12,
             Self::Reporter => 12,
             Self::Parent => 12,
+            Self::Labels => 16,
+            Self::Sprint => 14,
             Self::Summary => 24,
         }
     }

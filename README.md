@@ -91,14 +91,15 @@ base_url = "https://my-team.atlassian.net"
 |--------|---------|-------------|
 | `email` | — | Your Atlassian account email |
 | `token` | file / env | [Atlassian API token](https://id.atlassian.com/manage-profile/security/api-tokens); also `~/.config/tick/token` or `TICK_TOKEN` |
-| `[views]` | built-in JQL | Override JQL for Assigned, Updated, Mentions, Watched |
+| `[views]` | built-in JQL | Override JQL for Assigned, Updated, Mentions, Watched, Sprint (see examples) |
+| `sprint_field` | — | Per-site Jira field id for sprint column (see `tick --doctor`) |
 | `max_results` | `50` | Max tickets to fetch per site |
 | `page_size` | `10` | Tickets shown per table page |
 | `theme` | `"default"` | Theme name (built-in or custom) |
 | `columns` | built-in default | Table column ids (see config comment) |
 | `sites` | — | List of Jira sites with `name` and `base_url` |
 
-Column ids: `site`, `key`, `type`, `status`, `priority`, `age`, `due`, `assignee`, `reporter`, `parent`, `summary`.
+Column ids: `site`, `key`, `type`, `status`, `priority`, `age`, `due`, `assignee`, `reporter`, `parent`, `labels`, `sprint`, `summary`.
 
 ### Credentials
 

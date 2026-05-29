@@ -60,15 +60,33 @@ pub async fn run_doctor(config: &Config) {
         }
 
         match client.search_jql(&site.base_url, probe_jql, 2).await {
-            Ok(ids) => match client.bulk_fetch(&site.base_url, &ids).await {
-                Ok(issues) => println!(
-                    "  Bulk fetch: OK ({} ids → {} issues)",
-                    ids.len(),
-                    issues.len()
-                ),
-                Err(e) => println!("  Bulk fetch: FAILED — {e}"),
-            },
+            Ok(ids) => {
+                let sf = site.sprint_field.as_deref();
+                match client.bulk_fetch(&site.base_url, &ids, sf).await {
+                    Ok(issues) => println!(
+                        "  Bulk fetch: OK ({} ids → {} issues)",
+                        ids.len(),
+                        issues.len()
+                    ),
+                    Err(e) => println!("  Bulk fetch: FAILED — {e}"),
+                }
+            }
             Err(e) => println!("  Bulk fetch: skipped — {e}"),
+        }
+
+        match client.find_sprint_fields(&site.base_url).await {
+            Ok(fields) if fields.is_empty() => {
+                println!("  Sprint fields: none found (set sprint_field in config if needed)");
+            }
+            Ok(fields) => {
+                println!("  Sprint fields (use id in config sprint_field):");
+                for (id, name) in fields {
+                    let configured = site.sprint_field.as_deref() == Some(id.as_str());
+                    let mark = if configured { " *" } else { "" };
+                    println!("    {id} — {name}{mark}");
+                }
+            }
+            Err(e) => println!("  Sprint fields: FAILED — {e}"),
         }
     }
 }
