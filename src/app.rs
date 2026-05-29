@@ -82,6 +82,7 @@ pub enum InputMode {
     None,
     Comment,
     Worklog,
+    EditSummary,
 }
 
 struct FilterCache {
@@ -107,6 +108,9 @@ pub struct App {
     pub showing_transitions: bool,
     pub transition_selected: usize,
     pub transition_options: Vec<(String, String)>,
+    pub showing_priorities: bool,
+    pub priority_selected: usize,
+    pub priority_options: Vec<(String, String)>,
     pub show_site_errors: bool,
     pub site_error_scroll: usize,
     pub live_data: bool,
@@ -149,6 +153,9 @@ impl App {
             showing_transitions: false,
             transition_selected: 0,
             transition_options: Vec::new(),
+            showing_priorities: false,
+            priority_selected: 0,
+            priority_options: Vec::new(),
             show_site_errors: false,
             site_error_scroll: 0,
             live_data: false,
@@ -183,15 +190,18 @@ impl App {
     }
 
     pub fn selected_ticket(&self) -> Option<TicketRef> {
-        let tickets = read_tickets(&self.tickets);
-        let indices = self.filtered_indices();
-        let ticket_idx = *indices.get(self.selected)?;
-        let t = tickets.get(ticket_idx)?;
-        Some(TicketRef {
-            site: t.site.clone(),
-            key: t.key.clone(),
-            link: t.link.clone(),
+        self.selected_ticket_entry().map(|t| TicketRef {
+            site: t.site,
+            key: t.key,
+            link: t.link,
         })
+    }
+
+    pub fn selected_ticket_entry(&self) -> Option<Ticket> {
+        let tickets = read_tickets(&self.tickets);
+        let indices = self.visible_indices();
+        let ticket_idx = *indices.get(self.selected)?;
+        tickets.get(ticket_idx).cloned()
     }
 
     fn load_cache(&mut self) {

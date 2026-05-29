@@ -3,5 +3,6 @@ pub mod detail;
 pub mod draw;
 pub mod errors;
 pub mod help;
+pub mod priorities;
 mod table;
 pub mod transitions;

@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.0] - 2026-05-29
+
+### Added
+
+- Edit issue summary from detail pane (`S`)
+- Change priority via picker overlay (`P`)
+
 ## [0.2.0] - 2026-05-29
 
 ### Added

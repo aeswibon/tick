@@ -46,6 +46,11 @@ pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
         return false;
     }
 
+    if app.showing_priorities {
+        handle_priority_key(app, code).await;
+        return false;
+    }
+
     handle_normal_key(app, code).await
 }
 
@@ -83,6 +88,7 @@ async fn submit_input(app: &mut App) {
     let result = match mode {
         InputMode::Comment => app.jira.add_comment(&base_url, &sel.key, &buffer).await,
         InputMode::Worklog => app.jira.add_worklog(&base_url, &sel.key, &buffer).await,
+        InputMode::EditSummary => app.jira.update_summary(&base_url, &sel.key, &buffer).await,
         InputMode::None => return,
     };
 
@@ -111,6 +117,51 @@ async fn handle_transition_key(app: &mut App, code: KeyCode) {
         }
         KeyCode::Esc => app.showing_transitions = false,
         _ => {}
+    }
+}
+
+async fn handle_priority_key(app: &mut App, code: KeyCode) {
+    match code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.priority_selected = app.priority_selected.saturating_sub(1);
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if app.priority_selected + 1 < app.priority_options.len() {
+                app.priority_selected += 1;
+            }
+        }
+        KeyCode::Enter => {
+            apply_priority(app, app.priority_selected).await;
+        }
+        KeyCode::Char(n) if ('1'..='9').contains(&n) => {
+            let idx = (n as u8 - b'1') as usize;
+            apply_priority(app, idx).await;
+        }
+        KeyCode::Esc => app.showing_priorities = false,
+        _ => {}
+    }
+}
+
+async fn apply_priority(app: &mut App, idx: usize) {
+    if idx >= app.priority_options.len() {
+        return;
+    }
+    let (_, name) = app.priority_options[idx].clone();
+    let Some(sel) = app.selected_ticket() else {
+        return;
+    };
+    let Some(base_url) = app.site_base_url(&sel.site) else {
+        return;
+    };
+    match app.jira.update_priority(&base_url, &sel.key, &name).await {
+        Ok(()) => {
+            app.showing_priorities = false;
+            app.refresh_all().await;
+        }
+        Err(e) => {
+            app.status.set_action_error(e);
+            app.showing_priorities = false;
+        }
     }
 }
 
@@ -183,6 +234,7 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             app.show_help = false;
             app.detail_open = false;
             app.showing_transitions = false;
+            app.showing_priorities = false;
             app.show_site_errors = false;
         }
         KeyCode::Char('!') if app.status.has_warnings() => {
@@ -246,6 +298,15 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('u') if app.detail_open => {
             unassign_ticket(app).await;
         }
+        KeyCode::Char('S') if app.detail_open => {
+            if let Some(ticket) = app.selected_ticket_entry() {
+                app.input_mode = InputMode::EditSummary;
+                app.input_buffer = ticket.summary;
+            }
+        }
+        KeyCode::Char('P') if app.detail_open => {
+            start_priority_picker(app).await;
+        }
         KeyCode::Char('g') => {
             app.current_page = 0;
             app.selected = 0;
@@ -289,6 +350,32 @@ async fn unassign_ticket(app: &mut App) {
     };
     match app.jira.unassign(&base_url, &sel.key).await {
         Ok(()) => app.refresh_all().await,
+        Err(e) => app.status.set_action_error(e),
+    }
+}
+
+async fn start_priority_picker(app: &mut App) {
+    let Some(sel) = app.selected_ticket() else {
+        return;
+    };
+    let Some(base_url) = app.site_base_url(&sel.site) else {
+        return;
+    };
+    match app.jira.list_priorities(&base_url).await {
+        Ok(options) if !options.is_empty() => {
+            let current = app
+                .selected_ticket_entry()
+                .map(|t| t.priority)
+                .unwrap_or_default();
+            app.priority_options = options;
+            app.priority_selected = app
+                .priority_options
+                .iter()
+                .position(|(_, name)| name == &current)
+                .unwrap_or(0);
+            app.showing_priorities = true;
+        }
+        Ok(_) => app.status.set_action_error("No priorities available"),
         Err(e) => app.status.set_action_error(e),
     }
 }

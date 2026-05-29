@@ -14,6 +14,7 @@ pub struct JiraClient {
     pub token: String,
     pub debug: bool,
     account_ids: Mutex<HashMap<String, String>>,
+    priorities: Mutex<HashMap<String, Vec<(String, String)>>>,
 }
 
 impl JiraClient {
@@ -24,6 +25,104 @@ impl JiraClient {
             token: token.to_string(),
             debug,
             account_ids: Mutex::new(HashMap::new()),
+            priorities: Mutex::new(HashMap::new()),
+        }
+    }
+
+    pub async fn list_priorities(&self, base_url: &str) -> Result<Vec<(String, String)>, String> {
+        let base = base_url.trim_end_matches('/');
+        if let Ok(cache) = self.priorities.lock() {
+            if let Some(list) = cache.get(base) {
+                return Ok(list.clone());
+            }
+        }
+        let url = format!("{base}/rest/api/3/priority");
+        let resp = self
+            .http
+            .get(&url)
+            .basic_auth(&self.email, Some(&self.token))
+            .send()
+            .await
+            .map_err(|e| format!("HTTP error: {}", e))?;
+        if !resp.status().is_success() {
+            return Err(format!(
+                "Priority API {}: {}",
+                resp.status(),
+                resp.text().await.unwrap_or_default()
+            ));
+        }
+        let data: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| format!("Parse error: {}", e))?;
+        let list: Vec<(String, String)> = data
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|p| {
+                        let id = p["id"].as_str()?;
+                        let name = p["name"].as_str()?;
+                        Some((id.to_string(), name.to_string()))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        if let Ok(mut cache) = self.priorities.lock() {
+            cache.insert(base.to_string(), list.clone());
+        }
+        Ok(list)
+    }
+
+    pub async fn update_summary(
+        &self,
+        base_url: &str,
+        key: &str,
+        summary: &str,
+    ) -> Result<(), String> {
+        self.update_fields(base_url, key, serde_json::json!({ "summary": summary }))
+            .await
+    }
+
+    pub async fn update_priority(
+        &self,
+        base_url: &str,
+        key: &str,
+        priority_name: &str,
+    ) -> Result<(), String> {
+        self.update_fields(
+            base_url,
+            key,
+            serde_json::json!({ "priority": { "name": priority_name } }),
+        )
+        .await
+    }
+
+    async fn update_fields(
+        &self,
+        base_url: &str,
+        key: &str,
+        fields: serde_json::Value,
+    ) -> Result<(), String> {
+        let url = format!(
+            "{}/rest/api/3/issue/{}",
+            base_url.trim_end_matches('/'),
+            key
+        );
+        let resp = self
+            .http
+            .put(&url)
+            .basic_auth(&self.email, Some(&self.token))
+            .json(&serde_json::json!({ "fields": fields }))
+            .send()
+            .await
+            .map_err(|e| format!("HTTP error: {}", e))?;
+        if resp.status().is_success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "Update failed: {}",
+                resp.text().await.unwrap_or_default()
+            ))
         }
     }
 
@@ -472,5 +571,68 @@ mod fetch_integration {
         assert_eq!(tickets[0].key, "DEMO-1");
         assert_eq!(tickets[0].site, "test");
         assert_eq!(tickets[0].summary, "Hello");
+    }
+}
+
+#[cfg(test)]
+mod field_updates {
+    use super::*;
+
+    #[tokio::test]
+    async fn update_summary_sends_put() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("PUT"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/DEMO-1"))
+            .and(wiremock::matchers::body_json(
+                serde_json::json!({ "fields": { "summary": "New title" } }),
+            ))
+            .respond_with(wiremock::ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        client
+            .update_summary(&server.uri(), "DEMO-1", "New title")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn update_priority_sends_put() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("PUT"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/DEMO-1"))
+            .and(wiremock::matchers::body_json(serde_json::json!({
+                "fields": { "priority": { "name": "High" } }
+            })))
+            .respond_with(wiremock::ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        client
+            .update_priority(&server.uri(), "DEMO-1", "High")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn list_priorities_parses_response() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/rest/api/3/priority"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                    { "id": "1", "name": "High" },
+                    { "id": "2", "name": "Low" }
+                ])),
+            )
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        let list = client.list_priorities(&server.uri()).await.unwrap();
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[0].1, "High");
     }
 }
