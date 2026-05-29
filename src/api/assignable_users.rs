@@ -1,6 +1,8 @@
 //! Assignable-user catalog per issue (cached, filtered locally).
 
 pub(crate) const CATALOG_MAX: &str = "100";
+/// Upper bound on cached users per issue after merges.
+pub const CACHE_MAX: usize = 500;
 
 pub fn cache_key(base_url: &str, issue_key: &str) -> String {
     format!("{}|{}", base_url.trim_end_matches('/'), issue_key)
@@ -20,6 +22,25 @@ pub fn filter_users(catalog: &[(String, String)], query: &str) -> Vec<(String, S
     };
     out.sort_by(|a, b| a.1.cmp(&b.1));
     out.truncate(50);
+    out
+}
+
+/// Union by account id; refresh appends rather than replacing the catalog.
+pub fn merge_users(
+    existing: &[(String, String)],
+    fetched: &[(String, String)],
+) -> Vec<(String, String)> {
+    use std::collections::HashMap;
+    let mut by_id: HashMap<String, String> = HashMap::new();
+    for (id, name) in existing {
+        by_id.insert(id.clone(), name.clone());
+    }
+    for (id, name) in fetched {
+        by_id.insert(id.clone(), name.clone());
+    }
+    let mut out: Vec<_> = by_id.into_iter().collect();
+    out.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
+    out.truncate(CACHE_MAX);
     out
 }
 
@@ -43,5 +64,20 @@ mod tests {
         let catalog = vec![("2".into(), "Zed".into()), ("1".into(), "Amy".into())];
         let out = filter_users(&catalog, "");
         assert_eq!(out[0].1, "Amy");
+    }
+
+    #[test]
+    fn merge_appends_without_duplicates() {
+        let a = vec![("1".into(), "Alice".into())];
+        let b = vec![("1".into(), "Alice".into()), ("2".into(), "Bob".into())];
+        let merged = merge_users(&a, &b);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn merge_keeps_existing_when_fetch_empty() {
+        let a = vec![("1".into(), "Alice".into())];
+        let merged = merge_users(&a, &[]);
+        assert_eq!(merged.len(), 1);
     }
 }

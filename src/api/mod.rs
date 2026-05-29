@@ -629,27 +629,47 @@ impl JiraClient {
         Ok(parse_user_list(&data))
     }
 
-    /// Load assignable users for an issue into the session cache (up to 100).
+    /// Load assignable users for an issue into the session cache.
+    ///
+    /// Initial load uses `api_query` `""` (up to 100). On refresh, fetches with `api_query`
+    /// (often the footer filter) and **merges** into the existing catalog.
     pub async fn ensure_assignable_users(
         &self,
         base_url: &str,
         issue_key: &str,
+        api_query: &str,
         force_refresh: bool,
     ) -> Result<Vec<(String, String)>, String> {
         let key = assignable_users::cache_key(base_url, issue_key);
-        if !force_refresh {
-            if let Ok(cache) = self.assignable_users.lock() {
-                if let Some(list) = cache.get(&key) {
-                    return Ok(list.clone());
-                }
+        let existing = if force_refresh {
+            self.assignable_users
+                .lock()
+                .ok()
+                .and_then(|c| c.get(&key).cloned())
+                .unwrap_or_default()
+        } else if let Ok(cache) = self.assignable_users.lock() {
+            if let Some(list) = cache.get(&key) {
+                return Ok(list.clone());
             }
-        } else if let Ok(mut cache) = self.assignable_users.lock() {
-            cache.remove(&key);
-        }
+            Vec::new()
+        } else {
+            Vec::new()
+        };
 
-        let list = self
-            .fetch_assignable_users_api(base_url, issue_key, "", assignable_users::CATALOG_MAX)
+        let fetched = self
+            .fetch_assignable_users_api(
+                base_url,
+                issue_key,
+                api_query,
+                assignable_users::CATALOG_MAX,
+            )
             .await?;
+
+        let list = if force_refresh {
+            assignable_users::merge_users(&existing, &fetched)
+        } else {
+            fetched
+        };
 
         if let Ok(mut cache) = self.assignable_users.lock() {
             cache.insert(key, list.clone());
@@ -665,7 +685,7 @@ impl JiraClient {
         query: &str,
     ) -> Result<Vec<(String, String)>, String> {
         let catalog = self
-            .ensure_assignable_users(base_url, issue_key, false)
+            .ensure_assignable_users(base_url, issue_key, "", false)
             .await?;
         Ok(assignable_users::filter_users(&catalog, query))
     }
@@ -1101,7 +1121,7 @@ mod field_updates {
 
         let client = JiraClient::new("u@example.com", "token", false);
         let catalog = client
-            .ensure_assignable_users(&server.uri(), "DEMO-1", false)
+            .ensure_assignable_users(&server.uri(), "DEMO-1", "", false)
             .await
             .unwrap();
         assert_eq!(catalog.len(), 2);
@@ -1113,9 +1133,16 @@ mod field_updates {
         assert_eq!(users.len(), 1);
         assert_eq!(users[0], ("acc-1".into(), "Alice".into()));
 
-        // Second call uses cache (no extra HTTP).
+        // Refresh merges (same response still dedupes to 2).
+        let merged = client
+            .ensure_assignable_users(&server.uri(), "DEMO-1", "", true)
+            .await
+            .unwrap();
+        assert_eq!(merged.len(), 2);
+
+        // Second load uses cache (no extra HTTP).
         let again = client
-            .ensure_assignable_users(&server.uri(), "DEMO-1", false)
+            .ensure_assignable_users(&server.uri(), "DEMO-1", "", false)
             .await
             .unwrap();
         assert_eq!(again.len(), 2);

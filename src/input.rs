@@ -147,13 +147,16 @@ async fn refresh_mention_catalog(app: &mut App, force: bool) -> Result<(), Strin
     let Some(base_url) = app.site_base_url(&sel.site) else {
         return Ok(());
     };
+    let api_query = active_mention_query(&app.input_buffer)
+        .map(|(_, q)| q.to_string())
+        .unwrap_or_default();
     if force {
         app.loading = true;
-        app.loading_message = Some("Refreshing users…".into());
+        app.loading_message = Some("Loading more users…".into());
     }
     let result = app
         .jira
-        .ensure_assignable_users(&base_url, &sel.key, force)
+        .ensure_assignable_users(&base_url, &sel.key, &api_query, force)
         .await
         .map(|_| ());
     if force {
@@ -489,9 +492,10 @@ async fn refresh_transition_user_search(app: &mut App, force_refresh: bool) {
         app.loading_message = Some("Refreshing users…".into());
     }
 
+    let api_query = if force_refresh { query } else { "" };
     let users = match app
         .jira
-        .ensure_assignable_users(&base_url, &sel.key, force_refresh)
+        .ensure_assignable_users(&base_url, &sel.key, api_query, force_refresh)
         .await
     {
         Ok(catalog) => assignable_users::filter_users(&catalog, query),

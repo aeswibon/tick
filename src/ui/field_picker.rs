@@ -74,7 +74,7 @@ pub fn draw_field_picker(
     if !text_input_mode || user_field {
         lines.push(Line::from(""));
         let footer = if user_field {
-            "  Type in footer to filter  j/k move  Enter pick  R refresh  Esc cancel"
+            "  Type in footer to filter  j/k move  Enter pick  R add users  Esc cancel"
         } else {
             "  j/k move  Enter confirm  1-9  R refresh  Esc cancel"
         };

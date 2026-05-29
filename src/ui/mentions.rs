@@ -48,7 +48,7 @@ pub fn draw_mentions(f: &mut Frame, app: &App, area: Rect) {
 
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        "  j/k move  Enter pick  R refresh users  Esc cancel",
+        "  j/k move  Enter pick  R add users  Esc cancel",
         Style::default().fg(app.theme.border),
     )));
 
