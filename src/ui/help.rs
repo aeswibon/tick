@@ -61,9 +61,7 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
         Line::from("  c                      Add comment (@ tags users)"),
         Line::from("  w                      Log work time"),
         Line::from("  a / u                  Assign to me / unassign (detail open)"),
-        Line::from(
-            "  S / P / L / M / D      Edit summary / priority / labels / sprint / description",
-        ),
+        Line::from("  S / P / L / M / D      Edit fields (D: markdown + @mentions)"),
         Line::from("  !                      Toggle site error overlay"),
         Line::from(""),
         Line::from(Span::styled(

@@ -1,17 +1,24 @@
 # tick roadmap
 
+## Shipped (v0.6)
+
+- HTTP retry/backoff on rate limits and transient errors
+- Preserve selection/scroll on refresh when ticket set unchanged
+- Markdown descriptions (`D`) with `@` mention picker
+- Comments use markdown + mentions
+
 ## Shipped (v0.5)
 
-- OAuth 2.0 + API token auth
-- Description edit (`D`)
-- Full user documentation in `docs/`
-- Sprint view tab, virtualized table, themes, labels/sprint, notify, cache age, board config
+- OAuth 2.0 + API token auth (token default)
+- Description edit, user docs, `@mention` display
+- Sprint tab, virtualization, 10 themes, labels/sprint moves
 
 ## Next
 
 | Item | Notes |
 |------|-------|
-| Rich ADF description editor | WYSIWYG or markdown — backlog |
+| ADF → markdown round-trip for edit | Load existing formatting when pressing `D` |
+| Rich ADF read (tables, media) | Fewer blank blocks in detail pane |
 | Jira Server/Data Center | Out of scope unless demand |
 
 ---

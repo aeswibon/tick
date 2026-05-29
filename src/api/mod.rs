@@ -1,5 +1,7 @@
 pub mod adf;
 pub mod agile;
+pub mod markdown;
+pub mod retry;
 pub mod types;
 
 use crate::auth::Auth;
@@ -58,6 +60,14 @@ impl JiraClient {
         self.authed(self.http.post(url))
     }
 
+    pub(crate) async fn send<F, Fut>(&self, build: F) -> Result<reqwest::Response, String>
+    where
+        F: Fn() -> Fut,
+        Fut: std::future::Future<Output = Result<reqwest::Response, reqwest::Error>>,
+    {
+        retry::with_retry(build).await
+    }
+
     pub async fn list_priorities(&self, base_url: &str) -> Result<Vec<(String, String)>, String> {
         let base = base_url.trim_end_matches('/');
         if let Ok(cache) = self.priorities.lock() {
@@ -66,11 +76,7 @@ impl JiraClient {
             }
         }
         let url = format!("{base}/rest/api/3/priority");
-        let resp = self
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+        let resp = self.send(|| self.get(&url).send()).await?;
         if !resp.status().is_success() {
             return Err(format!(
                 "Priority API {}: {}",
@@ -139,8 +145,9 @@ impl JiraClient {
         base_url: &str,
         key: &str,
         text: &str,
+        mentions: &[(String, String)],
     ) -> Result<(), String> {
-        let body = adf::plain_text_to_description(text);
+        let body = markdown::to_adf(text, mentions);
         self.update_fields(base_url, key, serde_json::json!({ "description": body }))
             .await
     }
@@ -157,11 +164,12 @@ impl JiraClient {
             key
         );
         let resp = self
-            .put(&url)
-            .json(&serde_json::json!({ "fields": fields }))
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+            .send(|| {
+                self.put(&url)
+                    .json(&serde_json::json!({ "fields": fields }))
+                    .send()
+            })
+            .await?;
         if resp.status().is_success() {
             Ok(())
         } else {
@@ -180,11 +188,7 @@ impl JiraClient {
             }
         }
         let url = format!("{base}/rest/api/3/myself");
-        let resp = self
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+        let resp = self.send(|| self.get(&url).send()).await?;
         if !resp.status().is_success() {
             return Err(format!(
                 "Myself API {}: {}",
@@ -236,14 +240,8 @@ impl JiraClient {
             base_url.trim_end_matches('/'),
             key
         );
-        let resp = self
-            .put(&url)
-            .json(&serde_json::json!({
-                "fields": { "assignee": assignee },
-            }))
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+        let payload = serde_json::json!({ "fields": { "assignee": assignee } });
+        let resp = self.send(|| self.put(&url).json(&payload).send()).await?;
         if resp.status().is_success() {
             Ok(())
         } else {
@@ -277,12 +275,7 @@ impl JiraClient {
                 eprintln!("[DEBUG] POST {} (JQL: {})", url, jql);
             }
 
-            let resp = self
-                .post(&url)
-                .json(&body)
-                .send()
-                .await
-                .map_err(|e| format!("HTTP error: {}", e))?;
+            let resp = self.send(|| self.post(&url).json(&body).send()).await?;
 
             if !resp.status().is_success() {
                 let status = resp.status();
@@ -314,11 +307,7 @@ impl JiraClient {
         base_url: &str,
     ) -> Result<Vec<(String, String)>, String> {
         let url = format!("{}/rest/api/3/field", base_url.trim_end_matches('/'));
-        let resp = self
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+        let resp = self.send(|| self.get(&url).send()).await?;
         if !resp.status().is_success() {
             return Err(format!(
                 "Field API {}: {}",
@@ -384,15 +373,11 @@ impl JiraClient {
             }
         }
 
-        let resp = self
-            .post(&url)
-            .json(&serde_json::json!({
-                "issueIdsOrKeys": ids,
-                "fields": fields,
-            }))
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+        let payload = serde_json::json!({
+            "issueIdsOrKeys": ids,
+            "fields": fields,
+        });
+        let resp = self.send(|| self.post(&url).json(&payload).send()).await?;
 
         if !resp.status().is_success() {
             let status = resp.status();
@@ -420,11 +405,7 @@ impl JiraClient {
             base_url.trim_end_matches('/'),
             key
         );
-        let resp = self
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+        let resp = self.send(|| self.get(&url).send()).await?;
 
         if !resp.status().is_success() {
             return Err(format!(
@@ -465,14 +446,8 @@ impl JiraClient {
             base_url.trim_end_matches('/'),
             key
         );
-        let resp = self
-            .post(&url)
-            .json(&serde_json::json!({
-                "transition": { "id": transition_id }
-            }))
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+        let payload = serde_json::json!({ "transition": { "id": transition_id } });
+        let resp = self.send(|| self.post(&url).json(&payload).send()).await?;
 
         if resp.status().is_success() {
             Ok(())
@@ -495,15 +470,16 @@ impl JiraClient {
             base_url.trim_end_matches('/')
         );
         let resp = self
-            .get(&url)
-            .query(&[
-                ("query", query),
-                ("issueKey", issue_key),
-                ("maxResults", "20"),
-            ])
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {e}"))?;
+            .send(|| {
+                self.get(&url)
+                    .query(&[
+                        ("query", query),
+                        ("issueKey", issue_key),
+                        ("maxResults", "20"),
+                    ])
+                    .send()
+            })
+            .await?;
         if !resp.status().is_success() {
             return Err(format!(
                 "User search {}: {}",
@@ -539,19 +515,9 @@ impl JiraClient {
             base_url.trim_end_matches('/'),
             key
         );
-        let adf_body = if mentions.is_empty() {
-            adf::plain_text_body(body)
-        } else {
-            adf::comment_body_with_mentions(body, mentions)
-        };
-        let resp = self
-            .post(&url)
-            .json(&serde_json::json!({
-                "body": adf_body,
-            }))
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+        let adf_body = markdown::to_adf(body, mentions);
+        let payload = serde_json::json!({ "body": adf_body });
+        let resp = self.send(|| self.post(&url).json(&payload).send()).await?;
 
         if resp.status().is_success() {
             Ok(())
@@ -576,11 +542,12 @@ impl JiraClient {
             key
         );
         let resp = self
-            .post(&url)
-            .json(&serde_json::json!({ "timeSpent": time_spent }))
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+            .send(|| {
+                self.post(&url)
+                    .json(&serde_json::json!({ "timeSpent": time_spent }))
+                    .send()
+            })
+            .await?;
 
         if resp.status().is_success() {
             Ok(())
@@ -772,7 +739,7 @@ mod field_updates {
 
         let client = JiraClient::new("u@example.com", "token", false);
         client
-            .update_description(&server.uri(), "DEMO-1", "Hello\n\nWorld")
+            .update_description(&server.uri(), "DEMO-1", "# Hello\n\nWorld", &[])
             .await
             .unwrap();
     }

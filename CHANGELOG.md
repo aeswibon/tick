@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.0] - 2026-05-29
+
+### Added
+
+- HTTP retry with exponential backoff on 429/5xx and transient network errors
+- Markdown descriptions: headings, bullet lists, **bold**, *italic*, `code`, links, `@mentions`
+- `@` user picker when editing descriptions (`D`), same as comments
+
+### Changed
+
+- `refresh_all` after writes preserves selection/scroll when the ticket list is unchanged
+- Background refresh keeps the selected issue key when possible
+- Comments submitted as markdown ADF
+
 ## [0.5.1] - 2026-05-29
 
 ### Added

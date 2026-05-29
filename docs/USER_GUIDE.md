@@ -103,7 +103,7 @@ If Jira is unreachable, tick **keeps the last cached tickets** instead of cleari
 | Change priority | `P` |
 | Set labels | `L` (comma-separated) |
 | Move to sprint/backlog | `M` |
-| Edit description | `D` (plain text; blank lines = new paragraphs) |
+| Edit description | `D` (markdown: `#` headings, `-` lists, `**bold**`, `@` mentions) |
 | Open in browser | `o` (from table) |
 | Copy key | `y` |
 

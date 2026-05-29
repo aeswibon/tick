@@ -136,8 +136,8 @@ pub struct App {
     pub mention_options: Vec<(String, String)>,
     /// Byte index of the active `@` in `input_buffer`.
     pub mention_anchor: Option<usize>,
-    /// Resolved mentions in the current comment: (`@Display Name`, account_id).
-    pub comment_mentions: Vec<(String, String)>,
+    /// Resolved @mentions while composing comment or description: (`@Display Name`, account_id).
+    pub input_mentions: Vec<(String, String)>,
     #[allow(dead_code)]
     pub debug: bool,
     /// Rows to jump when pressing `[` / `]` (from config `page_size`).
@@ -194,7 +194,7 @@ impl App {
             mention_selected: 0,
             mention_options: Vec::new(),
             mention_anchor: None,
-            comment_mentions: Vec::new(),
+            input_mentions: Vec::new(),
             debug,
             page_size,
             scroll_offset: 0,
@@ -407,11 +407,11 @@ impl App {
     }
 
     pub async fn refresh_all(&mut self) {
-        self.do_refresh_all(&ViewMode::all(), false).await;
+        self.do_refresh_all(&ViewMode::all(), false, true).await;
     }
 
     pub async fn refresh_all_notify(&mut self) {
-        self.do_refresh_all(&ViewMode::all(), true).await;
+        self.do_refresh_all(&ViewMode::all(), true, false).await;
     }
 
     async fn fetch_views_parallel(
@@ -436,11 +436,17 @@ impl App {
         results
     }
 
-    async fn do_refresh_all(&mut self, views: &[ViewMode], notify: bool) {
-        let previous_keys = if notify && self.config.notify_on_refresh {
+    async fn do_refresh_all(&mut self, views: &[ViewMode], notify: bool, preserve_ui: bool) {
+        let track_keys = preserve_ui || (notify && self.config.notify_on_refresh);
+        let previous_keys = if track_keys {
             ticket_keys(&read_tickets(&self.tickets))
         } else {
             Vec::new()
+        };
+        let selected_key = if preserve_ui {
+            self.selected_ticket().map(|t| t.key)
+        } else {
+            None
         };
         self.loading = true;
         let results = self.fetch_views_parallel(views).await;
@@ -455,7 +461,11 @@ impl App {
             all_errors.extend(errs);
         }
         if let Some(tickets) = active_tickets {
-            self.apply_fetch_result(tickets, all_errors, true);
+            let reset = !(preserve_ui && same_ticket_keys(&previous_keys, &tickets));
+            self.apply_fetch_result(tickets, all_errors, reset);
+            if preserve_ui && !reset {
+                restore_selection_on_key(self, selected_key.as_deref());
+            }
             self.maybe_notify_new_tickets(&previous_keys, &read_tickets(&self.tickets));
             self.view_fetched_at = Some(Utc::now());
         } else {
@@ -512,10 +522,11 @@ impl App {
                 all_errors.extend(errs);
             }
             if let Some(tickets) = active_tickets {
+                let selected_key = self.selected_ticket().map(|t| t.key);
                 let preserve_ui = same_ticket_keys(&previous_keys, &tickets);
                 self.apply_fetch_result(tickets, all_errors, !preserve_ui);
                 if preserve_ui {
-                    self.clamp_selection();
+                    restore_selection_on_key(self, selected_key.as_deref());
                 }
                 self.maybe_notify_new_tickets(&previous_keys, &read_tickets(&self.tickets));
                 self.view_fetched_at = Some(Utc::now());
@@ -682,6 +693,24 @@ fn tickets_new_since<'a>(previous: &[String], tickets: &'a [Ticket]) -> Vec<&'a 
         .collect()
 }
 
+fn restore_selection_on_key(app: &mut App, key: Option<&str>) {
+    let Some(key) = key else {
+        app.clamp_selection();
+        return;
+    };
+    let indices = app.filtered_indices();
+    let match_pos = {
+        let tickets = read_tickets(&app.tickets);
+        indices.iter().position(|&i| tickets[i].key == key)
+    };
+    if let Some(pos) = match_pos {
+        app.selected = pos;
+        app.ensure_selection_visible();
+    } else {
+        app.clamp_selection();
+    }
+}
+
 fn same_ticket_keys(previous: &[String], tickets: &[Ticket]) -> bool {
     if previous.len() != tickets.len() {
         return false;
@@ -838,6 +867,20 @@ mod tests {
     fn config_page_size_is_scroll_step() {
         let app = App::new(test_config(7), Theme::default(), test_jira(), false);
         assert_eq!(app.page_size, 7);
+    }
+
+    #[test]
+    fn same_ticket_keys_detects_unchanged_set() {
+        let keys = vec!["A-1".into(), "B-2".into()];
+        let tickets = vec![
+            sample_ticket("A-1", "s", "Open"),
+            sample_ticket("B-2", "s", "Open"),
+        ];
+        assert!(same_ticket_keys(&keys, &tickets));
+        assert!(!same_ticket_keys(
+            &keys,
+            &[sample_ticket("C-3", "s", "Open")]
+        ));
     }
 
     #[test]

@@ -30,13 +30,13 @@ pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
         match code {
             KeyCode::Char(c) => {
                 app.input_buffer.push(c);
-                if app.input_mode == InputMode::Comment {
+                if mentions_enabled(app.input_mode) {
                     refresh_mention_picker(app).await;
                 }
             }
             KeyCode::Backspace => {
                 app.input_buffer.pop();
-                if app.input_mode == InputMode::Comment {
+                if mentions_enabled(app.input_mode) {
                     refresh_mention_picker(app).await;
                 }
             }
@@ -44,7 +44,7 @@ pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
                 clear_mention_picker(app);
                 app.input_mode = InputMode::None;
                 app.input_buffer.clear();
-                app.comment_mentions.clear();
+                app.input_mentions.clear();
             }
             KeyCode::Enter => {
                 submit_input(app).await;
@@ -154,8 +154,12 @@ fn confirm_mention_pick(app: &mut App) {
     let label = format!("@{display_name}");
     let prefix = &app.input_buffer[..anchor];
     app.input_buffer = format!("{prefix}{label} ");
-    app.comment_mentions.push((label, account_id));
+    app.input_mentions.push((label, account_id));
     clear_mention_picker(app);
+}
+
+fn mentions_enabled(mode: InputMode) -> bool {
+    matches!(mode, InputMode::Comment | InputMode::EditDescription)
 }
 
 async fn handle_mention_picker_key(app: &mut App, code: KeyCode) {
@@ -184,11 +188,11 @@ async fn handle_mention_picker_key(app: &mut App, code: KeyCode) {
 async fn submit_input(app: &mut App) {
     let buffer = app.input_buffer.clone();
     let mode = app.input_mode;
-    let mentions = app.comment_mentions.clone();
+    let mentions = app.input_mentions.clone();
     app.input_mode = InputMode::None;
     app.input_buffer.clear();
     clear_mention_picker(app);
-    app.comment_mentions.clear();
+    app.input_mentions.clear();
 
     let Some(sel) = app.selected_ticket() else {
         return;
@@ -212,7 +216,7 @@ async fn submit_input(app: &mut App) {
         }
         InputMode::EditDescription => {
             app.jira
-                .update_description(&base_url, &sel.key, &buffer)
+                .update_description(&base_url, &sel.key, &buffer, &mentions)
                 .await
         }
         InputMode::None => return,
@@ -449,7 +453,7 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('c') if app.detail_open => {
             app.input_mode = InputMode::Comment;
             app.input_buffer.clear();
-            app.comment_mentions.clear();
+            app.input_mentions.clear();
             clear_mention_picker(app);
         }
         KeyCode::Char('w') if app.detail_open => {
@@ -485,6 +489,8 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
                 let text = ticket.description.clone().unwrap_or_default();
                 app.input_mode = InputMode::EditDescription;
                 app.input_buffer = text;
+                app.input_mentions.clear();
+                clear_mention_picker(app);
             }
         }
         KeyCode::Char('g') => app.go_to_first(),

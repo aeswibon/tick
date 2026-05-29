@@ -33,11 +33,7 @@ impl JiraClient {
     pub async fn list_boards(&self, base_url: &str) -> Result<Vec<BoardInfo>, String> {
         let base = base_url.trim_end_matches('/');
         let url = format!("{base}/rest/agile/1.0/board?maxResults=50");
-        let resp = self
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+        let resp = self.send(|| self.get(&url).send()).await?;
         if !resp.status().is_success() {
             return Err(format!(
                 "Board API {}: {}",
@@ -107,11 +103,7 @@ impl JiraClient {
     ) -> Result<u64, String> {
         let base = base_url.trim_end_matches('/');
         let url = format!("{base}/rest/agile/1.0/board?projectKeyOrId={project_key}");
-        let resp = self
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+        let resp = self.send(|| self.get(&url).send()).await?;
         if !resp.status().is_success() {
             return Err(format!(
                 "Board API {}: {}",
@@ -142,11 +134,7 @@ impl JiraClient {
     ) -> Result<Vec<(String, String, String)>, String> {
         let base = base_url.trim_end_matches('/');
         let url = format!("{base}/rest/agile/1.0/board/{board_id}/sprint?state=active,future");
-        let resp = self
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+        let resp = self.send(|| self.get(&url).send()).await?;
         if !resp.status().is_success() {
             return Err(format!(
                 "Sprint API {}: {}",
@@ -185,11 +173,12 @@ impl JiraClient {
             base_url.trim_end_matches('/')
         );
         let resp = self
-            .post(&url)
-            .json(&serde_json::json!({ "issues": issue_keys }))
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+            .send(|| {
+                self.post(&url)
+                    .json(&serde_json::json!({ "issues": issue_keys }))
+                    .send()
+            })
+            .await?;
         if resp.status().is_success() {
             Ok(())
         } else {
@@ -211,11 +200,12 @@ impl JiraClient {
             base_url.trim_end_matches('/')
         );
         let resp = self
-            .post(&url)
-            .json(&serde_json::json!({ "issues": issue_keys }))
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?;
+            .send(|| {
+                self.post(&url)
+                    .json(&serde_json::json!({ "issues": issue_keys }))
+                    .send()
+            })
+            .await?;
         if resp.status().is_success() {
             Ok(())
         } else {

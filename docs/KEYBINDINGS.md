@@ -34,7 +34,7 @@
 | `P` | Edit **priority** (picker) |
 | `L` | Edit **labels** (comma-separated, replaces all) |
 | `M` | **Move sprint** / backlog (Agile board) |
-| `D` | Edit **description** (plain text → ADF) |
+| `D` | Edit **description** (markdown + `@` mentions) |
 
 ## Overlays
 

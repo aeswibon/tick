@@ -132,8 +132,13 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::EditDescription {
+        let hint = if app.showing_mention_picker {
+            " @mention"
+        } else {
+            " (markdown, @)"
+        };
         (
-            format!(" Description: {}_", app.input_buffer),
+            format!(" Description{hint}: {}_", app.input_buffer),
             app.theme.accent,
         )
     } else if app.loading {
