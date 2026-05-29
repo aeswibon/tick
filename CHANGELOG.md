@@ -7,6 +7,7 @@ All notable changes to this project are documented in this file.
 ### Added
 
 - Status transitions prompt for **required workflow fields** before POST (resolution picker, text for others)
+- Typed transition fields: user search, boolean Yes/No, date/datetime, number
 - On validation failure, parse Jira `errors` and re-prompt for missing fields
 
 ### Fixed

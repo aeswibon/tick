@@ -2,7 +2,7 @@ use crossterm::event::KeyCode;
 
 use std::collections::HashMap;
 
-use crate::api::transition_fields::{self, TransitionField};
+use crate::api::transition_fields::{self, TransitionField, TransitionFieldKind};
 use crate::api::{self, types::WorkflowTransition};
 use crate::app::{App, InputMode, TransitionCollect};
 use crate::view_mode::ViewMode;
@@ -36,12 +36,20 @@ pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
                 app.input_buffer.push(c);
                 if mentions_enabled(app.input_mode) {
                     refresh_mention_picker(app).await;
+                } else if app.input_mode == InputMode::TransitionField
+                    && app.transition_field_user_search
+                {
+                    refresh_transition_user_search(app).await;
                 }
             }
             KeyCode::Backspace => {
                 app.input_buffer.pop();
                 if mentions_enabled(app.input_mode) {
                     refresh_mention_picker(app).await;
+                } else if app.input_mode == InputMode::TransitionField
+                    && app.transition_field_user_search
+                {
+                    refresh_transition_user_search(app).await;
                 }
             }
             KeyCode::Esc => {
@@ -284,12 +292,26 @@ async fn submit_input(app: &mut App) {
                 .await
         }
         InputMode::TransitionField => {
+            let Some(field) = app.transition_field_current.clone() else {
+                return;
+            };
+            if field.kind == TransitionFieldKind::User
+                && !app.transition_field_options.is_empty()
+            {
+                let idx = app.transition_field_selected;
+                apply_transition_field_pick(app, idx).await;
+                return;
+            }
             let Some(field) = app.transition_field_current.take() else {
                 return;
             };
-            let value = field.value_from_text(&buffer);
-            advance_transition_field(app, &field, value);
-            prompt_next_transition_field(app).await;
+            match field.value_from_text(&buffer) {
+                Ok(value) => {
+                    advance_transition_field(app, &field, value);
+                    prompt_next_transition_field(app).await;
+                }
+                Err(e) => app.status.set_action_error(e),
+            }
             return;
         }
         InputMode::OpenTicket | InputMode::None => return,
@@ -417,10 +439,32 @@ async fn apply_priority(app: &mut App, idx: usize) {
     }
 }
 
+async fn refresh_transition_user_search(app: &mut App) {
+    let Some(sel) = app.selected_ticket() else {
+        return;
+    };
+    let Some(base_url) = app.site_base_url(&sel.site) else {
+        return;
+    };
+    let query = app.input_buffer.trim();
+    let users = app
+        .jira
+        .search_assignable_users(&base_url, &sel.key, query)
+        .await
+        .unwrap_or_default();
+    app.transition_field_options = users;
+    app.transition_field_selected = app
+        .transition_field_selected
+        .min(app.transition_field_options.len().saturating_sub(1));
+    app.showing_transition_field = true;
+    app.transition_field_text_mode = app.transition_field_options.is_empty();
+}
+
 fn cancel_transition_collect(app: &mut App) {
     app.transition_collect = None;
     app.showing_transition_field = false;
     app.transition_field_text_mode = false;
+    app.transition_field_user_search = false;
     app.transition_field_current = None;
     app.transition_field_options.clear();
     if app.input_mode == InputMode::TransitionField {
@@ -440,6 +484,11 @@ fn advance_transition_field(app: &mut App, field: &TransitionField, value: serde
     }
     app.showing_transition_field = false;
     app.transition_field_current = None;
+    app.transition_field_user_search = false;
+    if app.input_mode == InputMode::TransitionField {
+        app.input_mode = InputMode::None;
+        app.input_buffer.clear();
+    }
 }
 
 /// Opens the next required-field prompt. Returns `false` when the queue is empty (caller should POST).
@@ -461,15 +510,27 @@ fn begin_next_field_prompt(app: &mut App) -> bool {
     };
 
     app.showing_transition_field = true;
-    if !field.options.is_empty() {
-        app.transition_field_text_mode = false;
-        app.transition_field_options = field.options;
-        app.transition_field_selected = 0;
-    } else {
-        app.transition_field_text_mode = true;
-        app.transition_field_options.clear();
-        app.input_mode = InputMode::TransitionField;
-        app.input_buffer.clear();
+    app.transition_field_user_search = false;
+
+    match field.kind {
+        TransitionFieldKind::User => {
+            app.transition_field_text_mode = true;
+            app.transition_field_user_search = true;
+            app.transition_field_options.clear();
+            app.input_mode = InputMode::TransitionField;
+            app.input_buffer.clear();
+        }
+        TransitionFieldKind::Picker | TransitionFieldKind::Boolean if !field.options.is_empty() => {
+            app.transition_field_text_mode = false;
+            app.transition_field_options = field.options;
+            app.transition_field_selected = 0;
+        }
+        _ => {
+            app.transition_field_text_mode = true;
+            app.transition_field_options.clear();
+            app.input_mode = InputMode::TransitionField;
+            app.input_buffer.clear();
+        }
     }
     true
 }
@@ -480,6 +541,10 @@ async fn prompt_next_transition_field(app: &mut App) {
             return;
         };
         execute_transition_with(app, collect.transition, collect.values).await;
+        return;
+    }
+    if app.transition_field_user_search {
+        refresh_transition_user_search(app).await;
     }
 }
 

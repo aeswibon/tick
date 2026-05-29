@@ -708,17 +708,33 @@ pub async fn enrich_transition_fields(
     base_url: &str,
     transition: &mut types::WorkflowTransition,
 ) {
-    let needs_resolution_opts = transition
+    let needs_resolution = transition
         .required_fields
         .iter()
         .any(|f| f.id == "resolution" && f.options.is_empty());
-    if !needs_resolution_opts {
-        return;
+    if needs_resolution {
+        if let Ok(opts) = client.list_resolutions(base_url).await {
+            for field in &mut transition.required_fields {
+                if field.id == "resolution" && field.options.is_empty() {
+                    field.options = opts.clone();
+                }
+            }
+        }
     }
-    if let Ok(opts) = client.list_resolutions(base_url).await {
-        for field in &mut transition.required_fields {
-            if field.id == "resolution" && field.options.is_empty() {
-                field.options = opts.clone();
+
+    let needs_priority = transition.required_fields.iter().any(|f| {
+        (f.id == "priority" || f.system == "priority")
+            && f.options.is_empty()
+            && f.kind == transition_fields::TransitionFieldKind::Picker
+    });
+    if needs_priority {
+        if let Ok(opts) = client.list_priorities(base_url).await {
+            for field in &mut transition.required_fields {
+                if (field.id == "priority" || field.system == "priority")
+                    && field.options.is_empty()
+                {
+                    field.options = opts.clone();
+                }
             }
         }
     }

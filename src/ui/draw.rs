@@ -56,6 +56,10 @@ pub fn render(f: &mut Frame, app: &mut App) {
             f,
             "Required field",
             &app.transition_field_heading,
+            app.transition_field_current
+                .as_ref()
+                .map(|f| f.modal_hint())
+                .unwrap_or(""),
             &app.transition_field_options,
             app.transition_field_selected,
             app.transition_field_text_mode,
@@ -152,12 +156,15 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::TransitionField {
-        let label = app
+        let (label, hint) = app
             .transition_field_current
             .as_ref()
-            .map(|f| f.name.as_str())
-            .unwrap_or("Field");
-        (format!(" {label}: {}_", app.input_buffer), app.theme.accent)
+            .map(|f| (f.name.as_str(), f.input_hint()))
+            .unwrap_or(("Field", "text"));
+        (
+            format!(" {label} ({hint}): {}_", app.input_buffer),
+            app.theme.accent,
+        )
     } else if app.input_mode == crate::app::InputMode::EditDescription {
         let hint = if app.showing_mention_picker {
             " @mention"

@@ -11,6 +11,7 @@ pub fn draw_field_picker(
     f: &mut Frame,
     title: &str,
     heading: &str,
+    subtitle: &str,
     options: &[(String, String)],
     selected: usize,
     text_input_mode: bool,
@@ -18,9 +19,9 @@ pub fn draw_field_picker(
     area: Rect,
 ) {
     let height = if text_input_mode {
-        9
+        10
     } else {
-        (options.len() as u16).saturating_add(6)
+        (options.len() as u16).saturating_add(7)
     };
     let popup = centered_rect(58, height.min(area.height.saturating_sub(2)), area);
     f.render_widget(Clear, popup);
@@ -36,11 +37,11 @@ pub fn draw_field_picker(
         Line::from(""),
     ];
 
+    lines.push(Line::from(Span::styled(
+        format!(" {subtitle}"),
+        Style::default().fg(theme.border),
+    )));
     if text_input_mode {
-        lines.push(Line::from(Span::styled(
-            " Type your value in the footer line below.",
-            Style::default().fg(theme.border),
-        )));
         lines.push(Line::from(Span::styled(
             " Press Enter to submit, Esc to cancel.",
             Style::default().fg(theme.border),

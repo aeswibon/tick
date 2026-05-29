@@ -1,37 +1,167 @@
 //! Parse required transition fields and build Jira `fields` payloads.
 
+use chrono::NaiveDate;
 use serde_json::{json, Value};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransitionFieldKind {
+    /// `allowedValues` or loaded options (resolution, priority, select list).
+    Picker,
+    User,
+    Boolean,
+    Date,
+    DateTime,
+    Number,
+    Text,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransitionField {
     pub id: String,
     pub name: String,
     pub field_type: String,
+    pub system: String,
+    pub kind: TransitionFieldKind,
     /// `(id, label)` from Jira `allowedValues`, when present.
     pub options: Vec<(String, String)>,
 }
 
 impl TransitionField {
+    pub fn input_hint(&self) -> &'static str {
+        match self.kind {
+            TransitionFieldKind::User => "type to search users",
+            TransitionFieldKind::Date => "YYYY-MM-DD",
+            TransitionFieldKind::DateTime => "YYYY-MM-DD or YYYY-MM-DDTHH:MM",
+            TransitionFieldKind::Boolean => "choose Yes or No",
+            TransitionFieldKind::Number => "number",
+            TransitionFieldKind::Text => "text",
+            TransitionFieldKind::Picker => "choose an option",
+        }
+    }
+
+    pub fn modal_hint(&self) -> &'static str {
+        match self.kind {
+            TransitionFieldKind::User => "Type in the footer to search, Enter to select",
+            TransitionFieldKind::Date => "Enter a date in the footer (YYYY-MM-DD), then Enter",
+            TransitionFieldKind::DateTime => {
+                "Enter date/time in the footer, then Enter"
+            }
+            TransitionFieldKind::Boolean => "Select Yes or No",
+            TransitionFieldKind::Number => "Enter a number in the footer, then Enter",
+            TransitionFieldKind::Text => "Enter text in the footer below, then Enter",
+            TransitionFieldKind::Picker => "Select an option",
+        }
+    }
+
     pub fn value_from_choice(&self, id: &str, label: &str) -> Value {
+        match self.kind {
+            TransitionFieldKind::User => json!({ "accountId": id }),
+            TransitionFieldKind::Boolean => json!(id == "true"),
+            TransitionFieldKind::Picker => self.picker_value(id, label),
+            _ => self.picker_value(id, label),
+        }
+    }
+
+    fn picker_value(&self, id: &str, label: &str) -> Value {
         match self.field_type.as_str() {
             "resolution" => json!({ "name": label }),
-            "user" => json!({ "accountId": id }),
             "priority" => json!({ "id": id }),
+            "option" => json!({ "id": id }),
             _ if self.id == "resolution" => json!({ "name": label }),
+            _ if self.system == "priority" => json!({ "id": id }),
             _ => json!({ "id": id }),
         }
     }
 
-    pub fn value_from_text(&self, text: &str) -> Value {
+    /// Build JSON for footer text entry; returns `Err` with a short validation message.
+    pub fn value_from_text(&self, text: &str) -> Result<Value, String> {
         let trimmed = text.trim();
-        match self.field_type.as_str() {
-            "string" => json!(trimmed),
-            "number" => trimmed
+        if trimmed.is_empty() {
+            return Err(format!("{} cannot be empty", self.name));
+        }
+        match self.kind {
+            TransitionFieldKind::Text | TransitionFieldKind::Number => {}
+            _ => {}
+        }
+        Ok(match self.kind {
+            TransitionFieldKind::Text => match self.field_type.as_str() {
+                "string" => json!(trimmed),
+                _ => json!({ "value": trimmed }),
+            },
+            TransitionFieldKind::Number => trimmed
                 .parse::<f64>()
                 .map(|n| json!(n))
-                .unwrap_or_else(|_| json!(trimmed)),
-            _ => json!({ "value": trimmed }),
+                .map_err(|_| format!("{} must be a number", self.name))?,
+            TransitionFieldKind::Date => {
+                let d = parse_date(trimmed)?;
+                json!(d)
+            }
+            TransitionFieldKind::DateTime => {
+                let dt = parse_datetime(trimmed)?;
+                json!(dt)
+            }
+            TransitionFieldKind::User => {
+                return Err(format!(
+                    "Select a user for {} from the list (type to search)",
+                    self.name
+                ));
+            }
+            TransitionFieldKind::Boolean | TransitionFieldKind::Picker => {
+                return Err(format!("Select a value for {} from the list", self.name));
+            }
+        })
+    }
+}
+
+fn parse_date(s: &str) -> Result<String, String> {
+    if let Ok(d) = NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+        return Ok(d.format("%Y-%m-%d").to_string());
+    }
+    if let Ok(d) = NaiveDate::parse_from_str(s, "%d/%m/%Y") {
+        return Ok(d.format("%Y-%m-%d").to_string());
+    }
+    if let Ok(d) = NaiveDate::parse_from_str(s, "%m/%d/%Y") {
+        return Ok(d.format("%Y-%m-%d").to_string());
+    }
+    Err("Use date format YYYY-MM-DD".into())
+}
+
+fn parse_datetime(s: &str) -> Result<String, String> {
+    if s.contains('T') {
+        return Ok(s.to_string());
+    }
+    let date = parse_date(s)?;
+    Ok(format!("{date}T12:00:00.000+0000"))
+}
+
+pub const BOOLEAN_OPTIONS: [(&str, &str); 2] = [("true", "Yes"), ("false", "No")];
+
+fn classify_field(
+    _meta: &Value,
+    field_type: &str,
+    system: &str,
+    options: &[(String, String)],
+) -> TransitionFieldKind {
+    if !options.is_empty() {
+        if field_type == "boolean" {
+            return TransitionFieldKind::Boolean;
         }
+        return TransitionFieldKind::Picker;
+    }
+    match field_type {
+        "user" => return TransitionFieldKind::User,
+        "date" => return TransitionFieldKind::Date,
+        "datetime" => return TransitionFieldKind::DateTime,
+        "boolean" => return TransitionFieldKind::Boolean,
+        "number" => return TransitionFieldKind::Number,
+        "string" => return TransitionFieldKind::Text,
+        "priority" | "resolution" | "option" => return TransitionFieldKind::Picker,
+        _ => {}
+    }
+    match system {
+        "assignee" | "reporter" => TransitionFieldKind::User,
+        "resolution" | "priority" | "fixVersions" | "components" => TransitionFieldKind::Picker,
+        _ => TransitionFieldKind::Text,
     }
 }
 
@@ -51,13 +181,18 @@ pub fn parse_transition_screen_fields(fields_obj: Option<&Value>) -> Vec<Transit
                 .and_then(|n| n.as_str())
                 .unwrap_or(id)
                 .to_string();
-            let field_type = meta
-                .get("schema")
+            let schema = meta.get("schema");
+            let field_type = schema
                 .and_then(|s| s.get("type"))
                 .and_then(|t| t.as_str())
                 .unwrap_or("")
                 .to_string();
-            let options = meta
+            let system = schema
+                .and_then(|s| s.get("system"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .to_string();
+            let mut options = meta
                 .get("allowedValues")
                 .and_then(|a| a.as_array())
                 .map(|arr| {
@@ -66,10 +201,19 @@ pub fn parse_transition_screen_fields(fields_obj: Option<&Value>) -> Vec<Transit
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
+            let kind = classify_field(meta, &field_type, &system, &options);
+            if kind == TransitionFieldKind::Boolean && options.is_empty() {
+                options = BOOLEAN_OPTIONS
+                    .iter()
+                    .map(|(id, label)| (id.to_string(), label.to_string()))
+                    .collect();
+            }
             Some(TransitionField {
                 id: id.clone(),
                 name,
                 field_type,
+                system,
+                kind,
                 options,
             })
         })
@@ -101,10 +245,21 @@ fn field_needs_input(meta: &Value) -> bool {
         .unwrap_or("");
     matches!(
         field_type,
-        "resolution" | "priority" | "user" | "option" | "array" | "version" | "component"
+        "resolution"
+            | "priority"
+            | "user"
+            | "option"
+            | "array"
+            | "version"
+            | "component"
+            | "date"
+            | "datetime"
+            | "boolean"
+            | "number"
+            | "string"
     ) || matches!(
         system,
-        "resolution" | "priority" | "assignee" | "fixVersions" | "components"
+        "resolution" | "priority" | "assignee" | "reporter" | "fixVersions" | "components"
     )
 }
 
@@ -126,6 +281,8 @@ pub fn infer_resolution_if_done_transition(
             id: "resolution".into(),
             name: "Resolution".into(),
             field_type: "resolution".into(),
+            system: "resolution".into(),
+            kind: TransitionFieldKind::Picker,
             options: Vec::new(),
         })
     } else {
@@ -163,18 +320,46 @@ pub fn field_for_error_key(key: &str, known: &[TransitionField]) -> TransitionFi
         .iter()
         .find(|f| f.id == key)
         .cloned()
-        .unwrap_or_else(|| TransitionField {
-            id: key.to_string(),
-            name: humanize_field_id(key),
-            field_type: String::new(),
-            options: Vec::new(),
-        })
+        .unwrap_or_else(|| infer_field_from_id(key))
+}
+
+fn infer_field_from_id(key: &str) -> TransitionField {
+    let (kind, field_type, system) = match key {
+        "resolution" => (
+            TransitionFieldKind::Picker,
+            "resolution",
+            "resolution",
+        ),
+        "assignee" | "reporter" => (TransitionFieldKind::User, "user", key),
+        "priority" => (TransitionFieldKind::Picker, "priority", "priority"),
+        "fixVersions" | "components" => (TransitionFieldKind::Picker, "array", key),
+        _ if key.contains("date") || key.ends_with("Date") => {
+            (TransitionFieldKind::Date, "date", "")
+        }
+        _ => (TransitionFieldKind::Text, "string", ""),
+    };
+    let mut options = Vec::new();
+    if kind == TransitionFieldKind::Boolean {
+        options = BOOLEAN_OPTIONS
+            .iter()
+            .map(|(id, label)| (id.to_string(), label.to_string()))
+            .collect();
+    }
+    TransitionField {
+        id: key.to_string(),
+        name: humanize_field_id(key),
+        field_type: field_type.into(),
+        system: system.into(),
+        kind,
+        options,
+    }
 }
 
 fn humanize_field_id(id: &str) -> String {
     match id {
         "resolution" => "Resolution".into(),
         "assignee" => "Assignee".into(),
+        "reporter" => "Reporter".into(),
         "fixVersions" => "Fix versions".into(),
         "components" => "Components".into(),
         other => {
@@ -207,11 +392,61 @@ mod tests {
         });
         let req = parse_transition_screen_fields(Some(&fields));
         assert_eq!(req.len(), 1);
-        assert_eq!(req[0].id, "resolution");
-        assert_eq!(req[0].options.len(), 2);
+        assert_eq!(req[0].kind, TransitionFieldKind::Picker);
         assert_eq!(
             req[0].value_from_choice("10000", "Done"),
             json!({ "name": "Done" })
+        );
+    }
+
+    #[test]
+    fn parses_user_and_date_fields() {
+        let fields = json!({
+            "assignee": {
+                "required": true,
+                "name": "Assignee",
+                "schema": { "type": "user", "system": "assignee" }
+            },
+            "customfield_10015": {
+                "required": true,
+                "name": "Start date",
+                "schema": { "type": "date", "custom": "customfield_10015" }
+            }
+        });
+        let req = parse_transition_screen_fields(Some(&fields));
+        assert_eq!(req.len(), 2);
+        assert!(req.iter().any(|f| f.kind == TransitionFieldKind::User));
+        assert!(req.iter().any(|f| f.kind == TransitionFieldKind::Date));
+    }
+
+    #[test]
+    fn boolean_field_gets_yes_no_options() {
+        let fields = json!({
+            "customfield_10040": {
+                "required": true,
+                "name": "Approved",
+                "schema": { "type": "boolean" }
+            }
+        });
+        let req = parse_transition_screen_fields(Some(&fields));
+        assert_eq!(req[0].kind, TransitionFieldKind::Boolean);
+        assert_eq!(req[0].options.len(), 2);
+        assert_eq!(req[0].value_from_choice("true", "Yes"), json!(true));
+    }
+
+    #[test]
+    fn date_text_parses_iso() {
+        let f = TransitionField {
+            id: "d".into(),
+            name: "Due".into(),
+            field_type: "date".into(),
+            system: String::new(),
+            kind: TransitionFieldKind::Date,
+            options: vec![],
+        };
+        assert_eq!(
+            f.value_from_text("2026-05-29").unwrap(),
+            json!("2026-05-29")
         );
     }
 }
