@@ -163,6 +163,8 @@ pub struct App {
     pub transition_options: Vec<crate::api::types::WorkflowTransition>,
     pub transition_collect: Option<TransitionCollect>,
     pub showing_transition_field: bool,
+    /// True when the modal is showing a footer text prompt (no option list).
+    pub transition_field_text_mode: bool,
     pub transition_field_options: Vec<(String, String)>,
     pub transition_field_selected: usize,
     pub transition_field_heading: String,
@@ -232,6 +234,7 @@ impl App {
             transition_options: Vec::new(),
             transition_collect: None,
             showing_transition_field: false,
+            transition_field_text_mode: false,
             transition_field_options: Vec::new(),
             transition_field_selected: 0,
             transition_field_heading: String::new(),

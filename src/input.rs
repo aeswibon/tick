@@ -3,7 +3,7 @@ use crossterm::event::KeyCode;
 use std::collections::HashMap;
 
 use crate::api::transition_fields::{self, TransitionField};
-use crate::api::types::WorkflowTransition;
+use crate::api::{self, types::WorkflowTransition};
 use crate::app::{App, InputMode, TransitionCollect};
 use crate::view_mode::ViewMode;
 
@@ -420,6 +420,7 @@ async fn apply_priority(app: &mut App, idx: usize) {
 fn cancel_transition_collect(app: &mut App) {
     app.transition_collect = None;
     app.showing_transition_field = false;
+    app.transition_field_text_mode = false;
     app.transition_field_current = None;
     app.transition_field_options.clear();
     if app.input_mode == InputMode::TransitionField {
@@ -459,11 +460,14 @@ fn begin_next_field_prompt(app: &mut App) -> bool {
         field.name.clone()
     };
 
+    app.showing_transition_field = true;
     if !field.options.is_empty() {
+        app.transition_field_text_mode = false;
         app.transition_field_options = field.options;
         app.transition_field_selected = 0;
-        app.showing_transition_field = true;
     } else {
+        app.transition_field_text_mode = true;
+        app.transition_field_options.clear();
         app.input_mode = InputMode::TransitionField;
         app.input_buffer.clear();
     }
@@ -493,6 +497,12 @@ async fn apply_transition_field_pick(app: &mut App, idx: usize) {
 }
 
 async fn handle_transition_field_key(app: &mut App, code: KeyCode) {
+    if app.transition_field_text_mode {
+        if matches!(code, KeyCode::Esc) {
+            cancel_transition_collect(app);
+        }
+        return;
+    }
     match code {
         KeyCode::Up | KeyCode::Char('k') => {
             app.transition_field_selected = app.transition_field_selected.saturating_sub(1);
@@ -541,13 +551,19 @@ async fn execute_transition_with(
             app.refresh_all().await;
         }
         Err(e) if !e.field_errors.is_empty() => {
-            let pending: Vec<TransitionField> = e
+            let mut pending: Vec<TransitionField> = e
                 .field_errors
                 .iter()
                 .map(|(id, _)| {
                     transition_fields::field_for_error_key(id, &transition.required_fields)
                 })
                 .collect();
+            if let Some(base_url) = app.site_base_url(&sel.site) {
+                let mut tmp = transition.clone();
+                tmp.required_fields = pending.clone();
+                api::enrich_transition_fields(&app.jira, &base_url, &mut tmp).await;
+                pending = tmp.required_fields;
+            }
             app.transition_collect = Some(TransitionCollect {
                 transition,
                 values,
@@ -569,12 +585,40 @@ async fn apply_transition(app: &mut App, idx: usize) {
     if idx >= app.transition_options.len() {
         return;
     }
-    let transition = app.transition_options[idx].clone();
-    if app.selected_ticket().is_none() {
+    let mut transition = app.transition_options[idx].clone();
+    let Some(sel) = app.selected_ticket() else {
         app.status.set_action_error("Select a ticket first");
         return;
-    }
+    };
+    let Some(base_url) = app.site_base_url(&sel.site) else {
+        app.status
+            .set_action_error(format!("Unknown site {:?} for ticket", sel.site));
+        return;
+    };
     app.showing_transitions = false;
+
+    app.loading = true;
+    app.loading_message = Some("Loading transition fields…".into());
+    if let Ok(detail) = app
+        .jira
+        .get_transition_detail(&base_url, &sel.key, &transition.id)
+        .await
+    {
+        transition = detail;
+    }
+    api::enrich_transition_fields(&app.jira, &base_url, &mut transition).await;
+    app.loading = false;
+    app.loading_message = None;
+
+    if transition.required_fields.is_empty() {
+        if let Some(res) = transition_fields::infer_resolution_if_done_transition(
+            &transition.name,
+            &transition.to_status,
+        ) {
+            transition.required_fields.push(res);
+            api::enrich_transition_fields(&app.jira, &base_url, &mut transition).await;
+        }
+    }
 
     if transition.required_fields.is_empty() {
         execute_transition_with(app, transition, HashMap::new()).await;

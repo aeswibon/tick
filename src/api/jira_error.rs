@@ -20,12 +20,13 @@ pub fn format_response_error(status: StatusCode, body: &str) -> String {
     }
 }
 
-/// Field keys from Jira's `errors` object (e.g. `resolution` when missing on transition).
+/// Field keys from Jira's `errors` object and common `errorMessages` text.
 pub fn field_errors(body: &str) -> Vec<(String, String)> {
     let Ok(v) = serde_json::from_str::<Value>(body) else {
         return Vec::new();
     };
-    v.get("errors")
+    let mut out: Vec<(String, String)> = v
+        .get("errors")
         .and_then(|e| e.as_object())
         .map(|obj| {
             obj.iter()
@@ -35,7 +36,40 @@ pub fn field_errors(body: &str) -> Vec<(String, String)> {
                 })
                 .collect()
         })
-        .unwrap_or_default()
+        .unwrap_or_default();
+
+    if let Some(msgs) = v.get("errorMessages").and_then(|m| m.as_array()) {
+        for m in msgs {
+            if let Some(s) = m.as_str() {
+                if let Some(id) = infer_field_from_message(s) {
+                    if !out.iter().any(|(k, _)| k == &id) {
+                        out.push((id, s.to_string()));
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+fn infer_field_from_message(msg: &str) -> Option<String> {
+    let lower = msg.to_lowercase();
+    if lower.contains("resolution") {
+        return Some("resolution".into());
+    }
+    if lower.contains("assignee") {
+        return Some("assignee".into());
+    }
+    if lower.contains("fix version") || lower.contains("fixversions") {
+        return Some("fixVersions".into());
+    }
+    if lower.contains("component") {
+        return Some("components".into());
+    }
+    if lower.contains("priority") {
+        return Some("priority".into());
+    }
+    None
 }
 
 fn parse_jira_body(body: &str) -> Option<String> {
@@ -70,6 +104,14 @@ fn parse_jira_body(body: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn field_errors_from_error_messages() {
+        let body = r#"{"errorMessages":["Resolution is required"],"errors":{}}"#;
+        let errs = field_errors(body);
+        assert_eq!(errs.len(), 1);
+        assert_eq!(errs[0].0, "resolution");
+    }
 
     #[test]
     fn field_errors_extracts_keys() {

@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file.
 - Status transitions prompt for **required workflow fields** before POST (resolution picker, text for others)
 - On validation failure, parse Jira `errors` and re-prompt for missing fields
 
+### Fixed
+
+- Required-field dialog now appears: re-fetch transition with `transitionId`, load resolutions from `/resolution`, infer Done/Close needs resolution, parse `errorMessages`, show modal for text fields
+
 ## [0.6.8] - 2026-05-29
 
 ### Added

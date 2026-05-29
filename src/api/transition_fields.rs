@@ -35,18 +35,15 @@ impl TransitionField {
     }
 }
 
-pub fn parse_required_fields(fields_obj: Option<&Value>) -> Vec<TransitionField> {
+/// Fields on the transition screen that need user input before POST.
+pub fn parse_transition_screen_fields(fields_obj: Option<&Value>) -> Vec<TransitionField> {
     let Some(obj) = fields_obj.and_then(|v| v.as_object()) else {
         return Vec::new();
     };
     let mut out: Vec<TransitionField> = obj
         .iter()
         .filter_map(|(id, meta)| {
-            if !meta
-                .get("required")
-                .and_then(|r| r.as_bool())
-                .unwrap_or(false)
-            {
+            if !field_needs_input(meta) {
                 return None;
             }
             let name = meta
@@ -79,6 +76,61 @@ pub fn parse_required_fields(fields_obj: Option<&Value>) -> Vec<TransitionField>
         .collect();
     out.sort_by(|a, b| a.name.cmp(&b.name));
     out
+}
+
+fn field_needs_input(meta: &Value) -> bool {
+    if meta.get("required").and_then(|r| r.as_bool()) == Some(true) {
+        return true;
+    }
+    if meta
+        .get("allowedValues")
+        .and_then(|a| a.as_array())
+        .is_some_and(|a| !a.is_empty())
+    {
+        return true;
+    }
+    let field_type = meta
+        .get("schema")
+        .and_then(|s| s.get("type"))
+        .and_then(|t| t.as_str())
+        .unwrap_or("");
+    let system = meta
+        .get("schema")
+        .and_then(|s| s.get("system"))
+        .and_then(|t| t.as_str())
+        .unwrap_or("");
+    matches!(
+        field_type,
+        "resolution" | "priority" | "user" | "option" | "array" | "version" | "component"
+    ) || matches!(
+        system,
+        "resolution" | "priority" | "assignee" | "fixVersions" | "components"
+    )
+}
+
+/// When Jira omits `fields` on the list response, still prompt for resolution on Done/Close transitions.
+pub fn infer_resolution_if_done_transition(
+    transition_name: &str,
+    to_status: &str,
+) -> Option<TransitionField> {
+    let done_like = |s: &str| {
+        let s = s.to_lowercase();
+        s.contains("done")
+            || s.contains("closed")
+            || s.contains("close")
+            || s.contains("complete")
+            || s.contains("resolved")
+    };
+    if done_like(transition_name) || done_like(to_status) {
+        Some(TransitionField {
+            id: "resolution".into(),
+            name: "Resolution".into(),
+            field_type: "resolution".into(),
+            options: Vec::new(),
+        })
+    } else {
+        None
+    }
 }
 
 fn parse_allowed_value(v: &Value) -> Option<(String, String)> {
@@ -153,7 +205,7 @@ mod tests {
             },
             "summary": { "required": false, "name": "Summary" }
         });
-        let req = parse_required_fields(Some(&fields));
+        let req = parse_transition_screen_fields(Some(&fields));
         assert_eq!(req.len(), 1);
         assert_eq!(req[0].id, "resolution");
         assert_eq!(req[0].options.len(), 2);

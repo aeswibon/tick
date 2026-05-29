@@ -6,16 +6,22 @@ use ratatui::{
     Frame,
 };
 
+#[allow(clippy::too_many_arguments)]
 pub fn draw_field_picker(
     f: &mut Frame,
     title: &str,
     heading: &str,
     options: &[(String, String)],
     selected: usize,
+    text_input_mode: bool,
     theme: &crate::theme::Theme,
     area: Rect,
 ) {
-    let height = (options.len() as u16).saturating_add(6);
+    let height = if text_input_mode {
+        9
+    } else {
+        (options.len() as u16).saturating_add(6)
+    };
     let popup = centered_rect(58, height.min(area.height.saturating_sub(2)), area);
     f.render_widget(Clear, popup);
 
@@ -29,6 +35,17 @@ pub fn draw_field_picker(
         )),
         Line::from(""),
     ];
+
+    if text_input_mode {
+        lines.push(Line::from(Span::styled(
+            " Type your value in the footer line below.",
+            Style::default().fg(theme.border),
+        )));
+        lines.push(Line::from(Span::styled(
+            " Press Enter to submit, Esc to cancel.",
+            Style::default().fg(theme.border),
+        )));
+    }
 
     for (i, (_, label)) in options.iter().enumerate() {
         let is_sel = i == selected;
@@ -52,11 +69,13 @@ pub fn draw_field_picker(
         ]));
     }
 
-    lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "  j/k move  Enter confirm  1-9  Esc cancel",
-        Style::default().fg(theme.border),
-    )));
+    if !text_input_mode {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "  j/k move  Enter confirm  1-9  Esc cancel",
+            Style::default().fg(theme.border),
+        )));
+    }
 
     let popup_widget = Paragraph::new(Text::from(lines))
         .block(

@@ -39,17 +39,6 @@ pub fn render(f: &mut Frame, app: &mut App) {
     if app.showing_transitions {
         super::transitions::draw_transitions(f, app, f.area());
     }
-    if app.showing_transition_field {
-        super::field_picker::draw_field_picker(
-            f,
-            "Required field",
-            &app.transition_field_heading,
-            &app.transition_field_options,
-            app.transition_field_selected,
-            &app.theme,
-            f.area(),
-        );
-    }
     if app.showing_priorities {
         super::priorities::draw_priorities(f, app, f.area());
     }
@@ -61,6 +50,18 @@ pub fn render(f: &mut Frame, app: &mut App) {
     }
     if app.show_site_errors {
         super::errors::draw_site_errors(f, app, f.area());
+    }
+    if app.showing_transition_field {
+        super::field_picker::draw_field_picker(
+            f,
+            "Required field",
+            &app.transition_field_heading,
+            &app.transition_field_options,
+            app.transition_field_selected,
+            app.transition_field_text_mode,
+            &app.theme,
+            f.area(),
+        );
     }
 
     render_footer(f, app, footer_area);
@@ -167,7 +168,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             format!(" Description{hint}: {}_", app.input_buffer),
             app.theme.accent,
         )
-    } else if app.loading {
+    } else if app.loading && !app.showing_transition_field {
         let msg = app.loading_message.as_deref().unwrap_or(" Loading...");
         (format!(" {msg}"), app.theme.loading_fg)
     } else if let Some(ref err) = app.status.action_error {

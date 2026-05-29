@@ -453,6 +453,57 @@ impl JiraClient {
         Ok(parse_workflow_transitions(&data))
     }
 
+    /// Fetch one transition with full screen field metadata (Jira often omits fields on the list call).
+    pub async fn get_transition_detail(
+        &self,
+        base_url: &str,
+        key: &str,
+        transition_id: &str,
+    ) -> Result<types::WorkflowTransition, String> {
+        let url = format!(
+            "{}/rest/api/3/issue/{}/transitions?transitionId={}&expand=transitions.fields",
+            base_url.trim_end_matches('/'),
+            key,
+            transition_id
+        );
+        let resp = self.send(|| self.get(&url).send()).await?;
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        if !status.is_success() {
+            return Err(jira_error::format_response_error(status, &body));
+        }
+        let data: serde_json::Value =
+            serde_json::from_str(&body).map_err(|e| format!("Parse transition detail: {e}"))?;
+        parse_single_transition(&data)
+            .ok_or_else(|| format!("Transition {transition_id} not returned by Jira for {key}"))
+    }
+
+    /// Project resolutions (used when transition metadata omits allowedValues).
+    pub async fn list_resolutions(&self, base_url: &str) -> Result<Vec<(String, String)>, String> {
+        let url = format!("{}/rest/api/3/resolution", base_url.trim_end_matches('/'));
+        let resp = self.send(|| self.get(&url).send()).await?;
+        if !resp.status().is_success() {
+            return Err(format!(
+                "Resolution list {}: {}",
+                resp.status(),
+                resp.text().await.unwrap_or_default()
+            ));
+        }
+        let data: serde_json::Value = resp.json().await.map_err(|e| format!("Parse error: {e}"))?;
+        Ok(data
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|r| {
+                        let id = r["id"].as_str()?.to_string();
+                        let name = r["name"].as_str()?.to_string();
+                        Some((id, name))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+
     pub async fn transition_issue(
         &self,
         base_url: &str,
@@ -610,7 +661,8 @@ fn parse_workflow_transitions(data: &serde_json::Value) -> Vec<types::WorkflowTr
                         .and_then(|n| n.as_str())
                         .unwrap_or("")
                         .to_string();
-                    let required_fields = transition_fields::parse_required_fields(t.get("fields"));
+                    let required_fields =
+                        transition_fields::parse_transition_screen_fields(t.get("fields"));
                     Some(types::WorkflowTransition {
                         id,
                         name,
@@ -621,6 +673,55 @@ fn parse_workflow_transitions(data: &serde_json::Value) -> Vec<types::WorkflowTr
                 .collect()
         })
         .unwrap_or_default()
+}
+
+fn parse_single_transition(data: &serde_json::Value) -> Option<types::WorkflowTransition> {
+    data["transitions"].as_array()?.first().and_then(|t| {
+        let id = t["id"].as_str()?.to_string();
+        let name = t["name"].as_str()?.to_string();
+        let to_status = t
+            .get("to")
+            .and_then(|to| to.get("name"))
+            .and_then(|n| n.as_str())
+            .unwrap_or("")
+            .to_string();
+        let mut required_fields =
+            transition_fields::parse_transition_screen_fields(t.get("fields"));
+        if required_fields.is_empty() {
+            if let Some(res) =
+                transition_fields::infer_resolution_if_done_transition(&name, &to_status)
+            {
+                required_fields.push(res);
+            }
+        }
+        Some(types::WorkflowTransition {
+            id,
+            name,
+            to_status,
+            required_fields,
+        })
+    })
+}
+
+pub async fn enrich_transition_fields(
+    client: &JiraClient,
+    base_url: &str,
+    transition: &mut types::WorkflowTransition,
+) {
+    let needs_resolution_opts = transition
+        .required_fields
+        .iter()
+        .any(|f| f.id == "resolution" && f.options.is_empty());
+    if !needs_resolution_opts {
+        return;
+    }
+    if let Ok(opts) = client.list_resolutions(base_url).await {
+        for field in &mut transition.required_fields {
+            if field.id == "resolution" && field.options.is_empty() {
+                field.options = opts.clone();
+            }
+        }
+    }
 }
 
 pub async fn fetch_all(
@@ -1119,6 +1220,9 @@ mod field_updates {
             .transition_issue(&server.uri(), "DEMO-1", &tr, &HashMap::new())
             .await
             .unwrap_err();
+        let errs =
+            jira_error::field_errors(r#"{"errorMessages":["Resolution is required"],"errors":{}}"#);
+        assert_eq!(errs.len(), 1);
         assert!(err.message.contains("Resolution is required"));
     }
 
