@@ -809,7 +809,9 @@ mod field_updates {
         let body = crate::api::adf::comment_body_with_mentions("hi @Alice", &mentions);
         wiremock::Mock::given(wiremock::matchers::method("POST"))
             .and(wiremock::matchers::path("/rest/api/3/issue/DEMO-1/comment"))
-            .and(wiremock::matchers::body_json(serde_json::json!({ "body": body })))
+            .and(wiremock::matchers::body_json(
+                serde_json::json!({ "body": body }),
+            ))
             .respond_with(wiremock::ResponseTemplate::new(201))
             .mount(&server)
             .await;
