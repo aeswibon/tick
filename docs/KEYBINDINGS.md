@@ -27,7 +27,7 @@
 | Key | Action |
 |-----|--------|
 | `h` / `l` | Previous / next tab (Details · Description · Comments) |
-| `c` | Add comment |
+| `c` | Add comment (`@` opens user tag picker) |
 | `w` | Log work (e.g. `30m`, `1h`) |
 | `a` / `u` | Assign to me / unassign |
 | `S` | Edit **summary** |
@@ -45,4 +45,5 @@
 | Sprint picker | `j`/`k`, `Enter`, `1`–`9`, `Esc` |
 | Site errors | `j`/`k`, `!` or `Esc` close |
 | Filter mode | Type filter, `Enter`/`Esc` apply |
+| Comment `@` picker | `j`/`k`, `Enter` pick user, `Esc` close picker |
 | Input modes (`c`, `w`, `S`, `L`, `D`) | Type text, `Enter` submit, `Esc` cancel |

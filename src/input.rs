@@ -5,6 +5,11 @@ use crate::view_mode::ViewMode;
 
 /// Returns `true` when the app should quit.
 pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
+    if app.showing_mention_picker {
+        handle_mention_picker_key(app, code).await;
+        return false;
+    }
+
     if app.filtering {
         match code {
             KeyCode::Char(c) => app.filter.push(c),
@@ -23,11 +28,24 @@ pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
 
     if app.input_mode != InputMode::None {
         match code {
-            KeyCode::Char(c) => app.input_buffer.push(c),
+            KeyCode::Char(c) => {
+                app.input_buffer.push(c);
+                if app.input_mode == InputMode::Comment {
+                    refresh_mention_picker(app).await;
+                }
+            }
             KeyCode::Backspace => {
                 app.input_buffer.pop();
+                if app.input_mode == InputMode::Comment {
+                    refresh_mention_picker(app).await;
+                }
             }
-            KeyCode::Esc => app.input_mode = InputMode::None,
+            KeyCode::Esc => {
+                clear_mention_picker(app);
+                app.input_mode = InputMode::None;
+                app.input_buffer.clear();
+                app.comment_mentions.clear();
+            }
             KeyCode::Enter => {
                 submit_input(app).await;
             }
@@ -76,11 +94,101 @@ fn handle_site_errors_key(app: &mut App, code: KeyCode) {
     }
 }
 
+fn clear_mention_picker(app: &mut App) {
+    app.showing_mention_picker = false;
+    app.mention_options.clear();
+    app.mention_anchor = None;
+    app.mention_selected = 0;
+}
+
+pub(crate) fn active_mention_query(buffer: &str) -> Option<(usize, &str)> {
+    let anchor = buffer.char_indices().rfind(|(_, c)| *c == '@')?.0;
+    let query = &buffer[anchor + 1..];
+    if query.chars().any(char::is_whitespace) {
+        return None;
+    }
+    Some((anchor, query))
+}
+
+async fn refresh_mention_picker(app: &mut App) {
+    let Some((anchor, query)) = active_mention_query(&app.input_buffer) else {
+        clear_mention_picker(app);
+        return;
+    };
+    app.mention_anchor = Some(anchor);
+    let Some(sel) = app.selected_ticket() else {
+        clear_mention_picker(app);
+        return;
+    };
+    let Some(base_url) = app.site_base_url(&sel.site) else {
+        clear_mention_picker(app);
+        return;
+    };
+    match app
+        .jira
+        .search_assignable_users(&base_url, &sel.key, query)
+        .await
+    {
+        Ok(users) => {
+            app.mention_options = users;
+            app.mention_selected = app
+                .mention_selected
+                .min(app.mention_options.len().saturating_sub(1));
+            app.showing_mention_picker = true;
+        }
+        Err(_) => {
+            app.mention_options.clear();
+            app.showing_mention_picker = true;
+        }
+    }
+}
+
+fn confirm_mention_pick(app: &mut App) {
+    let Some(anchor) = app.mention_anchor else {
+        return;
+    };
+    let Some((account_id, display_name)) = app.mention_options.get(app.mention_selected).cloned()
+    else {
+        return;
+    };
+    let label = format!("@{display_name}");
+    let prefix = &app.input_buffer[..anchor];
+    app.input_buffer = format!("{prefix}{label} ");
+    app.comment_mentions.push((label, account_id));
+    clear_mention_picker(app);
+}
+
+async fn handle_mention_picker_key(app: &mut App, code: KeyCode) {
+    let count = app.mention_options.len();
+    match code {
+        KeyCode::Esc => clear_mention_picker(app),
+        KeyCode::Up | KeyCode::Char('k') if count > 0 => {
+            app.mention_selected = app.mention_selected.saturating_sub(1);
+        }
+        KeyCode::Down | KeyCode::Char('j') if count > 0 && app.mention_selected + 1 < count => {
+            app.mention_selected += 1;
+        }
+        KeyCode::Enter if count > 0 => confirm_mention_pick(app),
+        KeyCode::Char(c) => {
+            app.input_buffer.push(c);
+            refresh_mention_picker(app).await;
+        }
+        KeyCode::Backspace => {
+            app.input_buffer.pop();
+            refresh_mention_picker(app).await;
+        }
+        _ => {}
+    }
+}
+
 async fn submit_input(app: &mut App) {
     let buffer = app.input_buffer.clone();
     let mode = app.input_mode;
+    let mentions = app.comment_mentions.clone();
     app.input_mode = InputMode::None;
     app.input_buffer.clear();
+    clear_mention_picker(app);
+    app.comment_mentions.clear();
 
     let Some(sel) = app.selected_ticket() else {
         return;
@@ -91,7 +199,11 @@ async fn submit_input(app: &mut App) {
     };
 
     let result = match mode {
-        InputMode::Comment => app.jira.add_comment(&base_url, &sel.key, &buffer).await,
+        InputMode::Comment => {
+            app.jira
+                .add_comment(&base_url, &sel.key, &buffer, &mentions)
+                .await
+        }
         InputMode::Worklog => app.jira.add_worklog(&base_url, &sel.key, &buffer).await,
         InputMode::EditSummary => app.jira.update_summary(&base_url, &sel.key, &buffer).await,
         InputMode::EditLabels => {
@@ -337,6 +449,8 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('c') if app.detail_open => {
             app.input_mode = InputMode::Comment;
             app.input_buffer.clear();
+            app.comment_mentions.clear();
+            clear_mention_picker(app);
         }
         KeyCode::Char('w') if app.detail_open => {
             app.input_mode = InputMode::Worklog;
@@ -494,5 +608,36 @@ async fn start_transition_picker(app: &mut App) {
         }
         Ok(_) => app.status.set_action_error("No transitions available"),
         Err(e) => app.status.set_action_error(e),
+    }
+}
+
+#[cfg(test)]
+mod mention_tests {
+    use super::active_mention_query;
+
+    #[test]
+    fn detects_query_after_at() {
+        let (pos, q) = active_mention_query("hello @ali").unwrap();
+        assert_eq!(pos, 6);
+        assert_eq!(q, "ali");
+    }
+
+    #[test]
+    fn rejects_completed_mention_with_space() {
+        assert!(active_mention_query("hey @Alice done").is_none());
+    }
+
+    #[test]
+    fn uses_last_at_sign() {
+        let (pos, q) = active_mention_query("@a @bob").unwrap();
+        assert_eq!(pos, 3);
+        assert_eq!(q, "bob");
+    }
+
+    #[test]
+    fn empty_query_after_at_is_valid() {
+        let (pos, q) = active_mention_query("cc @").unwrap();
+        assert_eq!(pos, 3);
+        assert_eq!(q, "");
     }
 }

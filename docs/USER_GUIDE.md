@@ -20,9 +20,9 @@ name = "my-team"
 base_url = "https://my-team.atlassian.net"
 ```
 
-### Credentials (API token)
+### Credentials (API token — default)
 
-Choose **one**:
+tick uses **API token** authentication unless you set `auth = "oauth"` in config. Choose **one** token source:
 
 1. `export TICK_TOKEN="your-api-token"` ([create token](https://id.atlassian.com/manage-profile/security/api-tokens))
 2. `echo 'token' > ~/.config/tick/token && chmod 600 ~/.config/tick/token`
@@ -95,7 +95,7 @@ If Jira is unreachable, tick **keeps the last cached tickets** instead of cleari
 | Goal | Key |
 |------|-----|
 | Change status | `t` → pick transition |
-| Comment | `c` |
+| Comment | `c` — type `@` to tag users (picker); mentions render in Description/Comments |
 | Log work | `w` |
 | Assign to yourself | `a` |
 | Unassign | `u` |

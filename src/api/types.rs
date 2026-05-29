@@ -149,7 +149,23 @@ pub(crate) fn extract_text(v: &serde_json::Value) -> Option<String> {
     match v {
         serde_json::Value::String(s) => Some(s.clone()),
         serde_json::Value::Object(m) => {
+            let node_type = m.get("type").and_then(|t| t.as_str());
+            if node_type == Some("mention") {
+                return m
+                    .get("attrs")
+                    .and_then(|a| a.get("text"))
+                    .and_then(|t| t.as_str())
+                    .filter(|s| !s.is_empty())
+                    .map(String::from);
+            }
+            if node_type == Some("hardBreak") {
+                return Some("\n".into());
+            }
             if let Some(content) = m.get("content").and_then(|c| c.as_array()) {
+                let sep = match node_type {
+                    Some("paragraph") => "",
+                    _ => "\n",
+                };
                 let mut parts = Vec::new();
                 for node in content {
                     if let Some(text) = extract_text(node) {
@@ -159,7 +175,7 @@ pub(crate) fn extract_text(v: &serde_json::Value) -> Option<String> {
                 if parts.is_empty() {
                     None
                 } else {
-                    Some(parts.join("\n"))
+                    Some(parts.join(sep))
                 }
             } else {
                 m.get("text")
@@ -168,6 +184,35 @@ pub(crate) fn extract_text(v: &serde_json::Value) -> Option<String> {
             }
         }
         _ => None,
+    }
+}
+
+/// Collect `@mention` labels from an ADF document (description or comment body).
+pub fn collect_mention_labels(doc: &serde_json::Value) -> Vec<String> {
+    let mut labels = Vec::new();
+    collect_mention_labels_rec(doc, &mut labels);
+    labels.sort();
+    labels.dedup();
+    labels
+}
+
+fn collect_mention_labels_rec(node: &serde_json::Value, out: &mut Vec<String>) {
+    if let Some(obj) = node.as_object() {
+        if obj.get("type").and_then(|t| t.as_str()) == Some("mention") {
+            if let Some(label) = obj
+                .get("attrs")
+                .and_then(|a| a.get("text"))
+                .and_then(|t| t.as_str())
+                .filter(|s| !s.is_empty())
+            {
+                out.push(label.to_string());
+            }
+        }
+        if let Some(content) = obj.get("content").and_then(|c| c.as_array()) {
+            for child in content {
+                collect_mention_labels_rec(child, out);
+            }
+        }
     }
 }
 
@@ -301,6 +346,38 @@ mod tests {
             "content": [{"type": "paragraph", "content": [{"type": "text", "text": "line one"}]}]
         });
         assert_eq!(extract_text(&v), Some("line one".into()));
+    }
+
+    #[test]
+    fn collect_mention_labels_dedupes() {
+        let doc = serde_json::json!({
+            "type": "doc",
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    {"type": "mention", "attrs": {"text": "@Ada"}},
+                    {"type": "mention", "attrs": {"text": "@Ada"}},
+                    {"type": "mention", "attrs": {"text": "@Bob"}},
+                ]
+            }]
+        });
+        assert_eq!(
+            collect_mention_labels(&doc),
+            vec!["@Ada".to_string(), "@Bob".to_string()]
+        );
+    }
+
+    #[test]
+    fn extract_text_includes_mention_label() {
+        let v = serde_json::json!({
+            "type": "paragraph",
+            "content": [
+                {"type": "text", "text": "hi "},
+                {"type": "mention", "attrs": {"id": "1", "text": "@Ada"}},
+                {"type": "text", "text": "!"}
+            ]
+        });
+        assert_eq!(extract_text(&v), Some("hi @Ada!".into()));
     }
 
     #[test]

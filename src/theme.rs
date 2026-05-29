@@ -244,12 +244,157 @@ impl Theme {
         }
     }
 
+    pub fn gruvbox_dark() -> Self {
+        Self {
+            accent: c(0x83A598),
+            bg: c(0x282828),
+            fg: c(0xEBDBB2),
+            selected_bg: c(0x3C3836),
+            header_bg: c(0x1D2021),
+            header_fg: c(0x83A598),
+            row_fg: c(0xEBDBB2),
+            row_alt_bg: c(0x32302F),
+            border: c(0x504945),
+            footer_bg: c(0x1D2021),
+            footer_fg: c(0x928374),
+            detail_label: c(0x83A598),
+            detail_value: c(0xEBDBB2),
+            detail_border: c(0x504945),
+            priority_p1: c(0xFB4934),
+            priority_p2: c(0xFE8019),
+            priority_p3: c(0xB8BB26),
+            priority_p4: c(0x8EC07C),
+            priority_p5: c(0x83A598),
+            loading_fg: c(0xFABD2F),
+            error_fg: c(0xFB4934),
+            tick_fg: c(0x83A598),
+        }
+    }
+
+    pub fn nord() -> Self {
+        Self {
+            accent: c(0x88C0D0),
+            bg: c(0x2E3440),
+            fg: c(0xECEFF4),
+            selected_bg: c(0x3B4252),
+            header_bg: c(0x242933),
+            header_fg: c(0x88C0D0),
+            row_fg: c(0xECEFF4),
+            row_alt_bg: c(0x343D4F),
+            border: c(0x4C566A),
+            footer_bg: c(0x242933),
+            footer_fg: c(0xD8DEE9),
+            detail_label: c(0x88C0D0),
+            detail_value: c(0xECEFF4),
+            detail_border: c(0x4C566A),
+            priority_p1: c(0xBF616A),
+            priority_p2: c(0xD08770),
+            priority_p3: c(0xA3BE8C),
+            priority_p4: c(0x8FBCBB),
+            priority_p5: c(0x81A1C1),
+            loading_fg: c(0xEBCB8B),
+            error_fg: c(0xBF616A),
+            tick_fg: c(0x88C0D0),
+        }
+    }
+
+    pub fn one_dark() -> Self {
+        Self {
+            accent: c(0x61AFEF),
+            bg: c(0x282C34),
+            fg: c(0xABB2BF),
+            selected_bg: c(0x3E4451),
+            header_bg: c(0x21252B),
+            header_fg: c(0x61AFEF),
+            row_fg: c(0xABB2BF),
+            row_alt_bg: c(0x2C313A),
+            border: c(0x4B5263),
+            footer_bg: c(0x21252B),
+            footer_fg: c(0x5C6370),
+            detail_label: c(0x61AFEF),
+            detail_value: c(0xABB2BF),
+            detail_border: c(0x4B5263),
+            priority_p1: c(0xE06C75),
+            priority_p2: c(0xD19A66),
+            priority_p3: c(0x98C379),
+            priority_p4: c(0x56B6C2),
+            priority_p5: c(0x61AFEF),
+            loading_fg: c(0xE5C07B),
+            error_fg: c(0xE06C75),
+            tick_fg: c(0x61AFEF),
+        }
+    }
+
+    pub fn solarized_dark() -> Self {
+        Self {
+            accent: c(0x268BD2),
+            bg: c(0x002B36),
+            fg: c(0x839496),
+            selected_bg: c(0x073642),
+            header_bg: c(0x001F27),
+            header_fg: c(0x268BD2),
+            row_fg: c(0x93A1A1),
+            row_alt_bg: c(0x00212C),
+            border: c(0x586E75),
+            footer_bg: c(0x001F27),
+            footer_fg: c(0x657B83),
+            detail_label: c(0x268BD2),
+            detail_value: c(0x93A1A1),
+            detail_border: c(0x586E75),
+            priority_p1: c(0xDC322F),
+            priority_p2: c(0xCB4B16),
+            priority_p3: c(0x859900),
+            priority_p4: c(0x2AA198),
+            priority_p5: c(0x268BD2),
+            loading_fg: c(0xB58900),
+            error_fg: c(0xDC322F),
+            tick_fg: c(0x268BD2),
+        }
+    }
+
+    pub fn rose_pine() -> Self {
+        Self {
+            accent: c(0xC4A7E7),
+            bg: c(0x191724),
+            fg: c(0xE0DEF4),
+            selected_bg: c(0x26233A),
+            header_bg: c(0x1F1D2E),
+            header_fg: c(0xC4A7E7),
+            row_fg: c(0xE0DEF4),
+            row_alt_bg: c(0x1E1B2E),
+            border: c(0x6E6A86),
+            footer_bg: c(0x1F1D2E),
+            footer_fg: c(0x908CAA),
+            detail_label: c(0xC4A7E7),
+            detail_value: c(0xE0DEF4),
+            detail_border: c(0x6E6A86),
+            priority_p1: c(0xEB6F92),
+            priority_p2: c(0xF6C177),
+            priority_p3: c(0x9CCFD8),
+            priority_p4: c(0x31748F),
+            priority_p5: c(0xC4A7E7),
+            loading_fg: c(0xF6C177),
+            error_fg: c(0xEB6F92),
+            tick_fg: c(0xC4A7E7),
+        }
+    }
+
+    pub fn catppuccin_mocha() -> Self {
+        Self::default()
+    }
+
     pub fn all_builtin() -> HashMap<&'static str, Theme> {
         let mut m = HashMap::new();
         m.insert("default", Self::default());
+        m.insert("catppuccin-mocha", Self::catppuccin_mocha());
         m.insert("light", Self::light());
         m.insert("tokyo-night", Self::tokyo_night());
         m.insert("dracula", Self::dracula());
+        m.insert("gruvbox-dark", Self::gruvbox_dark());
+        m.insert("nord", Self::nord());
+        m.insert("one-dark", Self::one_dark());
+        m.insert("solarized-dark", Self::solarized_dark());
+        m.insert("rose-pine", Self::rose_pine());
         m
     }
 
@@ -348,5 +493,69 @@ impl Theme {
             .fg(self.header_fg)
             .bg(self.header_bg)
             .add_modifier(Modifier::BOLD)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn all_builtin_themes_resolve() {
+        for name in Theme::all_builtin().keys() {
+            let theme = Theme::resolve(name).unwrap_or_else(|e| panic!("{name}: {e}"));
+            assert_ne!(theme.fg, Color::Reset);
+        }
+    }
+
+    #[test]
+    fn catppuccin_mocha_matches_default() {
+        let a = Theme::resolve("default").unwrap();
+        let b = Theme::resolve("catppuccin-mocha").unwrap();
+        assert_eq!(a.accent, b.accent);
+        assert_eq!(a.bg, b.bg);
+    }
+
+    #[test]
+    fn from_file_overrides_accent() {
+        let dir = std::env::temp_dir().join(format!("tick-theme-test-{}", std::process::id()));
+        let _ = fs::create_dir_all(&dir);
+        let path = dir.join("custom-test.toml");
+        fs::write(&path, "accent = \"#FF0000\"\n").unwrap();
+        let theme = Theme::from_file(&path).unwrap();
+        assert_eq!(theme.accent, parse_hex("#FF0000"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn unknown_theme_errors() {
+        assert!(Theme::resolve("not-a-real-theme-xyz").is_err());
+    }
+
+    #[test]
+    fn priority_and_status_styles_use_theme_colors() {
+        let theme = Theme::dracula();
+        let p = theme.priority_style("Highest");
+        assert_eq!(p.fg, Some(theme.priority_p1));
+        let s = theme.status_style("green");
+        assert_eq!(s.fg, Some(theme.priority_p3));
+    }
+
+    #[test]
+    fn list_available_includes_new_builtins() {
+        let names = Theme::list_available();
+        for expected in [
+            "gruvbox-dark",
+            "nord",
+            "one-dark",
+            "solarized-dark",
+            "rose-pine",
+            "catppuccin-mocha",
+        ] {
+            assert!(
+                names.iter().any(|n| n == expected),
+                "missing theme {expected}: {names:?}"
+            );
+        }
     }
 }

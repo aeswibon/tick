@@ -162,6 +162,27 @@ pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
                 ]));
             }
 
+            let mut mentioned = Vec::new();
+            if let Some(ref adf) = ticket.description_adf {
+                mentioned.extend(crate::api::types::collect_mention_labels(adf));
+            }
+            for comment in &ticket.all_comments {
+                if let Some(ref body) = comment.body {
+                    mentioned.extend(crate::api::types::collect_mention_labels(body));
+                }
+            }
+            mentioned.sort();
+            mentioned.dedup();
+            if !mentioned.is_empty() {
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        format!("{:<12}", "Mentioned:"),
+                        Style::default().fg(dl).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(mentioned.join(", "), Style::default().fg(dv)),
+                ]));
+            }
+
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
                 "Summary",

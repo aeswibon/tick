@@ -45,6 +45,9 @@ pub fn render(f: &mut Frame, app: &mut App) {
     if app.showing_sprints {
         super::sprints::draw_sprints(f, app, f.area());
     }
+    if app.showing_mention_picker {
+        super::mentions::draw_mentions(f, app, f.area());
+    }
     if app.show_site_errors {
         super::errors::draw_site_errors(f, app, f.area());
     }
@@ -107,7 +110,15 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     let (footer_text, fg_color) = if app.filtering {
         (format!(" Filter: {}_", app.filter), app.theme.accent)
     } else if app.input_mode == crate::app::InputMode::Comment {
-        (format!(" Comment: {}_", app.input_buffer), app.theme.accent)
+        let hint = if app.showing_mention_picker {
+            " @mention"
+        } else {
+            " (@ to tag)"
+        };
+        (
+            format!(" Comment{hint}: {}_", app.input_buffer),
+            app.theme.accent,
+        )
     } else if app.input_mode == crate::app::InputMode::Worklog {
         (
             format!(" Worklog (e.g. 30m): {}_", app.input_buffer),

@@ -18,7 +18,7 @@ A k9s-inspired Jira Cloud TUI for the terminal. Multi-site ticket dashboard with
 - **Virtualized table** — Scroll hundreds of issues at terminal height
 - **Detail pane** — Summary, description, comments; edit fields in place
 - **Jira write-back** — Transitions, comments, worklogs, summary, priority, labels, description, sprint/backlog
-- **Auth** — API token or [OAuth 2.0](docs/OAUTH.md)
+- **Auth** — API token by default; optional [OAuth 2.0](docs/OAUTH.md)
 - **Offline-friendly** — Per-view disk cache with staleness indicators
 - **Optional notify** — Desktop alert when refresh finds new issues
 - **Themes** — Built-in + custom TOML ([`themes/`](themes/))

@@ -270,12 +270,13 @@ impl Config {
         fs::create_dir_all(parent)
             .map_err(|e| format!("Cannot create config dir {}: {}", parent.display(), e))?;
         let default = r#"email = "you@example.com"
+# API token auth is the default (no auth line needed).
 # token = "your-api-token"   # or use ~/.config/tick/token or TICK_TOKEN env
 max_results = 50
 page_size = 10   # rows to scroll with [ and ]
 theme = "default"
 # notify_on_refresh = true   # desktop alert when new issues appear on refresh
-# auth = "oauth"             # or "token" (default); see docs/OAUTH.md
+# auth = "oauth"             # optional; default is token — see docs/OAUTH.md
 # [oauth]
 # client_id = "your-atlassian-oauth-app-id"
 # redirect_uri = "http://127.0.0.1:8765/callback"
@@ -321,6 +322,20 @@ name = "one"
 base_url = "https://one.atlassian.net"
 "#
         )
+    }
+
+    #[test]
+    fn auth_defaults_to_token_when_omitted() {
+        let toml = r#"
+email = "a@b.com"
+token = "secret"
+
+[[sites]]
+name = "s"
+base_url = "https://x.atlassian.net"
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        assert_eq!(config.auth, AuthMethod::Token);
     }
 
     #[test]

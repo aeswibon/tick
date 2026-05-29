@@ -129,6 +129,15 @@ pub struct App {
     pub sort_mode: SortMode,
     pub input_mode: InputMode,
     pub input_buffer: String,
+    /// `@` mention picker while composing a comment.
+    pub showing_mention_picker: bool,
+    pub mention_selected: usize,
+    /// `(account_id, display_name)`
+    pub mention_options: Vec<(String, String)>,
+    /// Byte index of the active `@` in `input_buffer`.
+    pub mention_anchor: Option<usize>,
+    /// Resolved mentions in the current comment: (`@Display Name`, account_id).
+    pub comment_mentions: Vec<(String, String)>,
     #[allow(dead_code)]
     pub debug: bool,
     /// Rows to jump when pressing `[` / `]` (from config `page_size`).
@@ -181,6 +190,11 @@ impl App {
             sort_mode: SortMode::Default,
             input_mode: InputMode::None,
             input_buffer: String::new(),
+            showing_mention_picker: false,
+            mention_selected: 0,
+            mention_options: Vec::new(),
+            mention_anchor: None,
+            comment_mentions: Vec::new(),
             debug,
             page_size,
             scroll_offset: 0,

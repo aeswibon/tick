@@ -3,6 +3,7 @@ pub mod detail;
 pub mod draw;
 pub mod errors;
 pub mod help;
+pub mod mentions;
 pub mod priorities;
 pub mod sprints;
 mod table;

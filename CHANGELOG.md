@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.5.1] - 2026-05-29
+
+### Added
+
+- Six built-in themes: `gruvbox-dark`, `nord`, `one-dark`, `solarized-dark`, `rose-pine`, `catppuccin-mocha`
+- `@mention` rendering in detail pane; comment user picker (`@` while composing)
+- Expanded tests: themes, ADF mentions, user search, comment ADF, auth default
+
+### Changed
+
+- API token remains the default auth method (documented in `--init` template)
+
 ## [0.5.0] - 2026-05-29
 
 ### Added

@@ -11,7 +11,47 @@ fn color_hex(hex: u32) -> Color {
     )
 }
 
+fn mention_style() -> Style {
+    Style::default()
+        .fg(color_hex(0xF9E2AF))
+        .add_modifier(Modifier::BOLD)
+}
+
 fn parse_inline(node: &serde_json::Value) -> Vec<Span<'static>> {
+    match node.get("type").and_then(|t| t.as_str()) {
+        Some("mention") => {
+            let label = node
+                .get("attrs")
+                .and_then(|a| a.get("text"))
+                .and_then(|t| t.as_str())
+                .filter(|s| !s.is_empty())
+                .or_else(|| {
+                    node.get("attrs")
+                        .and_then(|a| a.get("id"))
+                        .and_then(|t| t.as_str())
+                })
+                .unwrap_or("@user")
+                .to_string();
+            return vec![Span::styled(label, mention_style())];
+        }
+        Some("hardBreak") => return vec![Span::raw("\n")],
+        Some("emoji") => {
+            let short = node
+                .get("attrs")
+                .and_then(|a| a.get("shortName"))
+                .and_then(|s| s.as_str());
+            let text = node
+                .get("text")
+                .and_then(|t| t.as_str())
+                .map(String::from)
+                .or_else(|| short.map(|s| format!(":{s}:")))
+                .unwrap_or_default();
+            return vec![Span::raw(text)];
+        }
+        Some("text") | None => {}
+        _ => return vec![],
+    }
+
     let text = node.get("text").and_then(|t| t.as_str()).unwrap_or("");
     let text = text.to_string();
     let mut style = Style::default();
@@ -202,4 +242,52 @@ pub fn render_doc(doc: &serde_json::Value) -> Vec<Line<'static>> {
         None => return vec![Line::from(Span::raw(""))],
     };
     render_content(content, 0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn line_text(line: &Line) -> String {
+        line.spans
+            .iter()
+            .map(|s| s.content.clone())
+            .collect::<Vec<_>>()
+            .join("")
+    }
+
+    #[test]
+    fn renders_mention_node_with_label() {
+        let doc = serde_json::json!({
+            "type": "doc",
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    {"type": "text", "text": "ping "},
+                    {"type": "mention", "attrs": {"id": "1", "text": "@Ada"}},
+                ]
+            }]
+        });
+        let lines = render_doc(&doc);
+        let text = line_text(&lines[0]);
+        assert!(text.contains("ping "));
+        assert!(text.contains("@Ada"));
+    }
+
+    #[test]
+    fn renders_hard_break_as_newline() {
+        let doc = serde_json::json!({
+            "type": "doc",
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    {"type": "text", "text": "a"},
+                    {"type": "hardBreak"},
+                    {"type": "text", "text": "b"},
+                ]
+            }]
+        });
+        let lines = render_doc(&doc);
+        assert!(line_text(&lines[0]).contains('\n'));
+    }
 }

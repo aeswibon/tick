@@ -484,16 +484,70 @@ impl JiraClient {
         }
     }
 
-    pub async fn add_comment(&self, base_url: &str, key: &str, body: &str) -> Result<(), String> {
+    pub async fn search_assignable_users(
+        &self,
+        base_url: &str,
+        issue_key: &str,
+        query: &str,
+    ) -> Result<Vec<(String, String)>, String> {
+        let url = format!(
+            "{}/rest/api/3/user/assignable/search",
+            base_url.trim_end_matches('/')
+        );
+        let resp = self
+            .get(&url)
+            .query(&[
+                ("query", query),
+                ("issueKey", issue_key),
+                ("maxResults", "20"),
+            ])
+            .send()
+            .await
+            .map_err(|e| format!("HTTP error: {e}"))?;
+        if !resp.status().is_success() {
+            return Err(format!(
+                "User search {}: {}",
+                resp.status(),
+                resp.text().await.unwrap_or_default()
+            ));
+        }
+        let data: serde_json::Value = resp.json().await.map_err(|e| format!("Parse error: {e}"))?;
+        let users = data
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|u| {
+                        let id = u["accountId"].as_str()?;
+                        let name = u["displayName"].as_str()?;
+                        Some((id.to_string(), name.to_string()))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(users)
+    }
+
+    pub async fn add_comment(
+        &self,
+        base_url: &str,
+        key: &str,
+        body: &str,
+        mentions: &[(String, String)],
+    ) -> Result<(), String> {
         let url = format!(
             "{}/rest/api/3/issue/{}/comment",
             base_url.trim_end_matches('/'),
             key
         );
+        let adf_body = if mentions.is_empty() {
+            adf::plain_text_body(body)
+        } else {
+            adf::comment_body_with_mentions(body, mentions)
+        };
         let resp = self
             .post(&url)
             .json(&serde_json::json!({
-                "body": adf::plain_text_body(body),
+                "body": adf_body,
             }))
             .send()
             .await
@@ -719,6 +773,50 @@ mod field_updates {
         let client = JiraClient::new("u@example.com", "token", false);
         client
             .update_description(&server.uri(), "DEMO-1", "Hello\n\nWorld")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn search_assignable_users_parses_response() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path(
+                "/rest/api/3/user/assignable/search",
+            ))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                    { "accountId": "acc-1", "displayName": "Alice" },
+                    { "accountId": "acc-2", "displayName": "Bob" }
+                ])),
+            )
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        let users = client
+            .search_assignable_users(&server.uri(), "DEMO-1", "al")
+            .await
+            .unwrap();
+        assert_eq!(users.len(), 2);
+        assert_eq!(users[0], ("acc-1".into(), "Alice".into()));
+    }
+
+    #[tokio::test]
+    async fn add_comment_with_mention_sends_adf() {
+        let server = wiremock::MockServer::start().await;
+        let mentions = vec![("@Alice".into(), "acc-1".into())];
+        let body = crate::api::adf::comment_body_with_mentions("hi @Alice", &mentions);
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/DEMO-1/comment"))
+            .and(wiremock::matchers::body_json(serde_json::json!({ "body": body })))
+            .respond_with(wiremock::ResponseTemplate::new(201))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        client
+            .add_comment(&server.uri(), "DEMO-1", "hi @Alice", &mentions)
             .await
             .unwrap();
     }
