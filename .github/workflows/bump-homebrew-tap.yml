@@ -1,0 +1,50 @@
+name: Bump Homebrew tap
+
+# Manual tap bump (e.g. verify HOMEBREW_TAP_TOKEN or re-sync after a release).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release tag to pull tick.rb from
+        required: true
+        default: v0.2.0
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    name: Push formula to homebrew-tick
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download tick.rb from release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download "${{ inputs.version }}" \
+            --repo "${{ github.repository }}" \
+            --pattern tick.rb \
+            --dir .
+
+      - name: Update homebrew-tick
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${HOMEBREW_TAP_TOKEN}" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN is not set"
+            exit 1
+          fi
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/aeswibon/homebrew-tick.git" tap
+          cp tick.rb tap/Formula/tick.rb
+          cd tap
+          if git diff --quiet; then
+            echo "homebrew-tick formula already matches ${{ inputs.version }}"
+            exit 0
+          fi
+          git add Formula/tick.rb
+          git commit -m "chore: bump tick to ${{ inputs.version }}"
+          git push origin main
