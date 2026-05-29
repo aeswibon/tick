@@ -9,7 +9,7 @@ use ratatui::{
 use crate::app::App;
 use crate::view_mode::ViewMode;
 
-pub fn render(f: &mut Frame, app: &App) {
+pub fn render(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -132,17 +132,17 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             app.theme.loading_fg,
         )
     } else {
-        let mut left = " ? help  / filter  ! errors  j/k  s sort  y copy  t trans  [ ] page  ←/→ view  1-4 tabs  q quit".to_string();
+        let mut left = " ? help  / filter  ! errors  j/k  s sort  y copy  t trans  [ ] scroll  ←/→ view  1-4 tabs  q quit".to_string();
         if app.detail_open {
             left.push_str("  S/P summary/priority  h/l tabs");
         }
+        let total = app.filtered_count();
+        let row = if total == 0 { 0 } else { app.selected + 1 };
         let right = format!(
-            " {} | Page {}/{} | Sort: {} | {} tickets",
+            " {} | {row}/{total} | Sort: {} | {} tickets",
             app.active_view.label(),
-            app.current_page + 1,
-            app.total_pages(),
             app.sort_mode.label(),
-            app.filtered_count()
+            total
         );
         (format!("{left:<72}{right}"), app.theme.footer_fg)
     };

@@ -13,7 +13,7 @@ pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
             }
             KeyCode::Esc | KeyCode::Enter => {
                 app.filtering = false;
-                app.selected = 0;
+                app.go_to_first();
                 app.invalidate_filter_cache();
             }
             _ => {}
@@ -198,29 +198,15 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('r') => {
             app.refresh().await;
         }
-        KeyCode::Up | KeyCode::Char('k') => {
-            if app.selected > 0 {
-                app.selected -= 1;
-            } else {
-                app.prev_page();
-            }
-        }
-        KeyCode::Down | KeyCode::Char('j') => {
-            let visible_count = app.visible_indices().len();
-            if visible_count > 0 && app.selected + 1 < visible_count {
-                app.selected += 1;
-            } else {
-                app.next_page();
-            }
-        }
-        KeyCode::Char('[') => app.prev_page(),
-        KeyCode::Char(']') => app.next_page(),
+        KeyCode::Up | KeyCode::Char('k') => app.move_selection_up(),
+        KeyCode::Down | KeyCode::Char('j') => app.move_selection_down(),
+        KeyCode::Char('[') => app.scroll_page_up(),
+        KeyCode::Char(']') => app.scroll_page_down(),
         KeyCode::Char('/') => {
             app.filtering = true;
             app.filter.clear();
             app.detail_open = false;
-            app.current_page = 0;
-            app.selected = 0;
+            app.go_to_first();
             app.invalidate_filter_cache();
         }
         KeyCode::Enter => {
@@ -247,8 +233,7 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         }
         KeyCode::Char('s') => {
             app.sort_mode = app.sort_mode.next();
-            app.current_page = 0;
-            app.selected = 0;
+            app.go_to_first();
             app.invalidate_filter_cache();
         }
         KeyCode::Char('h') if app.detail_open => {
@@ -307,10 +292,7 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('P') if app.detail_open => {
             start_priority_picker(app).await;
         }
-        KeyCode::Char('g') => {
-            app.current_page = 0;
-            app.selected = 0;
-        }
+        KeyCode::Char('g') => app.go_to_first(),
         KeyCode::Char('G') => app.go_to_last(),
         KeyCode::Tab => app.switch_to(app.active_view.next()).await,
         KeyCode::BackTab => app.switch_to(app.active_view.prev()).await,

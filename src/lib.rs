@@ -45,6 +45,9 @@ pub struct Cli {
 
     #[arg(long)]
     pub page_size: Option<u32>,
+
+    #[arg(long)]
+    pub list_themes: bool,
 }
 
 pub async fn run_doctor(config: &Config) {
@@ -113,6 +116,19 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    if cli.list_themes {
+        println!("Available themes:");
+        for name in Theme::list_available() {
+            let builtin = Theme::all_builtin().contains_key(name.as_str());
+            let tag = if builtin { "built-in" } else { "custom" };
+            println!("  {name} ({tag})");
+        }
+        println!("\nSet theme in config.toml or pass --theme <name>");
+        println!("Custom themes: ~/.config/tick/themes/<name>.toml");
+        println!("Examples: themes/ in the tick repository");
+        return Ok(());
+    }
+
     if let Err(e) = config.apply_cli_overrides(cli.max_results, cli.page_size) {
         eprintln!("Config error: {}", e);
         std::process::exit(1);
@@ -148,7 +164,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         if app.apply_pending_updates() {
             app.spawn_background_refresh();
         }
-        terminal.draw(|f| ui::draw::render(f, &app))?;
+        terminal.draw(|f| ui::draw::render(f, &mut app))?;
 
         if event::poll(Duration::from_millis(250))? {
             if let Event::Key(key) = event::read()? {

@@ -164,8 +164,8 @@ impl Config {
         if self.page_size == 0 {
             return Err("config: page_size must be at least 1".into());
         }
-        if self.page_size > 200 {
-            return Err("config: page_size must be at most 200".into());
+        if self.page_size > 500 {
+            return Err("config: page_size must be at most 500".into());
         }
         if self.sites.is_empty() {
             return Err("config: at least one [[sites]] entry is required".into());
@@ -204,7 +204,7 @@ impl Config {
         let default = r#"email = "you@example.com"
 # token = "your-api-token"   # or use ~/.config/tick/token or TICK_TOKEN env
 max_results = 50
-page_size = 10
+page_size = 10   # rows to scroll with [ and ]
 theme = "default"
 # notify_on_refresh = true   # desktop alert when new issues appear on refresh
 

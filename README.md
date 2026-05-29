@@ -94,7 +94,7 @@ base_url = "https://my-team.atlassian.net"
 | `[views]` | built-in JQL | Override JQL for Assigned, Updated, Mentions, Watched, Sprint (see examples) |
 | `sprint_field` | — | Per-site Jira field id for sprint column (see `tick --doctor`) |
 | `max_results` | `50` | Max tickets to fetch per site |
-| `page_size` | `10` | Tickets shown per table page |
+| `page_size` | `10` | Rows to scroll with `[` / `]` (table fills terminal height) |
 | `notify_on_refresh` | `false` | Desktop alert when a refresh finds new issues in the active view |
 | `theme` | `"default"` | Theme name (built-in or custom) |
 | `columns` | built-in default | Table column ids (see config comment) |
@@ -106,9 +106,16 @@ Column ids: `site`, `key`, `type`, `status`, `priority`, `age`, `due`, `assignee
 
 Provide a token via **one** of: `TICK_TOKEN` env, `~/.config/tick/token`, or `token` in `config.toml`. Use a dedicated [Atlassian API token](https://id.atlassian.com/manage-profile/security/api-tokens) with minimal scope and restrict file permissions (`chmod 600` on the token file).
 
-### Theme from config
+### Themes
 
-Set `theme = "tokyo-night"` in `config.toml`. The CLI flag `--theme dracula` overrides it.
+Built-in: `default`, `light`, `tokyo-night`, `dracula`. Example TOML files are in [`themes/`](themes/).
+
+```bash
+tick --list-themes        # built-in + ~/.config/tick/themes/*.toml
+tick --theme dracula
+```
+
+Set `theme = "tokyo-night"` in `config.toml`, or copy a file from `themes/` to `~/.config/tick/themes/` and customize.
 
 ## Usage
 
@@ -118,7 +125,8 @@ tick --theme light       # Light theme
 tick --theme dracula     # Dracula theme
 tick --theme mycustom    # Load ~/.config/tick/themes/mycustom.toml
 tick --max-results 100   # Override max results
-tick --page-size 20      # Override rows per page
+tick --page-size 20      # Override scroll step for [ / ]
+tick --list-themes       # List built-in and custom themes
 tick --debug             # Print API debug info to stderr
 tick --doctor            # Test API connectivity and exit
 tick --init              # Create default config file
@@ -129,8 +137,8 @@ tick --init              # Create default config file
 | Key | Action |
 |-----|--------|
 | `j` / `k` or `↑` / `↓` | Navigate up / down |
-| `g` / `G` | Go to first / last page |
-| `[` / `]` | Previous / next page |
+| `g` / `G` | Go to first / last row |
+| `[` / `]` | Scroll up / down by `page_size` rows |
 | `Enter` | Toggle detail pane |
 | `Esc` | Close pane / help / overlay |
 | `?` | Toggle help |

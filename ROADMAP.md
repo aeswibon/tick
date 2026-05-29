@@ -8,15 +8,15 @@ Open-source Jira TUI (`aeswibon/tick`).
 - **v0.3.0:** Edit summary (`S`) and priority (`P`) from detail pane
 - **v0.3.1:** Labels + sprint column/filter, doctor sprint field hints
 - **v0.3.2:** Desktop notify on new issues (`notify_on_refresh`), recurring background fetch
+- **v0.4.0:** Virtualized table, theme gallery + `--list-themes`
 
 ## Next
 
 | Item | Target |
 |------|--------|
-| Virtualized table (500+ rows) | v0.4 |
-| Theme gallery | v0.4 |
 | Label/sprint membership edits | backlog |
 | OAuth | on demand |
+| Stronger offline UX | backlog |
 
 ## Out of scope
 

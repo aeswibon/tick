@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.0] - 2026-05-29
+
+### Added
+
+- Virtualized table: scroll through full filtered list using terminal height (no page cap)
+- `tick --list-themes` and `themes/` gallery with example TOML for each built-in theme
+
+### Changed
+
+- `page_size` now controls `[` / `]` scroll distance (not rows per page)
+- Footer shows `row/total` instead of page numbers
+
 ## [0.3.2] - 2026-05-29
 
 ### Added

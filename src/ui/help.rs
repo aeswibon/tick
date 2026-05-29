@@ -22,8 +22,8 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
             Style::default().add_modifier(Modifier::UNDERLINED),
         )),
         Line::from("  j/k  or  Up/Down      Move selection"),
-        Line::from("  [ / ]                  Previous / next page"),
-        Line::from("  g / G                  Go to first / last page"),
+        Line::from("  [ / ]                  Scroll up / down by page_size rows"),
+        Line::from("  g / G                  Go to first / last row"),
         Line::from("  1 / 2 / 3 / 4          Jump to view tab"),
         Line::from(""),
         Line::from(Span::styled(

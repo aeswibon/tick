@@ -263,6 +263,33 @@ impl Theme {
         Ok(theme)
     }
 
+    pub fn themes_dir() -> Result<std::path::PathBuf, String> {
+        let dir = dirs::config_dir()
+            .ok_or_else(|| "Cannot determine config directory".to_string())?
+            .join("tick")
+            .join("themes");
+        Ok(dir)
+    }
+
+    pub fn list_available() -> Vec<String> {
+        let mut names: Vec<String> = Self::all_builtin().keys().map(|s| s.to_string()).collect();
+        if let Ok(dir) = Self::themes_dir() {
+            if let Ok(entries) = fs::read_dir(dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.extension().is_some_and(|e| e == "toml") {
+                        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                            names.push(stem.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        names.sort();
+        names.dedup();
+        names
+    }
+
     pub fn resolve(name: &str) -> Result<Theme, String> {
         let builtin = Self::all_builtin();
         if let Some(t) = builtin.get(name) {

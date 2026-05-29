@@ -18,20 +18,19 @@ fn tab_style(active: bool, dl: ratatui::style::Color, dv: ratatui::style::Color)
     }
 }
 
-pub fn draw_detail(f: &mut Frame, app: &App, area: Rect) {
-    let tickets = read_tickets(&app.tickets);
-    let indices = app.visible_indices();
-    if app.selected >= indices.len() {
-        return;
-    }
-    let ticket = &tickets[indices[app.selected]];
-
+pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
     let chunks = Layout::default()
         .direction(ratatui::layout::Direction::Horizontal)
         .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
         .split(area);
 
     super::table::draw_table(f, app, chunks[0]);
+
+    let tickets = read_tickets(&app.tickets);
+    let Some(ticket_idx) = app.selected_ticket_index() else {
+        return;
+    };
+    let ticket = &tickets[ticket_idx];
 
     let dl = app.theme.detail_label;
     let dv = app.theme.detail_value;

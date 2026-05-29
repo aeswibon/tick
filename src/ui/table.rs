@@ -10,17 +10,20 @@ use crate::app::App;
 use crate::columns::Column;
 use crate::ticket_lock::read_tickets;
 
-pub fn draw_table(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+pub fn draw_table(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
+    let viewport_rows = area.height.saturating_sub(1).max(1) as usize;
+    app.set_table_viewport(viewport_rows);
     let tickets = read_tickets(&app.tickets);
     let indices = app.visible_indices();
     let columns = &app.columns;
+    let selected_row = app.selected_viewport_row();
 
     let rows: Vec<Row> = indices
         .iter()
         .enumerate()
         .map(|(pos, &idx)| {
             let t = &tickets[idx];
-            let is_selected = pos == app.selected;
+            let is_selected = pos == selected_row;
             let row_style = if is_selected {
                 app.theme.selected_style()
             } else if idx % 2 == 1 {

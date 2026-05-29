@@ -122,8 +122,12 @@ pub struct App {
     pub input_buffer: String,
     #[allow(dead_code)]
     pub debug: bool,
-    pub current_page: usize,
+    /// Rows to jump when pressing `[` / `]` (from config `page_size`).
     pub page_size: usize,
+    /// Index into the filtered ticket list (not the raw tickets vec).
+    pub scroll_offset: usize,
+    /// Viewport height in rows (set each frame from terminal size).
+    pub table_viewport_rows: usize,
     pub active_view: ViewMode,
     pub view_cache: HashMap<ViewMode, Vec<Ticket>>,
     cache: ViewCache,
@@ -166,8 +170,9 @@ impl App {
             input_mode: InputMode::None,
             input_buffer: String::new(),
             debug,
-            current_page: 0,
             page_size,
+            scroll_offset: 0,
+            table_viewport_rows: 20,
             active_view: ViewMode::MyIssues,
             view_cache: HashMap::new(),
             cache,
@@ -200,9 +205,17 @@ impl App {
 
     pub fn selected_ticket_entry(&self) -> Option<Ticket> {
         let tickets = read_tickets(&self.tickets);
-        let indices = self.visible_indices();
-        let ticket_idx = *indices.get(self.selected)?;
+        let ticket_idx = self.selected_ticket_index()?;
         tickets.get(ticket_idx).cloned()
+    }
+
+    pub fn selected_ticket_index(&self) -> Option<usize> {
+        self.filtered_indices().get(self.selected).copied()
+    }
+
+    pub fn set_table_viewport(&mut self, rows: usize) {
+        self.table_viewport_rows = rows.max(1);
+        self.clamp_selection();
     }
 
     fn load_cache(&mut self) {
@@ -221,51 +234,82 @@ impl App {
         }
     }
 
+    /// Ticket indices visible in the current table viewport (virtualized window).
     pub fn visible_indices(&self) -> Vec<usize> {
         let all = self.filtered_indices();
-        let total_pages = self.total_pages_from_len(all.len());
-        let page = self.current_page.min(total_pages.saturating_sub(1));
-        let start = page * self.page_size;
-        let end = start + self.page_size;
-        if start >= all.len() {
-            Vec::new()
-        } else {
-            all[start..end.min(all.len())].to_vec()
+        let viewport = self.table_viewport_rows;
+        if viewport == 0 || all.is_empty() {
+            return Vec::new();
+        }
+        let start = self.scroll_offset.min(all.len());
+        let end = (start + viewport).min(all.len());
+        all[start..end].to_vec()
+    }
+
+    pub fn selected_viewport_row(&self) -> usize {
+        self.selected.saturating_sub(self.scroll_offset)
+    }
+
+    pub fn move_selection_up(&mut self) {
+        if self.selected > 0 {
+            self.selected -= 1;
+            self.ensure_selection_visible();
         }
     }
 
-    fn total_pages_from_len(&self, total: usize) -> usize {
-        if total == 0 {
-            1
-        } else {
-            total.div_ceil(self.page_size)
+    pub fn move_selection_down(&mut self) {
+        let count = self.filtered_count();
+        if count > 0 && self.selected + 1 < count {
+            self.selected += 1;
+            self.ensure_selection_visible();
         }
     }
 
-    pub fn total_pages(&self) -> usize {
-        self.total_pages_from_len(self.filtered_count())
+    pub fn scroll_page_up(&mut self) {
+        self.scroll_offset = self.scroll_offset.saturating_sub(self.page_size);
+        self.clamp_scroll_offset();
     }
 
-    pub fn next_page(&mut self) {
-        let total = self.total_pages();
-        if self.current_page + 1 < total {
-            self.current_page += 1;
-            self.selected = 0;
-        }
+    pub fn scroll_page_down(&mut self) {
+        let count = self.filtered_count();
+        let max_offset = count.saturating_sub(self.table_viewport_rows);
+        self.scroll_offset = (self.scroll_offset + self.page_size).min(max_offset);
+        self.clamp_scroll_offset();
     }
 
-    pub fn prev_page(&mut self) {
-        if self.current_page > 0 {
-            self.current_page -= 1;
-            self.selected = 0;
-        }
+    pub fn go_to_first(&mut self) {
+        self.selected = 0;
+        self.scroll_offset = 0;
     }
 
     pub fn go_to_last(&mut self) {
-        let total = self.total_pages();
-        self.current_page = total.saturating_sub(1);
-        let last_count = self.visible_indices().len();
-        self.selected = last_count.saturating_sub(1);
+        let count = self.filtered_count();
+        if count == 0 {
+            self.selected = 0;
+            self.scroll_offset = 0;
+            return;
+        }
+        self.selected = count - 1;
+        self.ensure_selection_visible();
+    }
+
+    fn clamp_scroll_offset(&mut self) {
+        let viewport = self.table_viewport_rows.max(1);
+        let count = self.filtered_count();
+        let max_offset = count.saturating_sub(viewport);
+        if self.scroll_offset > max_offset {
+            self.scroll_offset = max_offset;
+        }
+    }
+
+    fn ensure_selection_visible(&mut self) {
+        let viewport = self.table_viewport_rows.max(1);
+        if self.selected < self.scroll_offset {
+            self.scroll_offset = self.selected;
+        } else if self.selected >= self.scroll_offset + viewport {
+            self.scroll_offset = self.selected + 1 - viewport;
+        }
+        self.clamp_scroll_offset();
     }
 
     fn apply_fetch_result(
@@ -291,7 +335,7 @@ impl App {
         self.invalidate_filter_cache();
         self.live_data = !tickets.is_empty() || no_errors;
         if reset_cursor {
-            self.current_page = 0;
+            self.scroll_offset = 0;
             self.selected = 0;
         }
     }
@@ -417,7 +461,7 @@ impl App {
             self.loading = false;
             self.live_data = false;
             self.invalidate_filter_cache();
-            self.current_page = 0;
+            self.scroll_offset = 0;
             self.selected = 0;
         } else if let Some(tickets) = self.cache.load_view(mode) {
             write_tickets(&self.tickets).clone_from(&tickets);
@@ -425,7 +469,7 @@ impl App {
             self.loading = false;
             self.live_data = false;
             self.invalidate_filter_cache();
-            self.current_page = 0;
+            self.scroll_offset = 0;
             self.selected = 0;
             self.detail_open = false;
             return;
@@ -481,19 +525,16 @@ impl App {
     }
 
     fn clamp_selection(&mut self) {
-        let visible = self.visible_indices().len();
-        if visible == 0 {
+        let count = self.filtered_count();
+        if count == 0 {
             self.selected = 0;
-            self.current_page = 0;
+            self.scroll_offset = 0;
             return;
         }
-        let total_pages = self.total_pages();
-        if self.current_page >= total_pages {
-            self.current_page = total_pages.saturating_sub(1);
+        if self.selected >= count {
+            self.selected = count - 1;
         }
-        if self.selected >= visible {
-            self.selected = visible.saturating_sub(1);
-        }
+        self.ensure_selection_visible();
     }
 
     pub fn filtered_count(&self) -> usize {
@@ -657,7 +698,7 @@ mod tests {
     }
 
     #[test]
-    fn new_uses_config_page_size() {
+    fn config_page_size_is_scroll_step() {
         let config = Config {
             email: "a@b.com".into(),
             token: "t".into(),
@@ -692,7 +733,7 @@ mod tests {
     }
 
     #[test]
-    fn pagination_slices_filtered_list() {
+    fn virtualized_viewport_slices_filtered_list() {
         let config = Config {
             email: "a@b.com".into(),
             token: "t".into(),
@@ -711,14 +752,46 @@ mod tests {
         };
         let theme = Theme::default();
         let mut app = App::new(config, theme, false);
-        app.page_size = 2;
         *write_tickets(&app.tickets) = (0..5)
             .map(|i| sample_ticket(&format!("T-{i}"), "x", "Open"))
             .collect();
         app.invalidate_filter_cache();
-        app.current_page = 1;
+        app.set_table_viewport(2);
+        app.scroll_offset = 2;
+        app.selected = 3;
         assert_eq!(app.visible_indices(), vec![2, 3]);
-        assert_eq!(app.total_pages(), 3);
+        assert_eq!(app.selected_viewport_row(), 1);
+    }
+
+    #[test]
+    fn scroll_page_down_advances_offset() {
+        let mut app = App::new(
+            Config {
+                email: "a@b.com".into(),
+                token: "t".into(),
+                sites: vec![crate::config::Site {
+                    name: "acme".into(),
+                    base_url: "https://acme.atlassian.net".into(),
+                    sprint_field: None,
+                }],
+                columns: None,
+                max_results: 50,
+                page_size: 2,
+                theme: "default".into(),
+                views: Default::default(),
+                notify_on_refresh: false,
+                view_jql: Config::build_view_jql(&Default::default()),
+            },
+            Theme::default(),
+            false,
+        );
+        *write_tickets(&app.tickets) = (0..6)
+            .map(|i| sample_ticket(&format!("T-{i}"), "x", "Open"))
+            .collect();
+        app.invalidate_filter_cache();
+        app.set_table_viewport(2);
+        app.scroll_page_down();
+        assert_eq!(app.scroll_offset, 2);
     }
 
     #[test]
