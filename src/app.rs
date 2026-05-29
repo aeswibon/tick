@@ -3,8 +3,8 @@ use crate::api::{self, JiraClient};
 use crate::cache::ViewCache;
 use crate::columns::Column;
 use crate::config::Config;
-use crate::issue_key::{host_from_url, parse_issue_key};
 use crate::fetch_status::FetchStatus;
+use crate::issue_key::{host_from_url, parse_issue_key};
 use crate::platform;
 use crate::theme::Theme;
 use crate::ticket_lock::{read_tickets, write_tickets};
@@ -262,10 +262,7 @@ impl App {
         let key = parse_issue_key(raw)
             .ok_or_else(|| "Paste an issue key (e.g. PROJ-123) or Jira browse URL".to_string())?;
         let tickets = read_tickets(&self.tickets);
-        if let Some(t) = tickets
-            .iter()
-            .find(|t| t.key.eq_ignore_ascii_case(&key))
-        {
+        if let Some(t) = tickets.iter().find(|t| t.key.eq_ignore_ascii_case(&key)) {
             return Ok(t.link.clone());
         }
 

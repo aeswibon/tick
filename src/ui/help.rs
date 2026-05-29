@@ -34,7 +34,9 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
         Line::from("  Esc                    Close pane / help / overlay"),
         Line::from("  r                      Refresh tickets"),
         Line::from("  o                      Open selected ticket in browser"),
-        Line::from("  O                      Open ticket from clipboard/key (probes sites if needed)"),
+        Line::from(
+            "  O                      Open ticket from clipboard/key (probes sites if needed)",
+        ),
         Line::from("  y                      Copy ticket key to clipboard"),
         Line::from("  e                      Open config file in editor"),
         Line::from(""),

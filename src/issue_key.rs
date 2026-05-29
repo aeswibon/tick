@@ -78,10 +78,7 @@ mod tests {
 
     #[test]
     fn parses_plain_key() {
-        assert_eq!(
-            parse_issue_key("proj-42").as_deref(),
-            Some("PROJ-42")
-        );
+        assert_eq!(parse_issue_key("proj-42").as_deref(), Some("PROJ-42"));
     }
 
     #[test]
