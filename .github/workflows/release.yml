@@ -163,3 +163,25 @@ jobs:
             CHECKSUMS.txt
             tick.rb
           generate_release_notes: true
+
+      - name: Update homebrew-tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${HOMEBREW_TAP_TOKEN}" ]; then
+            echo "HOMEBREW_TAP_TOKEN not set — skip homebrew-tick bump (update Formula/tick.rb manually)"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/aeswibon/homebrew-tick.git" tap
+          cp tick.rb tap/Formula/tick.rb
+          cd tap
+          if git diff --quiet; then
+            echo "homebrew-tick formula already up to date"
+            exit 0
+          fi
+          git add Formula/tick.rb
+          git commit -m "chore: bump tick to ${{ github.ref_name }}"
+          git push origin main

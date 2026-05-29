@@ -39,7 +39,9 @@ Maintainers tag releases as `v*` on `master`. Pushing a tag triggers the **Relea
 2. Merge to `master`; wait for CI green.
 3. `git tag vX.Y.Z && git push origin vX.Y.Z`
 4. Confirm the GitHub release has all platform binaries, `CHECKSUMS.txt`, and `tick.rb`.
-5. Update the Homebrew tap: copy `tick.rb` from the release into [homebrew-tick](https://github.com/aeswibon/homebrew-tick) `Formula/tick.rb` and push.
+5. Homebrew tap (choose one):
+   - **Automated:** Add repo secret `HOMEBREW_TAP_TOKEN` (fine-grained PAT with `contents: write` on `homebrew-tick`). The release workflow pushes `tick.rb` to [homebrew-tick](https://github.com/aeswibon/homebrew-tick).
+   - **Manual:** Copy `tick.rb` from the GitHub release into `Formula/tick.rb` and push the tap repo.
 6. Smoke: `brew update && brew upgrade tick`, `tick --help`.
 
 ## Code of conduct
