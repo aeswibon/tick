@@ -230,7 +230,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         if event::poll(Duration::from_millis(250))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    should_quit = input::handle_key(&mut app, key.code).await;
+                    should_quit = input::handle_key(&mut app, key).await;
                 }
             }
         }

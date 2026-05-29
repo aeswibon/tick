@@ -313,7 +313,7 @@ Jira Cloud does **not** allow setting the status field directly. tick loads your
 1. When you pick a transition, tick reads `transitions.fields` from Jira (`required: true`).
 2. For each required field (typed from Jira’s schema):
    - **Select / resolution / priority** → picker (`j`/`k`, `Enter`, `1`–`9`).
-   - **User** (assignee, etc.) → cached list filtered in footer; **R** fetches more from Jira and **appends** to the cache (up to 500 per issue).
+   - **User** (assignee, etc.) → cached list filtered in footer; **Ctrl+R** fetches more from Jira and **appends** to the cache (up to 500 per issue). Plain `r`/`R` type into the filter (e.g. names starting with R).
    - **Boolean** → Yes / No picker.
    - **Date** → footer input `YYYY-MM-DD`.
    - **Date-time** → footer input `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`.

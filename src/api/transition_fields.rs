@@ -42,7 +42,7 @@ impl TransitionField {
     pub fn modal_hint(&self) -> &'static str {
         match self.kind {
             TransitionFieldKind::User => {
-                "Type in footer to filter; R fetch more users into cache; Enter to select"
+                "Type in footer to filter; Ctrl+R fetch more users into cache; Enter to select"
             }
             TransitionFieldKind::Date => "Enter a date in the footer (YYYY-MM-DD), then Enter",
             TransitionFieldKind::DateTime => "Enter date/time in the footer, then Enter",

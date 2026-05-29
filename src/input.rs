@@ -1,4 +1,4 @@
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use std::collections::HashMap;
 
@@ -8,15 +8,22 @@ use crate::api::{self, types::WorkflowTransition};
 use crate::app::{App, InputMode, TransitionCollect};
 use crate::view_mode::ViewMode;
 
+/// Load more assignable users from Jira (merge into cache). Plain `r`/`R` are for filtering.
+fn load_more_users_key(key: &KeyEvent) -> bool {
+    key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(key.code, KeyCode::Char('r') | KeyCode::Char('R'))
+}
+
 /// Returns `true` when the app should quit.
-pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
+pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
+    let code = key.code;
     if app.showing_mention_picker {
-        handle_mention_picker_key(app, code).await;
+        handle_mention_picker_key(app, &key).await;
         return false;
     }
 
     if app.showing_transition_field && app.transition_field_user_search {
-        if handle_transition_user_field_key(app, code).await {
+        if handle_transition_user_field_key(app, &key).await {
             return false;
         }
     } else if app.showing_transition_field && !app.transition_field_text_mode {
@@ -219,7 +226,8 @@ fn mentions_enabled(mode: InputMode) -> bool {
     matches!(mode, InputMode::Comment | InputMode::EditDescription)
 }
 
-async fn handle_mention_picker_key(app: &mut App, code: KeyCode) {
+async fn handle_mention_picker_key(app: &mut App, key: &KeyEvent) {
+    let code = key.code;
     let count = app.mention_options.len();
     match code {
         KeyCode::Esc => clear_mention_picker(app),
@@ -230,7 +238,7 @@ async fn handle_mention_picker_key(app: &mut App, code: KeyCode) {
             app.mention_selected += 1;
         }
         KeyCode::Enter if count > 0 => confirm_mention_pick(app),
-        KeyCode::Char('r') | KeyCode::Char('R') => {
+        _ if load_more_users_key(key) => {
             if refresh_mention_catalog(app, true).await.is_ok() {
                 refresh_mention_picker(app).await;
             }
@@ -624,16 +632,17 @@ async fn apply_transition_field_pick(app: &mut App, idx: usize) {
     prompt_next_transition_field(app).await;
 }
 
-/// User field: picker keys (j/k, arrows, R, Enter) vs footer typing for filter text.
+/// User field: picker keys (j/k, arrows, Ctrl+R, Enter) vs footer typing for filter text.
 /// Returns `true` when the key was handled here (not passed to the input buffer).
-async fn handle_transition_user_field_key(app: &mut App, code: KeyCode) -> bool {
+async fn handle_transition_user_field_key(app: &mut App, key: &KeyEvent) -> bool {
+    let code = key.code;
     let has_options = !app.transition_field_options.is_empty();
     match code {
         KeyCode::Esc => {
             cancel_transition_collect(app);
             true
         }
-        KeyCode::Char('r') | KeyCode::Char('R') => {
+        _ if load_more_users_key(key) => {
             refresh_transition_user_search(app, true).await;
             true
         }
@@ -656,7 +665,7 @@ async fn handle_transition_user_field_key(app: &mut App, code: KeyCode) -> bool 
             apply_transition_field_pick(app, idx).await;
             true
         }
-        // Letters/digits go to footer filter; j/k/R reserved when a list is shown.
+        // Letters/digits go to footer filter; j/k reserved when a list is shown; Ctrl+R loads more.
         _ => false,
     }
 }
@@ -1094,7 +1103,30 @@ async fn start_status_picker(app: &mut App) {
 
 #[cfg(test)]
 mod mention_tests {
-    use super::active_mention_query;
+    use super::{active_mention_query, load_more_users_key};
+    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+
+    fn key(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
+        KeyEvent {
+            code,
+            modifiers,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        }
+    }
+
+    #[test]
+    fn load_more_users_requires_ctrl_r() {
+        assert!(load_more_users_key(&key(
+            KeyCode::Char('r'),
+            KeyModifiers::CONTROL
+        )));
+        assert!(!load_more_users_key(&key(KeyCode::Char('r'), KeyModifiers::empty())));
+        assert!(!load_more_users_key(&key(
+            KeyCode::Char('R'),
+            KeyModifiers::SHIFT
+        )));
+    }
 
     #[test]
     fn detects_query_after_at() {
