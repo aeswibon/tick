@@ -173,8 +173,8 @@ jobs:
             echo "HOMEBREW_TAP_TOKEN not set — skip homebrew-tick bump (update Formula/tick.rb manually)"
             exit 0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/aeswibon/homebrew-tick.git" tap
           cp tick.rb tap/Formula/tick.rb
           cd tap
