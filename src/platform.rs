@@ -33,6 +33,36 @@ pub fn open_url(url: &str) -> std::io::Result<()> {
     open_path(Path::new(url))
 }
 
+/// Read text from the system clipboard, if a clipboard tool is available.
+pub fn read_from_clipboard() -> Option<String> {
+    #[cfg(target_os = "macos")]
+    {
+        read_stdout("pbpaste", &[])
+    }
+    #[cfg(target_os = "linux")]
+    {
+        read_stdout("wl-paste", &["--no-newline"])
+            .or_else(|| read_stdout("xclip", &["-selection", "clipboard", "-o"]))
+            .or_else(|| read_stdout("xsel", &["--clipboard", "--output"]))
+    }
+    #[cfg(target_os = "windows")]
+    {
+        read_stdout(
+            "powershell",
+            &[
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Get-Clipboard -Raw",
+            ],
+        )
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        None
+    }
+}
+
 /// Copy text to the system clipboard. Returns false if no clipboard tool is available.
 pub fn copy_to_clipboard(text: &str) -> bool {
     #[cfg(target_os = "macos")]
@@ -136,6 +166,20 @@ fn escape_xml(s: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+fn read_stdout(cmd: &str, args: &[&str]) -> Option<String> {
+    let output = Command::new(cmd).args(args).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8(output.stdout).ok()?;
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
 }
 
 fn spawn_stdin(cmd: &str, args: &[&str], text: &str) -> bool {

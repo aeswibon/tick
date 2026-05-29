@@ -131,6 +131,14 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             format!(" Labels (comma-separated): {}_", app.input_buffer),
             app.theme.accent,
         )
+    } else if app.input_mode == crate::app::InputMode::OpenTicket {
+        (
+            format!(
+                " Open ticket (key or URL, paste from clipboard): {}_",
+                app.input_buffer
+            ),
+            app.theme.accent,
+        )
     } else if app.input_mode == crate::app::InputMode::EditDescription {
         let hint = if app.showing_mention_picker {
             " @mention"
@@ -154,7 +162,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             app.theme.loading_fg,
         )
     } else {
-        let mut left = " ? help  / filter  ! errors  j/k  s/S sort  y copy  t trans  [ ] scroll  ←/→ view  1-5 tabs  q quit".to_string();
+        let mut left = " ? help  / filter  ! errors  j/k  s/S sort  y copy  o/O open  t trans  [ ] scroll  ←/→ view  1-5 tabs  q quit".to_string();
         if app.detail_open {
             left.push_str("  S/P/L/M/D fields  h/l tabs");
         }

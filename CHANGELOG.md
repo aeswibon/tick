@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.4] - 2026-05-29
+
+### Added
+
+- `O` opens a ticket in the browser from the clipboard or by pasting an issue key / Jira browse URL; with multiple sites, probes each Jira instance and opens the first match
+
 ## [0.6.3] - 2026-05-29
 
 ### Added

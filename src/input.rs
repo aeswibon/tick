@@ -47,7 +47,11 @@ pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
                 app.input_mentions.clear();
             }
             KeyCode::Enter => {
-                submit_input(app).await;
+                if app.input_mode == InputMode::OpenTicket {
+                    submit_open_ticket(app).await;
+                } else {
+                    submit_input(app).await;
+                }
             }
             _ => {}
         }
@@ -185,6 +189,39 @@ async fn handle_mention_picker_key(app: &mut App, code: KeyCode) {
     }
 }
 
+async fn start_open_ticket(app: &mut App) {
+    let prefilled = crate::platform::read_from_clipboard().unwrap_or_default();
+    if !prefilled.is_empty() {
+        app.loading = true;
+        let result = app.resolve_ticket_url(&prefilled).await;
+        app.loading = false;
+        if let Ok(url) = result {
+            if crate::platform::open_url(&url).is_ok() {
+                return;
+            }
+        }
+    }
+    app.input_mode = InputMode::OpenTicket;
+    app.input_buffer = prefilled;
+}
+
+async fn submit_open_ticket(app: &mut App) {
+    let buffer = app.input_buffer.clone();
+    app.input_mode = InputMode::None;
+    app.input_buffer.clear();
+    app.loading = true;
+    let result = app.resolve_ticket_url(&buffer).await;
+    app.loading = false;
+    match result {
+        Ok(url) => {
+            if crate::platform::open_url(&url).is_err() {
+                app.status.set_action_error("Could not open browser");
+            }
+        }
+        Err(e) => app.status.set_action_error(e),
+    }
+}
+
 async fn submit_input(app: &mut App) {
     let buffer = app.input_buffer.clone();
     let mode = app.input_mode;
@@ -219,7 +256,7 @@ async fn submit_input(app: &mut App) {
                 .update_description(&base_url, &sel.key, &buffer, &mentions)
                 .await
         }
-        InputMode::None => return,
+        InputMode::OpenTicket | InputMode::None => return,
     };
 
     match result {
@@ -450,6 +487,9 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
                     app.status.set_action_error("Could not open browser");
                 }
             }
+        }
+        KeyCode::Char('O') if !app.detail_open => {
+            start_open_ticket(app).await;
         }
         KeyCode::Char('1') => app.switch_to(ViewMode::MyIssues).await,
         KeyCode::Char('2') => app.switch_to(ViewMode::Updated).await,

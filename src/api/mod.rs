@@ -6,8 +6,9 @@ pub mod retry;
 pub mod types;
 
 use crate::auth::Auth;
-use crate::config::Config;
+use crate::config::{Config, Site};
 use reqwest::Client;
+use reqwest::StatusCode;
 use types::*;
 
 use std::collections::HashMap;
@@ -179,6 +180,29 @@ impl JiraClient {
                 resp.text().await.unwrap_or_default()
             ))
         }
+    }
+
+    /// `GET /rest/api/3/issue/{key}` — true when the issue exists (or is forbidden but present).
+    pub async fn issue_exists(&self, base_url: &str, key: &str) -> bool {
+        let base = base_url.trim_end_matches('/');
+        let url = format!("{base}/rest/api/3/issue/{key}?fields=key");
+        let resp = match self.send(|| self.get(&url).send()).await {
+            Ok(r) => r,
+            Err(_) => return false,
+        };
+        let status = resp.status();
+        status.is_success() || status == StatusCode::FORBIDDEN
+    }
+
+    /// Probe each configured site in order; return browse URL for the first site that has the issue.
+    pub async fn find_issue_browse_url(&self, sites: &[Site], key: &str) -> Option<String> {
+        for site in sites {
+            if self.issue_exists(&site.base_url, key).await {
+                let base = site.base_url.trim_end_matches('/');
+                return Some(format!("{base}/browse/{key}"));
+            }
+        }
+        None
     }
 
     pub async fn current_user_account_id(&self, base_url: &str) -> Result<String, String> {
@@ -690,6 +714,45 @@ mod fetch_integration {
 #[cfg(test)]
 mod field_updates {
     use super::*;
+
+    #[tokio::test]
+    async fn find_issue_browse_url_probes_sites_in_order() {
+        let first = wiremock::MockServer::start().await;
+        let second = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/FOO-1"))
+            .respond_with(wiremock::ResponseTemplate::new(404))
+            .mount(&first)
+            .await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/FOO-1"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({ "key": "FOO-1" })),
+            )
+            .mount(&second)
+            .await;
+
+        let sites = vec![
+            crate::config::Site {
+                name: "a".into(),
+                base_url: first.uri(),
+                sprint_field: None,
+                board_id: None,
+                boards: Default::default(),
+            },
+            crate::config::Site {
+                name: "b".into(),
+                base_url: second.uri(),
+                sprint_field: None,
+                board_id: None,
+                boards: Default::default(),
+            },
+        ];
+        let client = JiraClient::new("u@example.com", "token", false);
+        let url = client.find_issue_browse_url(&sites, "FOO-1").await.unwrap();
+        assert_eq!(url, format!("{}/browse/FOO-1", second.uri()));
+    }
 
     #[tokio::test]
     async fn update_summary_sends_put() {

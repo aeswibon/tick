@@ -3,6 +3,7 @@ use crate::api::{self, JiraClient};
 use crate::cache::ViewCache;
 use crate::columns::Column;
 use crate::config::Config;
+use crate::issue_key::{host_from_url, parse_issue_key};
 use crate::fetch_status::FetchStatus;
 use crate::platform;
 use crate::theme::Theme;
@@ -119,6 +120,7 @@ pub enum InputMode {
     EditSummary,
     EditLabels,
     EditDescription,
+    OpenTicket,
 }
 
 struct FilterCache {
@@ -253,6 +255,44 @@ impl App {
             .iter()
             .find(|s| s.name == site_name)
             .map(|s| s.base_url.clone())
+    }
+
+    /// Build a browse URL for pasted text (issue key or Jira `/browse/` URL).
+    pub async fn resolve_ticket_url(&self, raw: &str) -> Result<String, String> {
+        let key = parse_issue_key(raw)
+            .ok_or_else(|| "Paste an issue key (e.g. PROJ-123) or Jira browse URL".to_string())?;
+        let tickets = read_tickets(&self.tickets);
+        if let Some(t) = tickets
+            .iter()
+            .find(|t| t.key.eq_ignore_ascii_case(&key))
+        {
+            return Ok(t.link.clone());
+        }
+
+        if let Some(host) = host_from_url(raw) {
+            for site in &self.config.sites {
+                if host_from_url(&site.base_url).as_deref() == Some(host.as_str()) {
+                    let base = site.base_url.trim_end_matches('/');
+                    return Ok(format!("{base}/browse/{key}"));
+                }
+            }
+        }
+
+        if self.config.sites.len() > 1 {
+            return self
+                .jira
+                .find_issue_browse_url(&self.config.sites, &key)
+                .await
+                .ok_or_else(|| format!("Issue {key} not found on any configured site"));
+        }
+
+        let site = self
+            .config
+            .sites
+            .first()
+            .ok_or_else(|| "No sites in config".to_string())?;
+        let base = site.base_url.trim_end_matches('/');
+        Ok(format!("{base}/browse/{key}"))
     }
 
     pub fn selected_ticket(&self) -> Option<TicketRef> {
@@ -882,6 +922,39 @@ mod tests {
             sprint_name: None,
             project_key: String::new(),
         }
+    }
+
+    #[tokio::test]
+    async fn resolve_ticket_url_from_key_single_site() {
+        let app = App::new(test_config(20), Theme::default(), test_jira(), false);
+        let url = app.resolve_ticket_url("demo-9").await.unwrap();
+        assert_eq!(url, "https://acme.atlassian.net/browse/DEMO-9");
+    }
+
+    #[tokio::test]
+    async fn resolve_ticket_url_uses_loaded_ticket_link() {
+        let app = App::new(test_config(20), Theme::default(), test_jira(), false);
+        *write_tickets(&app.tickets) = vec![sample_ticket("WEB-1", "x", "Open")];
+        let url = app.resolve_ticket_url("WEB-1").await.unwrap();
+        assert_eq!(url, "https://acme.atlassian.net/browse/WEB-1");
+    }
+
+    #[tokio::test]
+    async fn resolve_ticket_url_from_browse_url_host() {
+        let mut cfg = test_config(20);
+        cfg.sites.push(crate::config::Site {
+            name: "other".into(),
+            base_url: "https://other.atlassian.net".into(),
+            sprint_field: None,
+            board_id: None,
+            boards: Default::default(),
+        });
+        let app = App::new(cfg, Theme::default(), test_jira(), false);
+        let url = app
+            .resolve_ticket_url("https://other.atlassian.net/browse/OTH-2")
+            .await
+            .unwrap();
+        assert_eq!(url, "https://other.atlassian.net/browse/OTH-2");
     }
 
     #[test]

@@ -6,6 +6,7 @@ pub mod cache;
 pub mod columns;
 pub mod config;
 pub mod fetch_status;
+pub mod issue_key;
 pub mod input;
 pub mod oauth;
 pub mod platform;

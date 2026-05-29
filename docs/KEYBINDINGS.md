@@ -15,7 +15,8 @@
 | `S` | Toggle sort **asc** ↑ / **desc** ↓ (table only; not in detail pane) |
 | `r` | Refresh current view from Jira |
 | `y` | Copy issue key to clipboard |
-| `o` | Open issue in browser |
+| `o` | Open selected issue in browser |
+| `O` | Open issue from clipboard, or paste key/URL (`Enter` to open); multi-site: checks each instance via API |
 | `e` | Open config file in editor |
 | `t` | Status transition picker |
 | `!` | Site errors overlay (when warnings exist) |
