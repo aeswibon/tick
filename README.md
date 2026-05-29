@@ -148,6 +148,10 @@ tick --theme dracula
 
 Create `~/.config/tick/themes/mycustom.toml` (see existing README theme keys). Use with `--theme mycustom` or `theme = "mycustom"` in config.
 
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for planned releases and priorities.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and feature requests: [GitHub Issues](https://github.com/aeswibon/tick/issues).
