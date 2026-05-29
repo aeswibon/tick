@@ -39,5 +39,10 @@ jobs:
       - name: cargo test
         run: cargo test
 
+      - name: cargo deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+
       - name: cargo build --release
         run: cargo build --release

@@ -261,9 +261,12 @@ impl App {
     pub async fn resolve_ticket_url(&self, raw: &str) -> Result<String, String> {
         let key = parse_issue_key(raw)
             .ok_or_else(|| "Paste an issue key (e.g. PROJ-123) or Jira browse URL".to_string())?;
-        let tickets = read_tickets(&self.tickets);
-        if let Some(t) = tickets.iter().find(|t| t.key.eq_ignore_ascii_case(&key)) {
-            return Ok(t.link.clone());
+        if let Some(link) = read_tickets(&self.tickets)
+            .iter()
+            .find(|t| t.key.eq_ignore_ascii_case(&key))
+            .map(|t| t.link.clone())
+        {
+            return Ok(link);
         }
 
         if let Some(host) = host_from_url(raw) {

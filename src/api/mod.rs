@@ -194,10 +194,16 @@ impl JiraClient {
         status.is_success() || status == StatusCode::FORBIDDEN
     }
 
-    /// Probe each configured site in order; return browse URL for the first site that has the issue.
+    /// Probe all configured sites concurrently; return browse URL for the first match in config order.
     pub async fn find_issue_browse_url(&self, sites: &[Site], key: &str) -> Option<String> {
-        for site in sites {
-            if self.issue_exists(&site.base_url, key).await {
+        let exists = futures::future::join_all(
+            sites
+                .iter()
+                .map(|site| self.issue_exists(&site.base_url, key)),
+        )
+        .await;
+        for (site, found) in sites.iter().zip(exists) {
+            if found {
                 let base = site.base_url.trim_end_matches('/');
                 return Some(format!("{base}/browse/{key}"));
             }

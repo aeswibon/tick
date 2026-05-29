@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.5] - 2026-05-29
+
+### Added
+
+- `cargo-deny` in CI (license and advisory checks)
+
+### Changed
+
+- Multi-site `O` open: probe all Jira instances in parallel, still prefer first match in config order
+
 ## [0.6.4] - 2026-05-29
 
 ### Added
