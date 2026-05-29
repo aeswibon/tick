@@ -89,6 +89,10 @@ async fn submit_input(app: &mut App) {
         InputMode::Comment => app.jira.add_comment(&base_url, &sel.key, &buffer).await,
         InputMode::Worklog => app.jira.add_worklog(&base_url, &sel.key, &buffer).await,
         InputMode::EditSummary => app.jira.update_summary(&base_url, &sel.key, &buffer).await,
+        InputMode::EditLabels => {
+            let labels = crate::app::parse_labels_input(&buffer);
+            app.jira.update_labels(&base_url, &sel.key, &labels).await
+        }
         InputMode::None => return,
     };
 
@@ -291,6 +295,12 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         }
         KeyCode::Char('P') if app.detail_open => {
             start_priority_picker(app).await;
+        }
+        KeyCode::Char('L') if app.detail_open => {
+            if let Some(ticket) = app.selected_ticket_entry() {
+                app.input_mode = InputMode::EditLabels;
+                app.input_buffer = ticket.labels.join(", ");
+            }
         }
         KeyCode::Char('g') => app.go_to_first(),
         KeyCode::Char('G') => app.go_to_last(),

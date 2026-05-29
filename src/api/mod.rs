@@ -97,6 +97,16 @@ impl JiraClient {
         .await
     }
 
+    pub async fn update_labels(
+        &self,
+        base_url: &str,
+        key: &str,
+        labels: &[String],
+    ) -> Result<(), String> {
+        self.update_fields(base_url, key, serde_json::json!({ "labels": labels }))
+            .await
+    }
+
     async fn update_fields(
         &self,
         base_url: &str,
@@ -671,6 +681,29 @@ mod field_updates {
         let client = JiraClient::new("u@example.com", "token", false);
         client
             .update_priority(&server.uri(), "DEMO-1", "High")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn update_labels_sends_put() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("PUT"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/DEMO-1"))
+            .and(wiremock::matchers::body_json(serde_json::json!({
+                "fields": { "labels": ["backend", "urgent"] }
+            })))
+            .respond_with(wiremock::ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        client
+            .update_labels(
+                &server.uri(),
+                "DEMO-1",
+                &["backend".into(), "urgent".into()],
+            )
             .await
             .unwrap();
     }

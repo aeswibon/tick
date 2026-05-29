@@ -13,6 +13,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 
+use chrono::{DateTime, Utc};
+
 type BgResult = Vec<(ViewMode, Vec<Ticket>, Vec<String>)>;
 
 #[derive(Debug, Clone)]
@@ -84,6 +86,7 @@ pub enum InputMode {
     Comment,
     Worklog,
     EditSummary,
+    EditLabels,
 }
 
 struct FilterCache {
@@ -97,6 +100,8 @@ pub struct App {
     pub tickets: Arc<RwLock<Vec<Ticket>>>,
     pub jira: Arc<JiraClient>,
     pub last_refresh: Instant,
+    /// When the active view was last fetched to disk (shown while `live_data` is false).
+    pub view_fetched_at: Option<DateTime<Utc>>,
     pub loading: bool,
     pub status: FetchStatus,
     pub columns: Vec<Column>,
@@ -146,6 +151,7 @@ impl App {
             tickets: Arc::new(RwLock::new(Vec::new())),
             jira,
             last_refresh: Instant::now(),
+            view_fetched_at: None,
             loading: true,
             status: FetchStatus::default(),
             columns,
@@ -226,6 +232,25 @@ impl App {
             self.live_data = false;
             self.invalidate_filter_cache();
         }
+        self.sync_view_fetched_at(self.active_view);
+    }
+
+    pub fn sync_view_fetched_at(&mut self, mode: ViewMode) {
+        self.view_fetched_at = self.cache.fetched_at_for(mode);
+    }
+
+    pub fn refresh_status_label(&self) -> String {
+        if self.loading {
+            return "loading".into();
+        }
+        if self.live_data {
+            let mins = self.last_refresh.elapsed().as_secs() / 60;
+            return format!("live · refresh {mins}m ago");
+        }
+        if let Some(at) = self.view_fetched_at {
+            return format!("cached · {}", format_cache_age(at));
+        }
+        "cached".into()
     }
 
     pub fn save_cache(&self, mode: ViewMode) {
@@ -349,6 +374,7 @@ impl App {
         self.apply_fetch_result(tickets, errors, true);
         self.loading = false;
         self.last_refresh = Instant::now();
+        self.view_fetched_at = Some(Utc::now());
     }
 
     pub async fn refresh_all(&mut self) {
@@ -387,6 +413,7 @@ impl App {
         if let Some(tickets) = active_tickets {
             self.apply_fetch_result(tickets, all_errors, true);
             self.maybe_notify_new_tickets(&previous_keys, &read_tickets(&self.tickets));
+            self.view_fetched_at = Some(Utc::now());
         } else {
             self.status.set_site_warnings(all_errors);
         }
@@ -443,6 +470,7 @@ impl App {
                     self.clamp_selection();
                 }
                 self.maybe_notify_new_tickets(&previous_keys, &read_tickets(&self.tickets));
+                self.view_fetched_at = Some(Utc::now());
             } else {
                 self.status.set_site_warnings(all_errors);
             }
@@ -463,6 +491,7 @@ impl App {
             self.invalidate_filter_cache();
             self.scroll_offset = 0;
             self.selected = 0;
+            self.sync_view_fetched_at(mode);
         } else if let Some(tickets) = self.cache.load_view(mode) {
             write_tickets(&self.tickets).clone_from(&tickets);
             self.view_cache.insert(mode, tickets.clone());
@@ -471,6 +500,7 @@ impl App {
             self.invalidate_filter_cache();
             self.scroll_offset = 0;
             self.selected = 0;
+            self.sync_view_fetched_at(mode);
             self.detail_open = false;
             return;
         } else {
@@ -570,6 +600,28 @@ impl App {
 
 fn ticket_keys(tickets: &[Ticket]) -> Vec<String> {
     tickets.iter().map(|t| t.key.clone()).collect()
+}
+
+pub(crate) fn parse_labels_input(input: &str) -> Vec<String> {
+    input
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .collect()
+}
+
+fn format_cache_age(at: DateTime<Utc>) -> String {
+    let mins = (Utc::now() - at).num_minutes();
+    if mins < 1 {
+        "just now".into()
+    } else if mins < 60 {
+        format!("{mins}m ago")
+    } else if mins < 24 * 60 {
+        format!("{}h ago", mins / 60)
+    } else {
+        format!("{}d ago", mins / (24 * 60))
+    }
 }
 
 fn tickets_new_since<'a>(previous: &[String], tickets: &'a [Ticket]) -> Vec<&'a Ticket> {
@@ -675,6 +727,12 @@ mod tests {
             labels: vec![],
             sprint_name: None,
         }
+    }
+
+    #[test]
+    fn parse_labels_input_splits_and_trims() {
+        assert_eq!(parse_labels_input("a, b , ,c"), vec!["a", "b", "c"]);
+        assert!(parse_labels_input("  , ").is_empty());
     }
 
     #[test]

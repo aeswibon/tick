@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use crate::api::types::{CachedView, Ticket};
 use crate::view_mode::ViewMode;
+use chrono::{DateTime, Utc};
 
 pub struct ViewCache {
     pub(crate) dir: PathBuf,
@@ -36,9 +37,19 @@ impl ViewCache {
     }
 
     pub fn load_view(&self, mode: ViewMode) -> Option<Vec<Ticket>> {
+        self.load_cached_view(mode).map(|c| c.tickets)
+    }
+
+    pub fn load_cached_view(&self, mode: ViewMode) -> Option<CachedView> {
         let content = fs::read_to_string(self.path_for(mode)).ok()?;
-        let cached: CachedView = serde_json::from_str(&content).ok()?;
-        Some(cached.tickets)
+        serde_json::from_str(&content).ok()
+    }
+
+    pub fn fetched_at_for(&self, mode: ViewMode) -> Option<DateTime<Utc>> {
+        let cached = self.load_cached_view(mode)?;
+        DateTime::parse_from_rfc3339(&cached.fetched_at)
+            .ok()
+            .map(|dt| dt.with_timezone(&Utc))
     }
 
     pub fn save_view(&self, mode: ViewMode, tickets: &[Ticket]) {
@@ -84,6 +95,17 @@ mod tests {
             labels: vec![],
             sprint_name: None,
         }
+    }
+
+    #[test]
+    fn fetched_at_roundtrip() {
+        let dir = std::env::temp_dir().join(format!("tick-cache-age-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let cache = ViewCache { dir: dir.clone() };
+        cache.save_view(ViewMode::MyIssues, &[sample_ticket("A-1")]);
+        assert!(cache.fetched_at_for(ViewMode::MyIssues).is_some());
+        let _ = fs::remove_dir_all(dir);
     }
 
     #[test]

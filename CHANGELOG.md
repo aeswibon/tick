@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.1] - 2026-05-29
+
+### Added
+
+- Edit labels from detail pane (`L`) — comma-separated list, replaces all labels on the issue
+- Header shows cache age when viewing offline data (e.g. `cached · 2h ago`)
+
 ## [0.4.0] - 2026-05-29
 
 ### Added

@@ -52,15 +52,8 @@ pub fn render(f: &mut Frame, app: &mut App) {
 fn render_header(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     let count = app.filtered_count();
     let sites = app.sites_str();
-    let mins = app.last_refresh.elapsed().as_secs() / 60;
-    let mode = if app.loading {
-        "loading"
-    } else if !app.live_data {
-        "cached"
-    } else {
-        "live"
-    };
-    let right_text = format!(" {count} tickets | {mode} | refresh {mins}m ago");
+    let status = app.refresh_status_label();
+    let right_text = format!(" {count} tickets | {status}");
 
     let header_chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -119,6 +112,11 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         )
     } else if app.input_mode == crate::app::InputMode::EditSummary {
         (format!(" Summary: {}_", app.input_buffer), app.theme.accent)
+    } else if app.input_mode == crate::app::InputMode::EditLabels {
+        (
+            format!(" Labels (comma-separated): {}_", app.input_buffer),
+            app.theme.accent,
+        )
     } else if app.loading {
         (" Loading...".into(), app.theme.loading_fg)
     } else if let Some(ref err) = app.status.action_error {
@@ -134,7 +132,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     } else {
         let mut left = " ? help  / filter  ! errors  j/k  s sort  y copy  t trans  [ ] scroll  ←/→ view  1-4 tabs  q quit".to_string();
         if app.detail_open {
-            left.push_str("  S/P summary/priority  h/l tabs");
+            left.push_str("  S/P/L summary/priority/labels  h/l tabs");
         }
         let total = app.filtered_count();
         let row = if total == 0 { 0 } else { app.selected + 1 };
