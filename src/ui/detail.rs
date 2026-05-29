@@ -6,6 +6,7 @@ use ratatui::{
     Frame,
 };
 use crate::app::{App, DetailTab};
+use crate::ticket_lock::read_tickets;
 
 fn tab_style(active: bool, dl: ratatui::style::Color, dv: ratatui::style::Color) -> Style {
     if active {
@@ -16,7 +17,7 @@ fn tab_style(active: bool, dl: ratatui::style::Color, dv: ratatui::style::Color)
 }
 
 pub fn draw_detail(f: &mut Frame, app: &App, area: Rect) {
-    let tickets = app.tickets.read().unwrap();
+    let tickets = read_tickets(&app.tickets);
     let indices = app.visible_indices();
     if app.selected >= indices.len() { return; }
     let ticket = &tickets[indices[app.selected]];

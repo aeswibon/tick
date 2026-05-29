@@ -31,7 +31,7 @@ cargo test --all-targets
 
 ## Releases
 
-Maintainers tag releases as `v*`. Pushing a tag triggers the release workflow (binaries + checksums + Homebrew formula).
+Maintainers tag releases as `v*` on `master`. Pushing a tag triggers the **Release** workflow (primary): binaries, checksums, and `tick.rb`. **CI** on push/PR runs a snapshot `cargo test` + `cargo build --release` only.
 
 ## Code of conduct
 

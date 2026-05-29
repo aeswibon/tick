@@ -39,7 +39,6 @@ pub struct CommentEntry {
 #[derive(Debug, Deserialize)]
 pub struct JqlSearchResponse {
     pub issues: Vec<JqlIssue>,
-    #[allow(dead_code)]
     pub next_page_token: Option<String>,
 }
 

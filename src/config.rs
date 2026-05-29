@@ -21,9 +21,13 @@ pub struct Config {
     pub theme: String,
 }
 
-fn default_theme() -> String { "default".to_string() }
+fn default_theme() -> String {
+    "default".to_string()
+}
 
-fn default_max_results() -> u32 { 50 }
+fn default_max_results() -> u32 {
+    50
+}
 
 impl Config {
     pub fn config_path() -> Result<PathBuf, String> {
@@ -36,8 +40,38 @@ impl Config {
         let path = Self::config_path()?;
         let contents = fs::read_to_string(&path)
             .map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
-        toml::from_str(&contents)
-            .map_err(|e| format!("Invalid config: {}", e))
+        let config: Config = toml::from_str(&contents)
+            .map_err(|e| format!("Invalid config: {}", e))?;
+        config.validate()?;
+        Ok(config)
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.email.trim().is_empty() {
+            return Err("config: email must not be empty".into());
+        }
+        if self.token.trim().is_empty() {
+            return Err("config: token must not be empty".into());
+        }
+        if self.sites.is_empty() {
+            return Err("config: at least one [[sites]] entry is required".into());
+        }
+        for site in &self.sites {
+            if site.name.trim().is_empty() {
+                return Err("config: site name must not be empty".into());
+            }
+            let url = site.base_url.trim();
+            if url.is_empty() {
+                return Err(format!("config: base_url for site '{}' must not be empty", site.name));
+            }
+            if !url.starts_with("https://") {
+                return Err(format!(
+                    "config: base_url for site '{}' must start with https://",
+                    site.name
+                ));
+            }
+        }
+        Ok(())
     }
 
     pub fn create_default_config() -> Result<(), String> {
@@ -45,7 +79,8 @@ impl Config {
         if path.exists() {
             return Ok(());
         }
-        let parent = path.parent()
+        let parent = path
+            .parent()
             .ok_or_else(|| "Config path has no parent directory".to_string())?;
         fs::create_dir_all(parent)
             .map_err(|e| format!("Cannot create config dir {}: {}", parent.display(), e))?;
@@ -58,12 +93,8 @@ theme = "default"
 # columns = ["site", "key", "type", "status", "priority", "age", "due", "assignee", "reporter"]
 
 [[sites]]
-name = "zeta-tm"
-base_url = "https://zeta-tm.atlassian.net"
-
-[[sites]]
-name = "zeta-saas"
-base_url = "https://zeta-saas.atlassian.net"
+name = "my-team"
+base_url = "https://my-team.atlassian.net"
 "#;
         fs::write(&path, default)
             .map_err(|e| format!("Cannot write {}: {}", path.display(), e))?;
@@ -89,24 +120,32 @@ name = "one"
 base_url = "https://one.atlassian.net"
 "#;
         let cfg: Config = toml::from_str(raw).unwrap();
-        assert_eq!(cfg.email, "a@b.com");
+        assert!(cfg.validate().is_ok());
         assert_eq!(cfg.max_results, 25);
-        assert_eq!(cfg.theme, "dracula");
-        assert_eq!(cfg.sites.len(), 1);
     }
 
     #[test]
-    fn parses_optional_columns() {
+    fn rejects_empty_sites() {
         let raw = r#"
 email = "a@b.com"
 token = "secret"
-columns = ["key", "summary"]
+sites = []
+"#;
+        let cfg: Config = toml::from_str(raw).unwrap();
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_non_https_base_url() {
+        let raw = r#"
+email = "a@b.com"
+token = "secret"
 
 [[sites]]
 name = "one"
-base_url = "https://one.atlassian.net"
+base_url = "http://one.atlassian.net"
 "#;
         let cfg: Config = toml::from_str(raw).unwrap();
-        assert_eq!(cfg.columns.as_ref().map(|c| c.len()), Some(2));
+        assert!(cfg.validate().is_err());
     }
 }

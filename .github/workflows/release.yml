@@ -17,10 +17,13 @@ jobs:
         include:
           - target: x86_64-apple-darwin
             os: macos-13
+            asset: tick-x86_64-apple-darwin
           - target: aarch64-apple-darwin
             os: macos-14
+            asset: tick-aarch64-apple-darwin
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-22.04
+            asset: tick-x86_64-unknown-linux-gnu
 
     steps:
       - uses: actions/checkout@v4
@@ -35,17 +38,17 @@ jobs:
 
       - name: Package
         run: |
-          mkdir -p dist
-          cp target/${{ matrix.target }}/release/tick dist/tick-${{ matrix.target }}
+          install -Dm755 "target/${{ matrix.target }}/release/tick" "dist/${{ matrix.asset }}"
+          chmod +x "dist/${{ matrix.asset }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tick-${{ matrix.target }}
-          path: dist/tick-${{ matrix.target }}
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}
 
   release:
-    name: Release
+    name: Publish release
     needs: build
     runs-on: ubuntu-22.04
 
@@ -56,73 +59,80 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          merge-multiple: true
 
       - name: Checksums
         run: |
-          for f in artifacts/*/tick-*; do
+          : > CHECKSUMS.txt
+          for f in artifacts/tick-*; do
             [ -f "$f" ] || continue
             sha256sum "$f" >> CHECKSUMS.txt
-            echo "$f"
           done
+          cat CHECKSUMS.txt
 
       - name: Extract hashes
         id: hashes
         run: |
-          AMD64=$(sha256sum artifacts/tick-x86_64-apple-darwin/tick-x86_64-apple-darwin | cut -d' ' -f1)
-          ARM64=$(sha256sum artifacts/tick-aarch64-apple-darwin/tick-aarch64-apple-darwin | cut -d' ' -f1)
-          LINUX=$(sha256sum artifacts/tick-x86_64-unknown-linux-gnu/tick-x86_64-unknown-linux-gnu | cut -d' ' -f1)
+          AMD64=$(sha256sum artifacts/tick-x86_64-apple-darwin | cut -d' ' -f1)
+          ARM64=$(sha256sum artifacts/tick-aarch64-apple-darwin | cut -d' ' -f1)
+          LINUX=$(sha256sum artifacts/tick-x86_64-unknown-linux-gnu | cut -d' ' -f1)
           echo "amd64=$AMD64" >> "$GITHUB_OUTPUT"
           echo "arm64=$ARM64" >> "$GITHUB_OUTPUT"
           echo "linux=$LINUX" >> "$GITHUB_OUTPUT"
 
       - name: Homebrew formula
+        env:
+          REPO: ${{ github.repository }}
+          REF: ${{ github.ref_name }}
+          VERSION: ${{ github.ref_name }}
+          AMD64_SHA: ${{ steps.hashes.outputs.amd64 }}
+          ARM64_SHA: ${{ steps.hashes.outputs.arm64 }}
+          LINUX_SHA: ${{ steps.hashes.outputs.linux }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          REPO="${{ github.repository }}"
-          REF="${{ github.ref_name }}"
-          AMD64_SHA="${{ steps.hashes.outputs.amd64 }}"
-          ARM64_SHA="${{ steps.hashes.outputs.arm64 }}"
-          LINUX_SHA="${{ steps.hashes.outputs.linux }}"
+          VERSION="${VERSION#v}"
+          cat > tick.rb <<FORMULA
+          class Tick < Formula
+            desc "Jira TUI dashboard for the terminal"
+            homepage "https://github.com/${REPO}"
+            version "${VERSION}"
+            license "MIT"
 
-          ruby -e '
-            formula = <<~FORMULA
-              class Tick < Formula
-                desc "Jira TUI dashboard for the terminal"
-                homepage "https://github.com/#{ENV["REPO"]}"
-                license "MIT"
-
-                on_macos do
-                  if Hardware::CPU.arm?
-                    url "https://github.com/#{ENV["REPO"]}/releases/download/#{ENV["REF"]}/tick-aarch64-apple-darwin"
-                    sha256 "#{ENV["ARM64_SHA"]}"
-                  else
-                    url "https://github.com/#{ENV["REPO"]}/releases/download/#{ENV["REF"]}/tick-x86_64-apple-darwin"
-                    sha256 "#{ENV["AMD64_SHA"]}"
-                  end
-                end
-
-                on_linux do
-                  url "https://github.com/#{ENV["REPO"]}/releases/download/#{ENV["REF"]}/tick-x86_64-unknown-linux-gnu"
-                  sha256 "#{ENV["LINUX_SHA"]}"
-                end
-
-                def install
-                  bin.install "tick"
-                end
-
-                test do
-                  system "#{bin}/tick", "--help"
-                end
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/${REPO}/releases/download/${REF}/tick-aarch64-apple-darwin"
+                sha256 "${ARM64_SHA}"
+              else
+                url "https://github.com/${REPO}/releases/download/${REF}/tick-x86_64-apple-darwin"
+                sha256 "${AMD64_SHA}"
               end
-            FORMULA
-            File.write("tick.rb", formula)
-          '
+            end
+
+            on_linux do
+              url "https://github.com/${REPO}/releases/download/${REF}/tick-x86_64-unknown-linux-gnu"
+              sha256 "${LINUX_SHA}"
+            end
+
+            def install
+              if OS.mac? && Hardware::CPU.arm?
+                bin.install "tick-aarch64-apple-darwin" => "tick"
+              elsif OS.mac?
+                bin.install "tick-x86_64-apple-darwin" => "tick"
+              else
+                bin.install "tick-x86_64-unknown-linux-gnu" => "tick"
+              end
+            end
+
+            test do
+              assert_match "tick", shell_output("#{bin}/tick --help", 0)
+            end
+          end
+          FORMULA
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/*/*
+            artifacts/tick-*
             CHECKSUMS.txt
             tick.rb
           generate_release_notes: true

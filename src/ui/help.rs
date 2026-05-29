@@ -29,7 +29,7 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
         Line::from("  e                      Open config file in editor"),
         Line::from(""),
         Line::from(Span::styled(" Detail Pane", Style::default().add_modifier(Modifier::UNDERLINED))),
-        Line::from("  h / l / Tab            Switch detail tab"),
+        Line::from("  h / l                  Prev / next detail tab"),
         Line::from(""),
         Line::from(Span::styled(" View", Style::default().add_modifier(Modifier::UNDERLINED))),
         Line::from("  ?                      Toggle this help"),

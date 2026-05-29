@@ -1,8 +1,4 @@
-use ratatui::{
-    style::Style,
-    text::Span,
-    widgets::Cell,
-};
+use ratatui::{text::Span, widgets::Cell};
 
 use crate::api::types::Ticket;
 use crate::theme::Theme;

@@ -8,9 +8,10 @@ use ratatui::{
 
 use crate::app::App;
 use crate::columns::Column;
+use crate::ticket_lock::read_tickets;
 
 pub fn draw_table(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
-    let tickets = app.tickets.read().unwrap();
+    let tickets = read_tickets(&app.tickets);
     let indices = app.visible_indices();
     let columns = &app.columns;
 
