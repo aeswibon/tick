@@ -4,6 +4,7 @@ pub enum ViewMode {
     Updated,
     Mentions,
     Watching,
+    Sprint,
 }
 
 impl ViewMode {
@@ -21,6 +22,9 @@ impl ViewMode {
             ViewMode::Watching => {
                 "watcher = currentUser() AND statusCategory != Done ORDER BY updated DESC"
             }
+            ViewMode::Sprint => {
+                "sprint in openSprints() AND assignee = currentUser() ORDER BY updated DESC"
+            }
         }
     }
 
@@ -29,16 +33,18 @@ impl ViewMode {
             ViewMode::MyIssues => ViewMode::Updated,
             ViewMode::Updated => ViewMode::Mentions,
             ViewMode::Mentions => ViewMode::Watching,
-            ViewMode::Watching => ViewMode::MyIssues,
+            ViewMode::Watching => ViewMode::Sprint,
+            ViewMode::Sprint => ViewMode::MyIssues,
         }
     }
 
     pub fn prev(self) -> Self {
         match self {
-            ViewMode::MyIssues => ViewMode::Watching,
+            ViewMode::MyIssues => ViewMode::Sprint,
             ViewMode::Updated => ViewMode::MyIssues,
             ViewMode::Mentions => ViewMode::Updated,
             ViewMode::Watching => ViewMode::Mentions,
+            ViewMode::Sprint => ViewMode::Watching,
         }
     }
 
@@ -48,6 +54,7 @@ impl ViewMode {
             ViewMode::Updated => "Updated",
             ViewMode::Mentions => "Mentions",
             ViewMode::Watching => "Watched",
+            ViewMode::Sprint => "Sprint",
         }
     }
 
@@ -57,15 +64,17 @@ impl ViewMode {
             ViewMode::Updated => "updated",
             ViewMode::Mentions => "mentions",
             ViewMode::Watching => "watched",
+            ViewMode::Sprint => "sprint",
         }
     }
 
-    pub fn all() -> [ViewMode; 4] {
+    pub fn all() -> [ViewMode; 5] {
         [
             ViewMode::MyIssues,
             ViewMode::Updated,
             ViewMode::Mentions,
             ViewMode::Watching,
+            ViewMode::Sprint,
         ]
     }
 }

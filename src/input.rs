@@ -327,6 +327,7 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('2') => app.switch_to(ViewMode::Updated).await,
         KeyCode::Char('3') => app.switch_to(ViewMode::Mentions).await,
         KeyCode::Char('4') => app.switch_to(ViewMode::Watching).await,
+        KeyCode::Char('5') => app.switch_to(ViewMode::Sprint).await,
         KeyCode::Char('t') => start_transition_picker(app).await,
         KeyCode::Char('c') if app.detail_open => {
             app.input_mode = InputMode::Comment;

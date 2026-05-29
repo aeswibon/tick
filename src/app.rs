@@ -393,31 +393,46 @@ impl App {
     }
 
     pub async fn refresh_all(&mut self) {
-        self.do_refresh_all(ViewMode::all(), false).await;
+        self.do_refresh_all(&ViewMode::all(), false).await;
     }
 
     pub async fn refresh_all_notify(&mut self) {
-        self.do_refresh_all(ViewMode::all(), true).await;
+        self.do_refresh_all(&ViewMode::all(), true).await;
     }
 
-    async fn do_refresh_all(&mut self, views: [ViewMode; 4], notify: bool) {
+    async fn fetch_views_parallel(
+        &self,
+        views: &[ViewMode],
+    ) -> Vec<(ViewMode, Vec<Ticket>, Vec<String>)> {
+        let mut set = tokio::task::JoinSet::new();
+        for &mode in views {
+            let jira = Arc::clone(&self.jira);
+            let config = self.config.clone();
+            set.spawn(async move {
+                let (tickets, errors) = api::fetch_all(&jira, &config, config.jql_for(mode)).await;
+                (mode, tickets, errors)
+            });
+        }
+        let mut results = Vec::new();
+        while let Some(res) = set.join_next().await {
+            if let Ok(item) = res {
+                results.push(item);
+            }
+        }
+        results
+    }
+
+    async fn do_refresh_all(&mut self, views: &[ViewMode], notify: bool) {
         let previous_keys = if notify && self.config.notify_on_refresh {
             ticket_keys(&read_tickets(&self.tickets))
         } else {
             Vec::new()
         };
         self.loading = true;
-        let (r0, r1, r2, r3) = tokio::join!(
-            api::fetch_all(&self.jira, &self.config, self.config.jql_for(views[0])),
-            api::fetch_all(&self.jira, &self.config, self.config.jql_for(views[1])),
-            api::fetch_all(&self.jira, &self.config, self.config.jql_for(views[2])),
-            api::fetch_all(&self.jira, &self.config, self.config.jql_for(views[3])),
-        );
-        let results = [r0, r1, r2, r3];
+        let results = self.fetch_views_parallel(views).await;
         let mut all_errors = Vec::new();
         let mut active_tickets = None;
-        for (i, (tickets, errs)) in results.into_iter().enumerate() {
-            let mode = views[i];
+        for (mode, tickets, errs) in results {
             self.view_cache.insert(mode, tickets.clone());
             self.save_cache(mode);
             if mode == self.active_view {
@@ -440,20 +455,24 @@ impl App {
         let jira = self.jira.clone();
         let config = self.config.clone();
         let pending = self.pending_bg_update.clone();
-        let views = ViewMode::all();
+        let views: Vec<ViewMode> = ViewMode::all().to_vec();
         tokio::spawn(async move {
-            let (r0, r1, r2, r3) = tokio::join!(
-                api::fetch_all(&jira, &config, config.jql_for(views[0])),
-                api::fetch_all(&jira, &config, config.jql_for(views[1])),
-                api::fetch_all(&jira, &config, config.jql_for(views[2])),
-                api::fetch_all(&jira, &config, config.jql_for(views[3])),
-            );
-            let results = vec![
-                (views[0], r0.0, r0.1),
-                (views[1], r1.0, r1.1),
-                (views[2], r2.0, r2.1),
-                (views[3], r3.0, r3.1),
-            ];
+            let mut set = tokio::task::JoinSet::new();
+            for mode in views.iter().copied() {
+                let jira = Arc::clone(&jira);
+                let config = config.clone();
+                set.spawn(async move {
+                    let (tickets, errors) =
+                        api::fetch_all(&jira, &config, config.jql_for(mode)).await;
+                    (mode, tickets, errors)
+                });
+            }
+            let mut results = Vec::new();
+            while let Some(res) = set.join_next().await {
+                if let Ok(item) = res {
+                    results.push(item);
+                }
+            }
             if let Ok(mut slot) = pending.lock() {
                 *slot = Some(results);
             }

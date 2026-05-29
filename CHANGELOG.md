@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.4] - 2026-05-29
+
+### Added
+
+- Fifth view tab **Sprint** (`5` / `←` `→`) with default JQL `sprint in openSprints() AND assignee = currentUser()`
+- Custom sprint JQL via `[views] sprint` in config
+
+### Changed
+
+- View refreshes run in parallel via `JoinSet` (scales with tab count)
+
 ## [0.4.3] - 2026-05-29
 
 ### Added

@@ -46,6 +46,7 @@ pub struct ViewQueries {
     pub updated: Option<String>,
     pub mentions: Option<String>,
     pub watched: Option<String>,
+    pub sprint: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,6 +147,7 @@ impl Config {
                     ViewMode::Updated => views.updated.as_deref(),
                     ViewMode::Mentions => views.mentions.as_deref(),
                     ViewMode::Watching => views.watched.as_deref(),
+                    ViewMode::Sprint => views.sprint.as_deref(),
                 };
                 let s = jql
                     .map(String::from)
@@ -240,7 +242,7 @@ theme = "default"
 # updated = "assignee = currentUser() AND statusCategory != Done AND updated >= -7d ORDER BY updated DESC"
 # mentions = "comment ~ currentUser() AND statusCategory != Done ORDER BY updated DESC"
 # watched = "watcher = currentUser() AND statusCategory != Done ORDER BY updated DESC"
-# sprint = "sprint in openSprints() AND assignee = currentUser() ORDER BY updated DESC"
+# sprint = "sprint in openSprints() AND assignee = currentUser() ORDER BY updated DESC"   # 5th tab
 
 # Optional table columns (ids: site, key, type, status, priority, age, due, assignee, reporter, parent, labels, sprint, summary)
 # columns = ["site", "key", "labels", "sprint", "summary", "status", "assignee"]
@@ -293,6 +295,7 @@ token = "secret"
 
 [views]
 assigned = "project = DEMO ORDER BY created DESC"
+sprint = "sprint in openSprints() ORDER BY rank"
 
 [[sites]]
 name = "one"
@@ -301,6 +304,7 @@ base_url = "https://one.atlassian.net"
         let mut cfg: Config = toml::from_str(raw).unwrap();
         cfg.view_jql = Config::build_view_jql(&cfg.views);
         assert!(cfg.jql_for(ViewMode::MyIssues).contains("DEMO"));
+        assert!(cfg.jql_for(ViewMode::Sprint).contains("openSprints"));
     }
 
     #[test]

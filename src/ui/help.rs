@@ -24,7 +24,7 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
         Line::from("  j/k  or  Up/Down      Move selection"),
         Line::from("  [ / ]                  Scroll up / down by page_size rows"),
         Line::from("  g / G                  Go to first / last row"),
-        Line::from("  1 / 2 / 3 / 4          Jump to view tab"),
+        Line::from("  1–5                    Jump to view tab"),
         Line::from(""),
         Line::from(Span::styled(
             " Actions",

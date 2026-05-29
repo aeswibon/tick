@@ -15,7 +15,7 @@ A k9s-inspired Jira TUI for the terminal. Shows your open tickets across multipl
 
 - **Multi-site** — Combine tickets from multiple Atlassian instances in one view
 - **Live TUI** — Auto-refresh every 3 hours, manual refresh with `r`
-- **View tabs** — Assigned, Updated (7d), Mentions, Watched
+- **View tabs** — Assigned, Updated (7d), Mentions, Watched, Sprint (open sprints)
 - **Filter & sort** — Filter by any field with `/`, cycle sort modes with `s`
 - **Detail pane** — Press `Enter` for split-screen detail with 3 tabs (Details, Description, Comments)
 - **Jira write-back** — Transition status (`t`), add comments (`c`), log work (`w`)
@@ -158,7 +158,7 @@ tick --init              # Create default config file
 | `!` | Toggle site error overlay |
 | `h` / `l` | Previous / next detail tab (Details → Description → Comments) |
 | `←` / `→` or `Tab` / `Shift+Tab` | Cycle view tab |
-| `1` / `2` / `3` / `4` | Jump to Assigned / Updated / Mentions / Watched |
+| `1`–`5` | Jump to Assigned / Updated / Mentions / Watched / Sprint |
 | `q` | Quit |
 
 ## Themes
