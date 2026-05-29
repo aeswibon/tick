@@ -39,6 +39,17 @@ pub fn render(f: &mut Frame, app: &mut App) {
     if app.showing_transitions {
         super::transitions::draw_transitions(f, app, f.area());
     }
+    if app.showing_transition_field {
+        super::field_picker::draw_field_picker(
+            f,
+            "Required field",
+            &app.transition_field_heading,
+            &app.transition_field_options,
+            app.transition_field_selected,
+            &app.theme,
+            f.area(),
+        );
+    }
     if app.showing_priorities {
         super::priorities::draw_priorities(f, app, f.area());
     }
@@ -139,6 +150,13 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             ),
             app.theme.accent,
         )
+    } else if app.input_mode == crate::app::InputMode::TransitionField {
+        let label = app
+            .transition_field_current
+            .as_ref()
+            .map(|f| f.name.as_str())
+            .unwrap_or("Field");
+        (format!(" {label}: {}_", app.input_buffer), app.theme.accent)
     } else if app.input_mode == crate::app::InputMode::EditDescription {
         let hint = if app.showing_mention_picker {
             " @mention"

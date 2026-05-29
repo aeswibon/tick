@@ -20,6 +20,24 @@ pub fn format_response_error(status: StatusCode, body: &str) -> String {
     }
 }
 
+/// Field keys from Jira's `errors` object (e.g. `resolution` when missing on transition).
+pub fn field_errors(body: &str) -> Vec<(String, String)> {
+    let Ok(v) = serde_json::from_str::<Value>(body) else {
+        return Vec::new();
+    };
+    v.get("errors")
+        .and_then(|e| e.as_object())
+        .map(|obj| {
+            obj.iter()
+                .map(|(field, msg)| {
+                    let text = msg.as_str().unwrap_or("required").to_string();
+                    (field.clone(), text)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn parse_jira_body(body: &str) -> Option<String> {
     let v: Value = serde_json::from_str(body).ok()?;
     let mut parts = Vec::new();
@@ -52,6 +70,16 @@ fn parse_jira_body(body: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn field_errors_extracts_keys() {
+        let body = r#"{"errors":{"resolution":"Resolution is required"}}"#;
+        let errs = field_errors(body);
+        assert_eq!(
+            errs,
+            vec![("resolution".into(), "Resolution is required".into())]
+        );
+    }
 
     #[test]
     fn parses_error_messages_and_errors() {

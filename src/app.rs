@@ -121,6 +121,16 @@ pub enum InputMode {
     EditLabels,
     EditDescription,
     OpenTicket,
+    /// Required workflow field (free text) while changing status.
+    TransitionField,
+}
+
+/// Collecting values for a workflow transition before POST.
+#[derive(Debug, Clone)]
+pub struct TransitionCollect {
+    pub transition: crate::api::types::WorkflowTransition,
+    pub values: std::collections::HashMap<String, serde_json::Value>,
+    pub pending: Vec<crate::api::transition_fields::TransitionField>,
 }
 
 struct FilterCache {
@@ -151,6 +161,12 @@ pub struct App {
     pub showing_transitions: bool,
     pub transition_selected: usize,
     pub transition_options: Vec<crate::api::types::WorkflowTransition>,
+    pub transition_collect: Option<TransitionCollect>,
+    pub showing_transition_field: bool,
+    pub transition_field_options: Vec<(String, String)>,
+    pub transition_field_selected: usize,
+    pub transition_field_heading: String,
+    pub transition_field_current: Option<crate::api::transition_fields::TransitionField>,
     pub showing_priorities: bool,
     pub priority_selected: usize,
     pub priority_options: Vec<(String, String)>,
@@ -214,6 +230,12 @@ impl App {
             showing_transitions: false,
             transition_selected: 0,
             transition_options: Vec::new(),
+            transition_collect: None,
+            showing_transition_field: false,
+            transition_field_options: Vec::new(),
+            transition_field_selected: 0,
+            transition_field_heading: String::new(),
+            transition_field_current: None,
             showing_priorities: false,
             priority_selected: 0,
             priority_options: Vec::new(),

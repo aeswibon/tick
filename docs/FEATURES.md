@@ -308,6 +308,17 @@ Jira Cloud does **not** allow setting the status field directly. tick loads your
 | Picker | Lists each transition as **action → target status** (e.g. `Start Progress → In Progress`) |
 | `Enter` / `1`–`9` | `POST` with `{ "transition": { "id": "…" } }`, then refreshes the view |
 
+**Required workflow fields** (e.g. Resolution on “Done”):
+
+1. When you pick a transition, tick reads `transitions.fields` from Jira (`required: true`).
+2. For each required field:
+   - **Allowed values** (resolution, many selects) → picker dialog (`j`/`k`, `Enter`, `1`–`9`).
+   - **No preset list** → footer text input (`Enter` to submit, `Esc` to cancel).
+3. Values are sent in the transition `POST` under `fields`.
+4. If Jira still rejects the transition, tick parses `errors` (e.g. `resolution`) and prompts again for those fields.
+
+Complex field types (rich text, multi-select components, some custom fields) may still need the Jira web UI.
+
 **When something is missing or invalid**, tick shows a footer error instead of silently failing:
 
 | Situation | Message |

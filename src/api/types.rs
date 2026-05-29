@@ -16,6 +16,8 @@ pub struct WorkflowTransition {
     pub name: String,
     /// Target status after the transition (e.g. "In Progress").
     pub to_status: String,
+    /// Fields Jira marks as required for this transition (from `transitions.fields`).
+    pub required_fields: Vec<super::transition_fields::TransitionField>,
 }
 
 impl WorkflowTransition {

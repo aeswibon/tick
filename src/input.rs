@@ -1,6 +1,10 @@
 use crossterm::event::KeyCode;
 
-use crate::app::{App, InputMode};
+use std::collections::HashMap;
+
+use crate::api::transition_fields::{self, TransitionField};
+use crate::api::types::WorkflowTransition;
+use crate::app::{App, InputMode, TransitionCollect};
 use crate::view_mode::ViewMode;
 
 /// Returns `true` when the app should quit.
@@ -42,9 +46,13 @@ pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
             }
             KeyCode::Esc => {
                 clear_mention_picker(app);
-                app.input_mode = InputMode::None;
-                app.input_buffer.clear();
-                app.input_mentions.clear();
+                if app.input_mode == InputMode::TransitionField {
+                    cancel_transition_collect(app);
+                } else {
+                    app.input_mode = InputMode::None;
+                    app.input_buffer.clear();
+                    app.input_mentions.clear();
+                }
             }
             KeyCode::Enter => {
                 if app.input_mode == InputMode::OpenTicket {
@@ -60,6 +68,11 @@ pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
 
     if app.show_site_errors {
         handle_site_errors_key(app, code);
+        return false;
+    }
+
+    if app.showing_transition_field {
+        handle_transition_field_key(app, code).await;
         return false;
     }
 
@@ -270,6 +283,15 @@ async fn submit_input(app: &mut App) {
                 .update_description(&base_url, &sel.key, &buffer, &mentions)
                 .await
         }
+        InputMode::TransitionField => {
+            let Some(field) = app.transition_field_current.take() else {
+                return;
+            };
+            let value = field.value_from_text(&buffer);
+            advance_transition_field(app, &field, value);
+            prompt_next_transition_field(app).await;
+            return;
+        }
         InputMode::OpenTicket | InputMode::None => return,
     };
 
@@ -395,11 +417,108 @@ async fn apply_priority(app: &mut App, idx: usize) {
     }
 }
 
-async fn apply_transition(app: &mut App, idx: usize) {
-    if idx >= app.transition_options.len() {
+fn cancel_transition_collect(app: &mut App) {
+    app.transition_collect = None;
+    app.showing_transition_field = false;
+    app.transition_field_current = None;
+    app.transition_field_options.clear();
+    if app.input_mode == InputMode::TransitionField {
+        app.input_mode = InputMode::None;
+        app.input_buffer.clear();
+    }
+}
+
+fn advance_transition_field(app: &mut App, field: &TransitionField, value: serde_json::Value) {
+    if let Some(collect) = &mut app.transition_collect {
+        collect.values.insert(field.id.clone(), value);
+        if collect.pending.first().map(|f| f.id.as_str()) == Some(field.id.as_str()) {
+            collect.pending.remove(0);
+        } else {
+            collect.pending.retain(|f| f.id != field.id);
+        }
+    }
+    app.showing_transition_field = false;
+    app.transition_field_current = None;
+}
+
+/// Opens the next required-field prompt. Returns `false` when the queue is empty (caller should POST).
+fn begin_next_field_prompt(app: &mut App) -> bool {
+    let Some(collect) = app.transition_collect.as_ref() else {
+        return false;
+    };
+    if collect.pending.is_empty() {
+        return false;
+    }
+
+    let field = collect.pending[0].clone();
+    let remaining = collect.pending.len();
+    app.transition_field_current = Some(field.clone());
+    app.transition_field_heading = if remaining > 1 {
+        format!("{} ({} more)", field.name, remaining)
+    } else {
+        field.name.clone()
+    };
+
+    if !field.options.is_empty() {
+        app.transition_field_options = field.options;
+        app.transition_field_selected = 0;
+        app.showing_transition_field = true;
+    } else {
+        app.input_mode = InputMode::TransitionField;
+        app.input_buffer.clear();
+    }
+    true
+}
+
+async fn prompt_next_transition_field(app: &mut App) {
+    if !begin_next_field_prompt(app) {
+        let Some(collect) = app.transition_collect.take() else {
+            return;
+        };
+        execute_transition_with(app, collect.transition, collect.values).await;
+    }
+}
+
+async fn apply_transition_field_pick(app: &mut App, idx: usize) {
+    if idx >= app.transition_field_options.len() {
         return;
     }
-    let transition = app.transition_options[idx].clone();
+    let Some(field) = app.transition_field_current.clone() else {
+        return;
+    };
+    let (id, label) = app.transition_field_options[idx].clone();
+    let value = field.value_from_choice(&id, &label);
+    advance_transition_field(app, &field, value);
+    prompt_next_transition_field(app).await;
+}
+
+async fn handle_transition_field_key(app: &mut App, code: KeyCode) {
+    match code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.transition_field_selected = app.transition_field_selected.saturating_sub(1);
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if app.transition_field_selected + 1 < app.transition_field_options.len() {
+                app.transition_field_selected += 1;
+            }
+        }
+        KeyCode::Enter => {
+            apply_transition_field_pick(app, app.transition_field_selected).await;
+        }
+        KeyCode::Char(n) if ('1'..='9').contains(&n) => {
+            let idx = (n as u8 - b'1') as usize;
+            apply_transition_field_pick(app, idx).await;
+        }
+        KeyCode::Esc => cancel_transition_collect(app),
+        _ => {}
+    }
+}
+
+async fn execute_transition_with(
+    app: &mut App,
+    transition: WorkflowTransition,
+    values: HashMap<String, serde_json::Value>,
+) {
     let Some(sel) = app.selected_ticket() else {
         app.status.set_action_error("Select a ticket first");
         return;
@@ -409,24 +528,65 @@ async fn apply_transition(app: &mut App, idx: usize) {
             .set_action_error(format!("Unknown site {:?} for ticket", sel.site));
         return;
     };
+
     app.loading = true;
     app.loading_message = Some(format!("Applying {}…", transition.label()));
     match app
         .jira
-        .transition_issue(&base_url, &sel.key, &transition)
+        .transition_issue(&base_url, &sel.key, &transition, &values)
         .await
     {
         Ok(()) => {
-            app.showing_transitions = false;
+            cancel_transition_collect(app);
             app.refresh_all().await;
         }
+        Err(e) if !e.field_errors.is_empty() => {
+            let pending: Vec<TransitionField> = e
+                .field_errors
+                .iter()
+                .map(|(id, _)| {
+                    transition_fields::field_for_error_key(id, &transition.required_fields)
+                })
+                .collect();
+            app.transition_collect = Some(TransitionCollect {
+                transition,
+                values,
+                pending,
+            });
+            app.status.set_action_error(e.message);
+            let _ = begin_next_field_prompt(app);
+        }
         Err(e) => {
-            app.status.set_action_error(e);
-            app.showing_transitions = false;
+            cancel_transition_collect(app);
+            app.status.set_action_error(e.message);
         }
     }
     app.loading = false;
     app.loading_message = None;
+}
+
+async fn apply_transition(app: &mut App, idx: usize) {
+    if idx >= app.transition_options.len() {
+        return;
+    }
+    let transition = app.transition_options[idx].clone();
+    if app.selected_ticket().is_none() {
+        app.status.set_action_error("Select a ticket first");
+        return;
+    }
+    app.showing_transitions = false;
+
+    if transition.required_fields.is_empty() {
+        execute_transition_with(app, transition, HashMap::new()).await;
+        return;
+    }
+
+    app.transition_collect = Some(TransitionCollect {
+        pending: transition.required_fields.clone(),
+        transition,
+        values: HashMap::new(),
+    });
+    prompt_next_transition_field(app).await;
 }
 
 async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
@@ -457,6 +617,7 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             app.show_help = false;
             app.detail_open = false;
             app.showing_transitions = false;
+            cancel_transition_collect(app);
             app.showing_priorities = false;
             app.showing_sprints = false;
             app.show_site_errors = false;

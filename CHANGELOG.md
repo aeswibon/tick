@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.9] - 2026-05-29
+
+### Added
+
+- Status transitions prompt for **required workflow fields** before POST (resolution picker, text for others)
+- On validation failure, parse Jira `errors` and re-prompt for missing fields
+
 ## [0.6.8] - 2026-05-29
 
 ### Added
