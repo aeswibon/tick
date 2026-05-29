@@ -29,7 +29,7 @@ pub struct TransitionField {
 impl TransitionField {
     pub fn input_hint(&self) -> &'static str {
         match self.kind {
-            TransitionFieldKind::User => "type to search users",
+            TransitionFieldKind::User => "type to filter users",
             TransitionFieldKind::Date => "YYYY-MM-DD",
             TransitionFieldKind::DateTime => "YYYY-MM-DD or YYYY-MM-DDTHH:MM",
             TransitionFieldKind::Boolean => "choose Yes or No",
@@ -41,7 +41,9 @@ impl TransitionField {
 
     pub fn modal_hint(&self) -> &'static str {
         match self.kind {
-            TransitionFieldKind::User => "Type in the footer to search, Enter to select",
+            TransitionFieldKind::User => {
+                "Type in footer to filter cached users; R refresh list; Enter to select"
+            }
             TransitionFieldKind::Date => "Enter a date in the footer (YYYY-MM-DD), then Enter",
             TransitionFieldKind::DateTime => "Enter date/time in the footer, then Enter",
             TransitionFieldKind::Boolean => "Select Yes or No",

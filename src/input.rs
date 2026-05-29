@@ -2,6 +2,7 @@ use crossterm::event::KeyCode;
 
 use std::collections::HashMap;
 
+use crate::api::assignable_users;
 use crate::api::transition_fields::{self, TransitionField, TransitionFieldKind};
 use crate::api::{self, types::WorkflowTransition};
 use crate::app::{App, InputMode, TransitionCollect};
@@ -39,7 +40,7 @@ pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
                 } else if app.input_mode == InputMode::TransitionField
                     && app.transition_field_user_search
                 {
-                    refresh_transition_user_search(app).await;
+                    refresh_transition_user_search(app, false).await;
                 }
             }
             KeyCode::Backspace => {
@@ -49,7 +50,7 @@ pub async fn handle_key(app: &mut App, code: KeyCode) -> bool {
                 } else if app.input_mode == InputMode::TransitionField
                     && app.transition_field_user_search
                 {
-                    refresh_transition_user_search(app).await;
+                    refresh_transition_user_search(app, false).await;
                 }
             }
             KeyCode::Esc => {
@@ -135,6 +136,29 @@ pub(crate) fn active_mention_query(buffer: &str) -> Option<(usize, &str)> {
     Some((anchor, query))
 }
 
+async fn refresh_mention_catalog(app: &mut App, force: bool) -> Result<(), String> {
+    let Some(sel) = app.selected_ticket() else {
+        return Ok(());
+    };
+    let Some(base_url) = app.site_base_url(&sel.site) else {
+        return Ok(());
+    };
+    if force {
+        app.loading = true;
+        app.loading_message = Some("Refreshing users…".into());
+    }
+    let result = app
+        .jira
+        .ensure_assignable_users(&base_url, &sel.key, force)
+        .await
+        .map(|_| ());
+    if force {
+        app.loading = false;
+        app.loading_message = None;
+    }
+    result
+}
+
 async fn refresh_mention_picker(app: &mut App) {
     let Some((anchor, query)) = active_mention_query(&app.input_buffer) else {
         clear_mention_picker(app);
@@ -151,7 +175,7 @@ async fn refresh_mention_picker(app: &mut App) {
     };
     match app
         .jira
-        .search_assignable_users(&base_url, &sel.key, query)
+        .filter_assignable_users(&base_url, &sel.key, query)
         .await
     {
         Ok(users) => {
@@ -161,7 +185,8 @@ async fn refresh_mention_picker(app: &mut App) {
                 .min(app.mention_options.len().saturating_sub(1));
             app.showing_mention_picker = true;
         }
-        Err(_) => {
+        Err(e) => {
+            app.status.set_action_error(e);
             app.mention_options.clear();
             app.showing_mention_picker = true;
         }
@@ -198,6 +223,11 @@ async fn handle_mention_picker_key(app: &mut App, code: KeyCode) {
             app.mention_selected += 1;
         }
         KeyCode::Enter if count > 0 => confirm_mention_pick(app),
+        KeyCode::Char('r') | KeyCode::Char('R') => {
+            if refresh_mention_catalog(app, true).await.is_ok() {
+                refresh_mention_picker(app).await;
+            }
+        }
         KeyCode::Char(c) => {
             app.input_buffer.push(c);
             refresh_mention_picker(app).await;
@@ -437,24 +467,11 @@ async fn apply_priority(app: &mut App, idx: usize) {
     }
 }
 
-async fn refresh_transition_user_search(app: &mut App) {
+async fn refresh_transition_user_search(app: &mut App, force_refresh: bool) {
     if !app.transition_field_user_search {
         return;
     }
     let query = app.input_buffer.trim();
-    if query.is_empty() {
-        app.transition_field_options.clear();
-        app.showing_transition_field = true;
-        app.transition_field_text_mode = true;
-        return;
-    }
-
-    app.transition_user_search_seq = app.transition_user_search_seq.wrapping_add(1);
-    let seq = app.transition_user_search_seq;
-    tokio::time::sleep(std::time::Duration::from_millis(280)).await;
-    if !app.transition_field_user_search || app.transition_user_search_seq != seq {
-        return;
-    }
 
     let Some(sel) = app.selected_ticket() else {
         return;
@@ -462,14 +479,33 @@ async fn refresh_transition_user_search(app: &mut App) {
     let Some(base_url) = app.site_base_url(&sel.site) else {
         return;
     };
-    let users = app
+
+    if force_refresh {
+        app.loading = true;
+        app.loading_message = Some("Refreshing users…".into());
+    }
+
+    let users = match app
         .jira
-        .search_assignable_users(&base_url, &sel.key, query)
+        .ensure_assignable_users(&base_url, &sel.key, force_refresh)
         .await
-        .unwrap_or_default();
-    if !app.transition_field_user_search || app.transition_user_search_seq != seq {
+    {
+        Ok(catalog) => assignable_users::filter_users(&catalog, query),
+        Err(e) => {
+            app.status.set_action_error(e);
+            Vec::new()
+        }
+    };
+
+    if force_refresh {
+        app.loading = false;
+        app.loading_message = None;
+    }
+
+    if !app.transition_field_user_search {
         return;
     }
+
     app.transition_field_options = users;
     app.transition_field_selected = app
         .transition_field_selected
@@ -562,7 +598,7 @@ async fn prompt_next_transition_field(app: &mut App) {
         return;
     }
     if app.transition_field_user_search {
-        refresh_transition_user_search(app).await;
+        refresh_transition_user_search(app, false).await;
     }
 }
 
@@ -603,6 +639,9 @@ async fn handle_transition_field_key(app: &mut App, code: KeyCode) {
             apply_transition_field_pick(app, idx).await;
         }
         KeyCode::Esc => cancel_transition_collect(app),
+        KeyCode::Char('r') | KeyCode::Char('R') => {
+            refresh_transition_user_search(app, true).await;
+        }
         _ => {}
     }
 }

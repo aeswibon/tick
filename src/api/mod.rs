@@ -1,6 +1,7 @@
 pub mod adf;
 pub mod adf_export;
 pub mod agile;
+pub mod assignable_users;
 pub mod jira_error;
 pub mod markdown;
 pub mod retry;
@@ -30,6 +31,8 @@ pub struct JiraClient {
     account_ids: Mutex<HashMap<String, String>>,
     priorities: Mutex<HashMap<String, Vec<(String, String)>>>,
     resolutions: Mutex<HashMap<String, Vec<(String, String)>>>,
+    /// Full assignable-user catalog per `base_url|issue_key`.
+    assignable_users: Mutex<HashMap<String, Vec<(String, String)>>>,
 }
 
 impl JiraClient {
@@ -45,6 +48,7 @@ impl JiraClient {
             account_ids: Mutex::new(HashMap::new()),
             priorities: Mutex::new(HashMap::new()),
             resolutions: Mutex::new(HashMap::new()),
+            assignable_users: Mutex::new(HashMap::new()),
         }
     }
 
@@ -592,11 +596,12 @@ impl JiraClient {
         })
     }
 
-    pub async fn search_assignable_users(
+    async fn fetch_assignable_users_api(
         &self,
         base_url: &str,
         issue_key: &str,
         query: &str,
+        max_results: &str,
     ) -> Result<Vec<(String, String)>, String> {
         let url = format!(
             "{}/rest/api/3/user/assignable/search",
@@ -608,7 +613,7 @@ impl JiraClient {
                     .query(&[
                         ("query", query),
                         ("issueKey", issue_key),
-                        ("maxResults", "20"),
+                        ("maxResults", max_results),
                     ])
                     .send()
             })
@@ -621,21 +626,76 @@ impl JiraClient {
             ));
         }
         let data: serde_json::Value = resp.json().await.map_err(|e| format!("Parse error: {e}"))?;
-        let users = data
-            .as_array()
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|u| {
-                        let id = u["accountId"].as_str()?;
-                        let name = u["displayName"].as_str()?;
-                        Some((id.to_string(), name.to_string()))
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-        Ok(users)
+        Ok(parse_user_list(&data))
     }
 
+    /// Load assignable users for an issue into the session cache (up to 100).
+    pub async fn ensure_assignable_users(
+        &self,
+        base_url: &str,
+        issue_key: &str,
+        force_refresh: bool,
+    ) -> Result<Vec<(String, String)>, String> {
+        let key = assignable_users::cache_key(base_url, issue_key);
+        if !force_refresh {
+            if let Ok(cache) = self.assignable_users.lock() {
+                if let Some(list) = cache.get(&key) {
+                    return Ok(list.clone());
+                }
+            }
+        } else if let Ok(mut cache) = self.assignable_users.lock() {
+            cache.remove(&key);
+        }
+
+        let list = self
+            .fetch_assignable_users_api(base_url, issue_key, "", assignable_users::CATALOG_MAX)
+            .await?;
+
+        if let Ok(mut cache) = self.assignable_users.lock() {
+            cache.insert(key, list.clone());
+        }
+        Ok(list)
+    }
+
+    /// Filter cached assignable users (loads catalog on first use).
+    pub async fn filter_assignable_users(
+        &self,
+        base_url: &str,
+        issue_key: &str,
+        query: &str,
+    ) -> Result<Vec<(String, String)>, String> {
+        let catalog = self
+            .ensure_assignable_users(base_url, issue_key, false)
+            .await?;
+        Ok(assignable_users::filter_users(&catalog, query))
+    }
+
+    pub async fn search_assignable_users(
+        &self,
+        base_url: &str,
+        issue_key: &str,
+        query: &str,
+    ) -> Result<Vec<(String, String)>, String> {
+        self.filter_assignable_users(base_url, issue_key, query)
+            .await
+    }
+}
+
+fn parse_user_list(data: &serde_json::Value) -> Vec<(String, String)> {
+    data.as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|u| {
+                    let id = u["accountId"].as_str()?;
+                    let name = u["displayName"].as_str()?;
+                    Some((id.to_string(), name.to_string()))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+impl JiraClient {
     pub async fn add_comment(
         &self,
         base_url: &str,
@@ -1040,12 +1100,25 @@ mod field_updates {
             .await;
 
         let client = JiraClient::new("u@example.com", "token", false);
-        let users = client
-            .search_assignable_users(&server.uri(), "DEMO-1", "al")
+        let catalog = client
+            .ensure_assignable_users(&server.uri(), "DEMO-1", false)
             .await
             .unwrap();
-        assert_eq!(users.len(), 2);
+        assert_eq!(catalog.len(), 2);
+
+        let users = client
+            .filter_assignable_users(&server.uri(), "DEMO-1", "al")
+            .await
+            .unwrap();
+        assert_eq!(users.len(), 1);
         assert_eq!(users[0], ("acc-1".into(), "Alice".into()));
+
+        // Second call uses cache (no extra HTTP).
+        let again = client
+            .ensure_assignable_users(&server.uri(), "DEMO-1", false)
+            .await
+            .unwrap();
+        assert_eq!(again.len(), 2);
     }
 
     #[tokio::test]

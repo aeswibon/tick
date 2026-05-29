@@ -167,8 +167,6 @@ pub struct App {
     pub transition_field_text_mode: bool,
     /// User field: footer search with live results in `transition_field_options`.
     pub transition_field_user_search: bool,
-    /// Bumped on each keystroke to debounce assignable-user search.
-    pub transition_user_search_seq: u64,
     pub transition_field_options: Vec<(String, String)>,
     pub transition_field_selected: usize,
     pub transition_field_heading: String,
@@ -240,7 +238,6 @@ impl App {
             showing_transition_field: false,
             transition_field_text_mode: false,
             transition_field_user_search: false,
-            transition_user_search_seq: 0,
             transition_field_options: Vec::new(),
             transition_field_selected: 0,
             transition_field_heading: String::new(),

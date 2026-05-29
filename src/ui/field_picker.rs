@@ -15,6 +15,7 @@ pub fn draw_field_picker(
     options: &[(String, String)],
     selected: usize,
     text_input_mode: bool,
+    user_field: bool,
     theme: &crate::theme::Theme,
     area: Rect,
 ) {
@@ -73,7 +74,12 @@ pub fn draw_field_picker(
     if !text_input_mode {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
-            "  j/k move  Enter confirm  1-9  Esc cancel",
+            "  j/k move  Enter confirm  1-9  R refresh  Esc cancel",
+            Style::default().fg(theme.border),
+        )));
+    } else if user_field && text_input_mode {
+        lines.push(Line::from(Span::styled(
+            "  R refresh user list from Jira",
             Style::default().fg(theme.border),
         )));
     }

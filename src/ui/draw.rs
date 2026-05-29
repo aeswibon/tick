@@ -63,6 +63,9 @@ pub fn render(f: &mut Frame, app: &mut App) {
             &app.transition_field_options,
             app.transition_field_selected,
             app.transition_field_text_mode,
+            app.transition_field_current.as_ref().is_some_and(|f| {
+                f.kind == crate::api::transition_fields::TransitionFieldKind::User
+            }),
             &app.theme,
             f.area(),
         );
