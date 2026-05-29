@@ -47,11 +47,11 @@ pub fn copy_to_clipboard(text: &str) -> bool {
         if spawn_stdin("xclip", &["-selection", "clipboard"], text) {
             return true;
         }
-        return spawn_stdin("xsel", &["--clipboard", "--input"], text);
+        spawn_stdin("xsel", &["--clipboard", "--input"], text)
     }
     #[cfg(target_os = "windows")]
     {
-        return spawn_stdin("clip", &[], text);
+        spawn_stdin("clip", &[], text)
     }
     #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     {
