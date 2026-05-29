@@ -1,10 +1,10 @@
 [package]
 name = "tick"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 
 [dependencies]
-ratatui = "0.29"
+ratatui = "0.30"
 crossterm = "0.28"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }

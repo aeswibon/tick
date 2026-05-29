@@ -486,7 +486,13 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         }
         KeyCode::Char('D') if app.detail_open => {
             if let Some(ticket) = app.selected_ticket_entry() {
-                let text = ticket.description.clone().unwrap_or_default();
+                let text = ticket
+                    .description_adf
+                    .as_ref()
+                    .map(crate::api::adf_export::to_markdown)
+                    .filter(|s| !s.is_empty())
+                    .or(ticket.description.clone())
+                    .unwrap_or_default();
                 app.input_mode = InputMode::EditDescription;
                 app.input_buffer = text;
                 app.input_mentions.clear();

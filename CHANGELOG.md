@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.1] - 2026-05-29
+
+### Added
+
+- ADF → markdown when opening description edit (`D`) — headings, lists, tables, mentions preserved
+- Richer ADF display: tables, media attachments, expand sections, unknown block labels
+
+### Changed
+
+- Upgraded `ratatui` to 0.30 (transitive `lru` 0.16 — addresses Dependabot advisory)
+
 ## [0.6.0] - 2026-05-29
 
 ### Added
