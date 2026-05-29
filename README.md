@@ -72,6 +72,7 @@ Edit the generated file at `~/.config/tick/config.toml`:
 email = "you@example.com"
 # token in config.toml, or ~/.config/tick/token, or TICK_TOKEN env
 max_results = 50
+page_size = 10
 theme = "default"
 
 # Optional custom JQL per view
@@ -92,6 +93,7 @@ base_url = "https://my-team.atlassian.net"
 | `token` | file / env | [Atlassian API token](https://id.atlassian.com/manage-profile/security/api-tokens); also `~/.config/tick/token` or `TICK_TOKEN` |
 | `[views]` | built-in JQL | Override JQL for Assigned, Updated, Mentions, Watched |
 | `max_results` | `50` | Max tickets to fetch per site |
+| `page_size` | `10` | Tickets shown per table page |
 | `theme` | `"default"` | Theme name (built-in or custom) |
 | `columns` | built-in default | Table column ids (see config comment) |
 | `sites` | — | List of Jira sites with `name` and `base_url` |
@@ -114,6 +116,7 @@ tick --theme light       # Light theme
 tick --theme dracula     # Dracula theme
 tick --theme mycustom    # Load ~/.config/tick/themes/mycustom.toml
 tick --max-results 100   # Override max results
+tick --page-size 20      # Override rows per page
 tick --debug             # Print API debug info to stderr
 tick --doctor            # Test API connectivity and exit
 tick --init              # Create default config file

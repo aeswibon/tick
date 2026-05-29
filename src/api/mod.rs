@@ -416,6 +416,7 @@ mod fetch_integration {
             }],
             columns: None,
             max_results: 50,
+            page_size: 10,
             theme: "default".into(),
             views: Default::default(),
             view_jql: Config::build_view_jql(&Default::default()),

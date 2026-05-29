@@ -1,3 +1,5 @@
+//! Render Jira ADF JSON in the detail pane. Request bodies use `api::adf`.
+
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 

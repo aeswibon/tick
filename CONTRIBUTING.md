@@ -31,7 +31,16 @@ cargo test --all-targets
 
 ## Releases
 
-Maintainers tag releases as `v*` on `master`. Pushing a tag triggers the **Release** workflow (primary): binaries, checksums, and `tick.rb`. **CI** on push/PR runs a snapshot `cargo test` + `cargo build --release` only.
+Maintainers tag releases as `v*` on `master`. Pushing a tag triggers the **Release** workflow (primary): binaries, checksums, and `tick.rb`. **CI** on push/PR runs fmt, clippy, tests, and a snapshot release build.
+
+### Release checklist
+
+1. Ensure `Cargo.toml` version matches the tag (e.g. `0.2.0` → `v0.2.0`).
+2. Merge to `master`; wait for CI green.
+3. `git tag vX.Y.Z && git push origin vX.Y.Z`
+4. Confirm the GitHub release has all platform binaries, `CHECKSUMS.txt`, and `tick.rb`.
+5. Update the Homebrew tap: copy `tick.rb` from the release into [homebrew-tick](https://github.com/aeswibon/homebrew-tick) `Formula/tick.rb` and push.
+6. Smoke: `brew update && brew upgrade tick`, `tick --help`.
 
 ## Code of conduct
 

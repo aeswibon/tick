@@ -2,7 +2,7 @@
 
 Open-source Jira TUI (`aeswibon/tick`). Priorities are ordered for impact vs effort. Adjust as users report needs.
 
-## v0.1.x — Stabilize (current)
+## v0.1.x — Stabilize ✅
 
 **Goal:** Trustworthy installs and daily use for a single developer or small team.
 
@@ -50,7 +50,7 @@ Open-source Jira TUI (`aeswibon/tick`). Priorities are ordered for impact vs eff
 | OAuth | Planned (token file + env done in v0.2) |
 | Offline mode | Partial — disk cache + `[cached]` header |
 | Theme gallery in repo | `themes/` examples + screenshot in README |
-| Optional `homebrew-tap` repo | Auto-bump formula SHA via release workflow |
+| Auto-bump `homebrew-tick` on release | Push formula SHA from release workflow (tap repo exists; bump is manual today) |
 
 ## Community & governance
 

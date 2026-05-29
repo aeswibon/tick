@@ -6,6 +6,8 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- Configurable `page_size` (table rows per page) and `--page-size` CLI flag
+
 - Custom JQL per view via `[views]` in `config.toml`
 - API token from `TICK_TOKEN` or `~/.config/tick/token`
 - Scrollable site-error overlay (`!` key)
@@ -22,6 +24,8 @@ All notable changes to this project are documented in this file.
 
 - `ViewMode` moved to `view_mode` module; JQL resolved through `Config::jql_for`
 - Footer shows site-error count instead of a single truncated line
+- `lib.rs` + `cache` module; background refresh preserves page when ticket set unchanged
+- Failed fetch keeps cached tickets instead of clearing the table
 
 ## [0.1.0] - 2026-05-29
 

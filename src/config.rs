@@ -29,6 +29,8 @@ pub struct Config {
     pub columns: Option<Vec<String>>,
     #[serde(default = "default_max_results")]
     pub max_results: u32,
+    #[serde(default = "default_page_size")]
+    pub page_size: u32,
     #[serde(default = "default_theme")]
     pub theme: String,
     #[serde(default)]
@@ -43,6 +45,10 @@ fn default_theme() -> String {
 
 fn default_max_results() -> u32 {
     50
+}
+
+fn default_page_size() -> u32 {
+    10
 }
 
 impl Config {
@@ -124,12 +130,36 @@ impl Config {
             .unwrap_or(mode.default_jql())
     }
 
+    /// Apply CLI overrides and re-validate (call after `load()`).
+    pub fn apply_cli_overrides(
+        &mut self,
+        max_results: Option<u32>,
+        page_size: Option<u32>,
+    ) -> Result<(), String> {
+        if let Some(mr) = max_results {
+            self.max_results = mr;
+        }
+        if let Some(ps) = page_size {
+            self.page_size = ps;
+        }
+        if max_results.is_some() || page_size.is_some() {
+            self.validate()?;
+        }
+        Ok(())
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if self.email.trim().is_empty() {
             return Err("config: email must not be empty".into());
         }
         if self.token.trim().is_empty() {
             return Err("config: token must not be empty".into());
+        }
+        if self.page_size == 0 {
+            return Err("config: page_size must be at least 1".into());
+        }
+        if self.page_size > 200 {
+            return Err("config: page_size must be at most 200".into());
         }
         if self.sites.is_empty() {
             return Err("config: at least one [[sites]] entry is required".into());
@@ -168,6 +198,7 @@ impl Config {
         let default = r#"email = "you@example.com"
 # token = "your-api-token"   # or use ~/.config/tick/token or TICK_TOKEN env
 max_results = 50
+page_size = 10
 theme = "default"
 
 # Optional custom JQL per view (defaults shown commented)
@@ -245,6 +276,49 @@ sites = []
         let mut cfg: Config = toml::from_str(raw).unwrap();
         cfg.view_jql = Config::build_view_jql(&cfg.views);
         assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn parses_page_size() {
+        let raw = r#"
+email = "a@b.com"
+token = "secret"
+page_size = 25
+
+[[sites]]
+name = "one"
+base_url = "https://one.atlassian.net"
+"#;
+        let mut cfg: Config = toml::from_str(raw).unwrap();
+        cfg.view_jql = Config::build_view_jql(&cfg.views);
+        assert_eq!(cfg.page_size, 25);
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_invalid_page_size() {
+        let raw = r#"
+email = "a@b.com"
+token = "secret"
+page_size = 0
+
+[[sites]]
+name = "one"
+base_url = "https://one.atlassian.net"
+"#;
+        let mut cfg: Config = toml::from_str(raw).unwrap();
+        cfg.view_jql = Config::build_view_jql(&cfg.views);
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn cli_overrides_validate() {
+        let mut cfg: Config = toml::from_str(&sample_config_toml("secret")).unwrap();
+        cfg.view_jql = Config::build_view_jql(&cfg.views);
+        assert!(cfg.apply_cli_overrides(Some(100), Some(15)).is_ok());
+        assert_eq!(cfg.max_results, 100);
+        assert_eq!(cfg.page_size, 15);
+        assert!(cfg.apply_cli_overrides(None, Some(0)).is_err());
     }
 
     #[test]

@@ -1,5 +1,6 @@
 use crate::api::types::Ticket;
-use crate::api::{self, types::CachedView, JiraClient};
+use crate::api::{self, JiraClient};
+use crate::cache::ViewCache;
 use crate::columns::Column;
 use crate::config::Config;
 use crate::fetch_status::FetchStatus;
@@ -8,7 +9,6 @@ use crate::ticket_lock::{read_tickets, write_tickets};
 use crate::view_mode::ViewMode;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 
@@ -121,21 +121,17 @@ pub struct App {
     pub page_size: usize,
     pub active_view: ViewMode,
     pub view_cache: HashMap<ViewMode, Vec<Ticket>>,
-    pub cache_dir: PathBuf,
+    cache: ViewCache,
     pub pending_bg_update: Arc<Mutex<Option<BgResult>>>,
     filter_cache: RefCell<Option<FilterCache>>,
 }
 
 impl App {
     pub fn new(config: Config, theme: Theme, debug: bool) -> Self {
-        let cache_dir = dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("tick")
-            .join("cache");
-        let _ = std::fs::create_dir_all(&cache_dir);
-
+        let cache = ViewCache::open();
         let jira = Arc::new(JiraClient::new(&config.email, &config.token, debug));
         let columns = Column::resolve(config.columns.as_deref());
+        let page_size = config.page_size as usize;
 
         let mut app = Self {
             tickets: Arc::new(RwLock::new(Vec::new())),
@@ -163,10 +159,10 @@ impl App {
             input_buffer: String::new(),
             debug,
             current_page: 0,
-            page_size: 10,
+            page_size,
             active_view: ViewMode::MyIssues,
             view_cache: HashMap::new(),
-            cache_dir,
+            cache,
             pending_bg_update: Arc::new(Mutex::new(None)),
             filter_cache: RefCell::new(None),
         };
@@ -199,14 +195,7 @@ impl App {
     }
 
     fn load_cache(&mut self) {
-        for mode in ViewMode::all() {
-            let path = self.cache_dir.join(format!("{}.json", mode.cache_key()));
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(cached) = serde_json::from_str::<CachedView>(&content) {
-                    self.view_cache.insert(mode, cached.tickets);
-                }
-            }
-        }
+        self.view_cache = self.cache.load_all();
         if let Some(cached) = self.view_cache.get(&self.active_view).cloned() {
             write_tickets(&self.tickets).clone_from(&cached);
             self.loading = false;
@@ -217,14 +206,7 @@ impl App {
 
     pub fn save_cache(&self, mode: ViewMode) {
         if let Some(tickets) = self.view_cache.get(&mode) {
-            let cached = CachedView {
-                fetched_at: chrono::Utc::now().to_rfc3339(),
-                tickets: tickets.clone(),
-            };
-            if let Ok(content) = serde_json::to_string(&cached) {
-                let path = self.cache_dir.join(format!("{}.json", mode.cache_key()));
-                let _ = std::fs::write(&path, &content);
-            }
+            self.cache.save_view(mode, tickets);
         }
     }
 
@@ -275,16 +257,31 @@ impl App {
         self.selected = last_count.saturating_sub(1);
     }
 
-    fn apply_fetch_result(&mut self, tickets: Vec<Ticket>, errors: Vec<String>) {
+    fn apply_fetch_result(
+        &mut self,
+        tickets: Vec<Ticket>,
+        errors: Vec<String>,
+        reset_cursor: bool,
+    ) {
         let no_errors = errors.is_empty();
+        let had_tickets = !read_tickets(&self.tickets).is_empty();
+
+        if tickets.is_empty() && !no_errors && had_tickets {
+            self.status.set_site_warnings(errors);
+            self.live_data = false;
+            return;
+        }
+
         self.status.set_site_warnings(errors);
         if no_errors {
             self.status.clear_action_error();
         }
         write_tickets(&self.tickets).clone_from(&tickets);
         self.invalidate_filter_cache();
-        if !tickets.is_empty() || no_errors {
-            self.live_data = true;
+        self.live_data = !tickets.is_empty() || no_errors;
+        if reset_cursor {
+            self.current_page = 0;
+            self.selected = 0;
         }
     }
 
@@ -294,11 +291,9 @@ impl App {
         let (tickets, errors) = api::fetch_all(&self.jira, &self.config, jql).await;
         self.view_cache.insert(self.active_view, tickets.clone());
         self.save_cache(self.active_view);
-        self.apply_fetch_result(tickets, errors);
+        self.apply_fetch_result(tickets, errors, true);
         self.loading = false;
         self.last_refresh = Instant::now();
-        self.current_page = 0;
-        self.selected = 0;
     }
 
     pub async fn refresh_all(&mut self) {
@@ -326,14 +321,12 @@ impl App {
             all_errors.extend(errs);
         }
         if let Some(tickets) = active_tickets {
-            self.apply_fetch_result(tickets, all_errors);
+            self.apply_fetch_result(tickets, all_errors, true);
         } else {
             self.status.set_site_warnings(all_errors);
         }
         self.loading = false;
         self.last_refresh = Instant::now();
-        self.current_page = 0;
-        self.selected = 0;
     }
 
     pub fn spawn_background_refresh(&self) {
@@ -367,6 +360,7 @@ impl App {
             .ok()
             .and_then(|mut g| g.take());
         if let Some(results) = updates {
+            let previous_keys = ticket_keys(&read_tickets(&self.tickets));
             let mut all_errors = Vec::new();
             let mut active_tickets = None;
             for (mode, tickets, errs) in results {
@@ -378,14 +372,16 @@ impl App {
                 all_errors.extend(errs);
             }
             if let Some(tickets) = active_tickets {
-                self.apply_fetch_result(tickets, all_errors);
+                let preserve_ui = same_ticket_keys(&previous_keys, &tickets);
+                self.apply_fetch_result(tickets, all_errors, !preserve_ui);
+                if preserve_ui {
+                    self.clamp_selection();
+                }
             } else {
                 self.status.set_site_warnings(all_errors);
             }
             self.loading = false;
             self.last_refresh = Instant::now();
-            self.current_page = 0;
-            self.selected = 0;
             true
         } else {
             false
@@ -401,21 +397,17 @@ impl App {
             self.invalidate_filter_cache();
             self.current_page = 0;
             self.selected = 0;
+        } else if let Some(tickets) = self.cache.load_view(mode) {
+            write_tickets(&self.tickets).clone_from(&tickets);
+            self.view_cache.insert(mode, tickets.clone());
+            self.loading = false;
+            self.live_data = false;
+            self.invalidate_filter_cache();
+            self.current_page = 0;
+            self.selected = 0;
+            self.detail_open = false;
+            return;
         } else {
-            let path = self.cache_dir.join(format!("{}.json", mode.cache_key()));
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(cached) = serde_json::from_str::<CachedView>(&content) {
-                    write_tickets(&self.tickets).clone_from(&cached.tickets);
-                    self.view_cache.insert(mode, cached.tickets);
-                    self.loading = false;
-                    self.live_data = false;
-                    self.invalidate_filter_cache();
-                    self.current_page = 0;
-                    self.selected = 0;
-                    self.detail_open = false;
-                    return;
-                }
-            }
             self.refresh().await;
         }
         self.detail_open = false;
@@ -466,6 +458,22 @@ impl App {
         indices
     }
 
+    fn clamp_selection(&mut self) {
+        let visible = self.visible_indices().len();
+        if visible == 0 {
+            self.selected = 0;
+            self.current_page = 0;
+            return;
+        }
+        let total_pages = self.total_pages();
+        if self.current_page >= total_pages {
+            self.current_page = total_pages.saturating_sub(1);
+        }
+        if self.selected >= visible {
+            self.selected = visible.saturating_sub(1);
+        }
+    }
+
     pub fn filtered_count(&self) -> usize {
         let ticket_count = read_tickets(&self.tickets).len();
         if let Some(cache) = self.filter_cache.borrow().as_ref() {
@@ -478,6 +486,21 @@ impl App {
         }
         self.filtered_indices().len()
     }
+}
+
+fn ticket_keys(tickets: &[Ticket]) -> Vec<String> {
+    tickets.iter().map(|t| t.key.clone()).collect()
+}
+
+fn same_ticket_keys(previous: &[String], tickets: &[Ticket]) -> bool {
+    if previous.len() != tickets.len() {
+        return false;
+    }
+    let mut a = previous.to_vec();
+    let mut b: Vec<_> = tickets.iter().map(|t| t.key.clone()).collect();
+    a.sort();
+    b.sort();
+    a == b
 }
 
 fn compute_filtered_indices(tickets: &[Ticket], filter: &str, sort_mode: SortMode) -> Vec<usize> {
@@ -569,6 +592,26 @@ mod tests {
     }
 
     #[test]
+    fn new_uses_config_page_size() {
+        let config = Config {
+            email: "a@b.com".into(),
+            token: "t".into(),
+            sites: vec![crate::config::Site {
+                name: "acme".into(),
+                base_url: "https://acme.atlassian.net".into(),
+            }],
+            columns: None,
+            max_results: 50,
+            page_size: 7,
+            theme: "default".into(),
+            views: Default::default(),
+            view_jql: Config::build_view_jql(&Default::default()),
+        };
+        let app = App::new(config, Theme::default(), false);
+        assert_eq!(app.page_size, 7);
+    }
+
+    #[test]
     fn pagination_slices_filtered_list() {
         let config = Config {
             email: "a@b.com".into(),
@@ -579,6 +622,7 @@ mod tests {
             }],
             columns: None,
             max_results: 50,
+            page_size: 10,
             theme: "default".into(),
             views: Default::default(),
             view_jql: Config::build_view_jql(&Default::default()),
@@ -598,12 +642,13 @@ mod tests {
     #[test]
     fn cache_roundtrip_format() {
         let tickets = vec![sample_ticket("X-1", "s", "Done")];
-        let cached = CachedView {
-            fetched_at: chrono::Utc::now().to_rfc3339(),
-            tickets: tickets.clone(),
-        };
-        let json = serde_json::to_string(&cached).unwrap();
-        let back: CachedView = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.tickets[0].key, "X-1");
+        let dir = std::env::temp_dir().join(format!("tick-app-cache-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let cache = crate::cache::ViewCache { dir: dir.clone() };
+        cache.save_view(ViewMode::MyIssues, &tickets);
+        let loaded = cache.load_view(ViewMode::MyIssues).unwrap();
+        assert_eq!(loaded[0].key, "X-1");
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

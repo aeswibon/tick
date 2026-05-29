@@ -133,8 +133,8 @@ pub struct Theme {
     pub accent: Color,
 }
 
-impl Theme {
-    pub fn default() -> Self {
+impl Default for Theme {
+    fn default() -> Self {
         Self {
             accent: c(0x89B4FA),
             bg: c(0x11111B),
@@ -160,7 +160,9 @@ impl Theme {
             tick_fg: c(0x89B4FA),
         }
     }
+}
 
+impl Theme {
     pub fn light() -> Self {
         Self {
             accent: c(0x1E66F5),

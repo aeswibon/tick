@@ -26,3 +26,7 @@ We aim to acknowledge reports within a few business days and will coordinate a f
 - Restrict file permissions (`chmod 600` on the token file)
 - Prefer `TICK_TOKEN` in your shell environment for ephemeral sessions
 - Never commit tokens to git
+
+## Local cache
+
+`tick` writes per-view ticket JSON under `~/.config/tick/cache/`. These files can contain issue summaries and metadata. Restrict directory permissions and treat the cache as sensitive on shared machines.

@@ -1,3 +1,5 @@
+//! ADF JSON for **writing** to Jira (comments). Rendering lives in `ui::adf`.
+
 use serde_json::{json, Value};
 
 /// Jira Cloud REST v3 comment body (Atlassian Document Format).
