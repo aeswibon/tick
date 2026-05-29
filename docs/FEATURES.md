@@ -335,6 +335,28 @@ Complex field types (rich text, multi-select components, some custom fields) may
 
 Works from the **table** or **detail pane** (same as `c` / `w`).
 
+### 10.2 Create and duplicate issues
+
+| Key | Action |
+|-----|--------|
+| `n` | New issue (wizard) |
+| `C` | Duplicate selected issue (maximal field copy) |
+| `Esc` | Cancel wizard |
+
+**New issue (`n`):** pick site (if multiple), project, issue type (skipped when set in config), summary, optional description, then any **required custom fields** from create metadata. Per-site shortcuts:
+
+```toml
+[[sites]]
+name = "my-team"
+base_url = "https://my-team.atlassian.net"
+create_project = "ENG"
+create_issue_type = "Task"
+```
+
+During the wizard, `p` reopens the project picker; `t` reopens the issue type picker (when not changing status on the main table).
+
+**Duplicate (`C`):** copies project, type, labels, priority, assignee, due date, parent, description, and sprint field (when configured) from the selected row; summary is prefilled as `Copy of: …` (configurable via `[create].clone_summary_prefix`). tick re-fetches the issue for accurate account IDs before create. After success, optionally adds a **Cloners** link to the source (`create_clone_link = true` by default).
+
 ---
 
 ## 11. Sprint and agile

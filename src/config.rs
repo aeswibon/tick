@@ -27,7 +27,7 @@ fn default_oauth_redirect() -> String {
     "http://127.0.0.1:8765/callback".to_string()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Site {
     pub name: String,
     pub base_url: String,
@@ -40,6 +40,26 @@ pub struct Site {
     /// Per-project board overrides: `boards = { DEMO = 7, WEB = 12 }`
     #[serde(default)]
     pub boards: HashMap<String, u64>,
+    /// Default project key for `n` (new issue).
+    #[serde(default)]
+    pub create_project: Option<String>,
+    /// Default issue type name for `n`.
+    #[serde(default)]
+    pub create_issue_type: Option<String>,
+    /// After duplicate, link new issue to source (`Cloners` by default).
+    #[serde(default = "default_true")]
+    pub create_clone_link: bool,
+    /// Issue link type name for duplicate.
+    #[serde(default = "default_clone_link_type")]
+    pub clone_link_type: String,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_clone_link_type() -> String {
+    "Cloners".into()
 }
 
 impl Site {
@@ -59,6 +79,18 @@ impl Site {
         }
         false
     }
+
+    pub fn clone_link_enabled(&self) -> bool {
+        self.create_clone_link
+    }
+
+    pub fn clone_link_type_name(&self) -> &str {
+        if self.clone_link_type.is_empty() {
+            "Cloners"
+        } else {
+            &self.clone_link_type
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -68,6 +100,16 @@ pub struct ViewQueries {
     pub mentions: Option<String>,
     pub watched: Option<String>,
     pub sprint: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct CreateSettings {
+    #[serde(default = "default_clone_summary_prefix")]
+    pub clone_summary_prefix: String,
+}
+
+fn default_clone_summary_prefix() -> String {
+    "Copy of: ".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,6 +135,8 @@ pub struct Config {
     pub auth: AuthMethod,
     #[serde(default)]
     pub oauth: OAuthSettings,
+    #[serde(default)]
+    pub create: CreateSettings,
     #[serde(skip)]
     pub view_jql: HashMap<ViewMode, String>,
 }

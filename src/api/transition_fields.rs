@@ -163,6 +163,28 @@ fn classify_field(
     }
 }
 
+/// Required fields on the create issue screen (excludes project, type, summary, description).
+pub fn parse_create_fields(fields_obj: &Value) -> Vec<TransitionField> {
+    let skip = [
+        "project",
+        "issuetype",
+        "summary",
+        "description",
+        "reporter",
+        "attachment",
+    ];
+    let mut all = parse_transition_screen_fields(Some(fields_obj));
+    all.retain(|f| {
+        !skip.iter().any(|s| f.id == *s || f.system == *s)
+            && fields_obj
+                .get(&f.id)
+                .and_then(|m| m.get("required"))
+                .and_then(|r| r.as_bool())
+                .unwrap_or(false)
+    });
+    all
+}
+
 /// Fields on the transition screen that need user input before POST.
 pub fn parse_transition_screen_fields(fields_obj: Option<&Value>) -> Vec<TransitionField> {
     let Some(obj) = fields_obj.and_then(|v| v.as_object()) else {

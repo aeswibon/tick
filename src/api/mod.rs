@@ -2,6 +2,7 @@ pub mod adf;
 pub mod adf_export;
 pub mod agile;
 pub mod assignable_users;
+pub mod create;
 pub mod jira_error;
 pub mod markdown;
 pub mod retry;
@@ -23,6 +24,8 @@ pub struct TransitionError {
     pub message: String,
     pub field_errors: Vec<(String, String)>,
 }
+
+pub use create::{CreateDraft, CreateError};
 
 pub struct JiraClient {
     pub http: Client,
@@ -607,15 +610,18 @@ impl JiraClient {
             "{}/rest/api/3/user/assignable/search",
             base_url.trim_end_matches('/')
         );
+        let project_only = issue_key.strip_suffix(".__CREATE__");
         let resp = self
             .send(|| {
-                self.get(&url)
-                    .query(&[
-                        ("query", query),
-                        ("issueKey", issue_key),
-                        ("maxResults", max_results),
-                    ])
-                    .send()
+                let mut req = self
+                    .get(&url)
+                    .query(&[("query", query), ("maxResults", max_results)]);
+                if let Some(project) = project_only {
+                    req = req.query(&[("project", project)]);
+                } else {
+                    req = req.query(&[("issueKey", issue_key)]);
+                }
+                req.send()
             })
             .await?;
         if !resp.status().is_success() {
@@ -936,9 +942,7 @@ mod fetch_integration {
             sites: vec![Site {
                 name: "test".into(),
                 base_url: base_url.into(),
-                sprint_field: None,
-                board_id: None,
-                boards: Default::default(),
+                ..Default::default()
             }],
             columns: None,
             max_results: 50,
@@ -948,6 +952,7 @@ mod fetch_integration {
             notify_on_refresh: false,
             auth: Default::default(),
             oauth: Default::default(),
+            create: Default::default(),
             view_jql: Config::build_view_jql(&Default::default()),
         }
     }
@@ -1032,16 +1037,12 @@ mod field_updates {
             crate::config::Site {
                 name: "a".into(),
                 base_url: first.uri(),
-                sprint_field: None,
-                board_id: None,
-                boards: Default::default(),
+                ..Default::default()
             },
             crate::config::Site {
                 name: "b".into(),
                 base_url: second.uri(),
-                sprint_field: None,
-                board_id: None,
-                boards: Default::default(),
+                ..Default::default()
             },
         ];
         let client = JiraClient::new("u@example.com", "token", false);
@@ -1492,5 +1493,58 @@ mod field_updates {
         assert_eq!(id, "me-42");
         let cached = client.current_user_account_id(&server.uri()).await.unwrap();
         assert_eq!(cached, "me-42");
+    }
+
+    #[tokio::test]
+    async fn create_issue_posts_fields_and_returns_key() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/rest/api/3/issue"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(201)
+                    .set_body_json(serde_json::json!({ "key": "DEMO-99", "id": "10099" })),
+            )
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        let fields = serde_json::json!({
+            "project": { "key": "DEMO" },
+            "issuetype": { "name": "Task" },
+            "summary": "New from tick"
+        });
+        let key = client
+            .create_issue(&server.uri(), &fields)
+            .await
+            .expect("create");
+        assert_eq!(key, "DEMO-99");
+    }
+
+    #[tokio::test]
+    async fn create_issue_reports_field_errors() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/rest/api/3/issue"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                    "errorMessages": [],
+                    "errors": { "components": "Components is required." }
+                })),
+            )
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        let fields = serde_json::json!({
+            "project": { "key": "DEMO" },
+            "issuetype": { "name": "Task" },
+            "summary": "X"
+        });
+        let err = client
+            .create_issue(&server.uri(), &fields)
+            .await
+            .expect_err("validation");
+        assert!(!err.field_errors.is_empty());
+        assert_eq!(err.field_errors[0].0, "components");
     }
 }

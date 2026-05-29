@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-29  
 **Target version:** 0.7.0  
-**Status:** Draft — awaiting review  
+**Status:** Implemented in v0.7.0  
 **User choices:** Mixed quick/varied/strict create flows; **duplicate copies all fields tick can represent** (option 3).
 
 ---

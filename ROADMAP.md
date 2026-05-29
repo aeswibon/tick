@@ -14,12 +14,12 @@
 | **0.6.7** | ADF round-trip (`adf-json` fences, lists, strike); mention restore on `D` |
 | **0.6.8** | Status via workflow transitions; Jira validation errors; `T` alias |
 | **0.6.9** | Required transition fields (typed inputs); assignable-user cache; ⌘R/Ctrl+R load more |
+| **0.7.0** | Create (`n`) and duplicate (`C`) issues; required create fields; clone link |
 
 ## Next — product
 
 | Item | Notes |
 |------|------|
-| **Create & duplicate issues (v0.7.0)** | `n` new, `C` maximal clone; spec [docs/specs/2026-05-29-create-issue-design.md](docs/specs/2026-05-29-create-issue-design.md) |
 | Richer transition fields | Multi-select, components, rich text (web UI today) |
 | User picker `j`/`k` vs typing | Names like “Jack” when list is open |
 | Jira Server / Data Center | Out of scope unless demand |

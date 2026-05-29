@@ -35,7 +35,7 @@ pub const LOAD_MORE_USERS_FIELD_PICKER_FOOTER: &str =
     "  Type in footer to filter  j/k move  Enter pick  Ctrl+R add users  Esc cancel";
 
 /// Load more assignable users from Jira (merge into cache). Plain `r`/`R` are for filtering.
-fn load_more_users_key(key: &KeyEvent) -> bool {
+pub fn load_more_users_key(key: &KeyEvent) -> bool {
     if !matches!(key.code, KeyCode::Char('r') | KeyCode::Char('R')) {
         return false;
     }
@@ -53,12 +53,31 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         return false;
     }
 
+    let create_required = app
+        .create_session
+        .as_ref()
+        .is_some_and(|s| s.showing_required_field);
     if app.showing_transition_field && app.transition_field_user_search {
-        if handle_transition_user_field_key(app, &key).await {
+        if create_required {
+            if crate::create_flow::handle_create_field_key(app, &key).await {
+                return false;
+            }
+        } else if handle_transition_user_field_key(app, &key).await {
             return false;
         }
     } else if app.showing_transition_field && !app.transition_field_text_mode {
-        handle_transition_field_key(app, code).await;
+        if create_required {
+            if crate::create_flow::handle_create_field_key(app, &key).await {
+                return false;
+            }
+        } else {
+            handle_transition_field_key(app, code).await;
+        }
+        return false;
+    }
+
+    if app.showing_create_picker {
+        crate::create_flow::handle_create_picker_key(app, code).await;
         return false;
     }
 
@@ -88,6 +107,14 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     && app.transition_field_user_search
                 {
                     refresh_transition_user_search(app, false).await;
+                } else if app.input_mode == InputMode::CreateField
+                    && app
+                        .create_session
+                        .as_ref()
+                        .is_some_and(|s| s.showing_required_field)
+                    && app.transition_field_user_search
+                {
+                    crate::create_flow::refresh_create_user_search(app, false).await;
                 }
             }
             KeyCode::Backspace => {
@@ -98,12 +125,25 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     && app.transition_field_user_search
                 {
                     refresh_transition_user_search(app, false).await;
+                } else if app.input_mode == InputMode::CreateField
+                    && app
+                        .create_session
+                        .as_ref()
+                        .is_some_and(|s| s.showing_required_field)
+                    && app.transition_field_user_search
+                {
+                    crate::create_flow::refresh_create_user_search(app, false).await;
                 }
             }
             KeyCode::Esc => {
                 clear_mention_picker(app);
                 if app.input_mode == InputMode::TransitionField {
                     cancel_transition_collect(app);
+                } else if matches!(
+                    app.input_mode,
+                    InputMode::CreateField | InputMode::CreateDescription
+                ) {
+                    crate::create_flow::cancel_create(app);
                 } else {
                     app.input_mode = InputMode::None;
                     app.input_buffer.clear();
@@ -113,6 +153,11 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
             KeyCode::Enter => {
                 if app.input_mode == InputMode::OpenTicket {
                     submit_open_ticket(app).await;
+                } else if matches!(
+                    app.input_mode,
+                    InputMode::CreateField | InputMode::CreateDescription
+                ) {
+                    crate::create_flow::submit_create_input(app).await;
                 } else {
                     submit_input(app).await;
                 }
@@ -388,6 +433,7 @@ async fn submit_input(app: &mut App) {
             }
             return;
         }
+        InputMode::CreateField | InputMode::CreateDescription => return,
         InputMode::OpenTicket | InputMode::None => return,
     };
 
@@ -895,6 +941,7 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             app.detail_open = false;
             app.showing_transitions = false;
             cancel_transition_collect(app);
+            crate::create_flow::cancel_create(app);
             app.showing_priorities = false;
             app.showing_sprints = false;
             app.show_site_errors = false;
@@ -955,7 +1002,24 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('3') => app.switch_to(ViewMode::Mentions).await,
         KeyCode::Char('4') => app.switch_to(ViewMode::Watching).await,
         KeyCode::Char('5') => app.switch_to(ViewMode::Sprint).await,
-        KeyCode::Char('t') | KeyCode::Char('T') => start_status_picker(app).await,
+        KeyCode::Char('n') if !app.detail_open && app.create_session.is_none() => {
+            crate::create_flow::start_create_blank(app).await;
+        }
+        KeyCode::Char('C') if !app.detail_open && app.create_session.is_none() => {
+            crate::create_flow::start_create_duplicate(app).await;
+        }
+        KeyCode::Char('t') | KeyCode::Char('T') => {
+            if crate::create_flow::handle_create_normal_keys(app, code).await {
+                // create wizard: change issue type
+            } else {
+                start_status_picker(app).await;
+            }
+        }
+        KeyCode::Char('p') if !app.detail_open => {
+            if !crate::create_flow::handle_create_normal_keys(app, code).await {
+                // not in create wizard; ignore (priority uses P)
+            }
+        }
         KeyCode::Char('c') if app.detail_open => {
             app.input_mode = InputMode::Comment;
             app.input_buffer.clear();

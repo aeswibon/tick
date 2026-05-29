@@ -36,6 +36,9 @@ pub fn render(f: &mut Frame, app: &mut App) {
     if app.show_help {
         super::help::draw_help(f, app, f.area());
     }
+    if app.showing_create_picker {
+        super::create::draw_create_picker(f, app, f.area());
+    }
     if app.showing_transitions {
         super::transitions::draw_transitions(f, app, f.area());
     }
@@ -52,9 +55,18 @@ pub fn render(f: &mut Frame, app: &mut App) {
         super::errors::draw_site_errors(f, app, f.area());
     }
     if app.showing_transition_field {
+        let modal_title = if app
+            .create_session
+            .as_ref()
+            .is_some_and(|s| s.showing_required_field)
+        {
+            "Create issue"
+        } else {
+            "Required field"
+        };
         super::field_picker::draw_field_picker(
             f,
-            "Required field",
+            modal_title,
             &app.transition_field_heading,
             app.transition_field_current
                 .as_ref()
@@ -154,6 +166,25 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         (
             format!(
                 " Open ticket (key or URL, paste from clipboard): {}_",
+                app.input_buffer
+            ),
+            app.theme.accent,
+        )
+    } else if app.input_mode == crate::app::InputMode::CreateField {
+        let label = if app
+            .create_session
+            .as_ref()
+            .is_some_and(|s| s.showing_required_field)
+        {
+            app.transition_field_heading.as_str()
+        } else {
+            "Summary"
+        };
+        (format!(" {label}: {}_", app.input_buffer), app.theme.accent)
+    } else if app.input_mode == crate::app::InputMode::CreateDescription {
+        (
+            format!(
+                " Description (markdown, Enter empty OK): {}_",
                 app.input_buffer
             ),
             app.theme.accent,

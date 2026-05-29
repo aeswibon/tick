@@ -123,6 +123,10 @@ pub enum InputMode {
     OpenTicket,
     /// Required workflow field (free text) while changing status.
     TransitionField,
+    /// Create issue: summary or required custom field entry.
+    CreateField,
+    /// Create issue: optional description (markdown).
+    CreateDescription,
 }
 
 /// Collecting values for a workflow transition before POST.
@@ -162,6 +166,8 @@ pub struct App {
     pub transition_selected: usize,
     pub transition_options: Vec<crate::api::types::WorkflowTransition>,
     pub transition_collect: Option<TransitionCollect>,
+    pub create_session: Option<crate::create_flow::CreateSession>,
+    pub showing_create_picker: bool,
     pub showing_transition_field: bool,
     /// True when the modal is showing a footer text prompt (no option list).
     pub transition_field_text_mode: bool,
@@ -235,6 +241,8 @@ impl App {
             transition_selected: 0,
             transition_options: Vec::new(),
             transition_collect: None,
+            create_session: None,
+            showing_create_picker: false,
             showing_transition_field: false,
             transition_field_text_mode: false,
             transition_field_user_search: false,
@@ -470,6 +478,23 @@ impl App {
         let max_offset = count.saturating_sub(viewport);
         if self.scroll_offset > max_offset {
             self.scroll_offset = max_offset;
+        }
+    }
+
+    pub fn select_ticket_by_key(&mut self, key: &str) {
+        self.invalidate_filter_cache();
+        let indices = self.filtered_indices();
+        let tickets = match self.tickets.read() {
+            Ok(g) => g,
+            Err(_) => return,
+        };
+        let found = indices
+            .iter()
+            .position(|&ticket_idx| tickets.get(ticket_idx).is_some_and(|t| t.key == key));
+        drop(tickets);
+        if let Some(view_idx) = found {
+            self.selected = view_idx;
+            self.ensure_selection_visible();
         }
     }
 
@@ -925,9 +950,7 @@ mod tests {
             sites: vec![crate::config::Site {
                 name: "acme".into(),
                 base_url: "https://acme.atlassian.net".into(),
-                sprint_field: None,
-                board_id: None,
-                boards: Default::default(),
+                ..Default::default()
             }],
             columns: None,
             max_results: 50,
@@ -937,6 +960,7 @@ mod tests {
             notify_on_refresh: false,
             auth: Default::default(),
             oauth: Default::default(),
+            create: Default::default(),
             view_jql: Config::build_view_jql(&Default::default()),
         }
     }
@@ -988,9 +1012,7 @@ mod tests {
         cfg.sites.push(crate::config::Site {
             name: "other".into(),
             base_url: "https://other.atlassian.net".into(),
-            sprint_field: None,
-            board_id: None,
-            boards: Default::default(),
+            ..Default::default()
         });
         let mut app = App::new(cfg, Theme::default(), test_jira(), false);
         let url = app
