@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.2] - 2026-05-29
+
+### Changed
+
+- `tick auth status` reports API token login (source, per-site verification) as well as OAuth; works without OAuth configured
+
 ## [0.6.1] - 2026-05-29
 
 ### Added

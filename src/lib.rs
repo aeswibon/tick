@@ -1,6 +1,7 @@
 pub mod api;
 pub mod app;
 pub mod auth;
+pub mod auth_status;
 pub mod cache;
 pub mod columns;
 pub mod config;
@@ -57,7 +58,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum TickCommand {
-    /// OAuth login / status / logout
+    /// Auth login / status / logout (status covers API token and OAuth)
     Auth {
         #[command(subcommand)]
         action: AuthCommand,
@@ -68,7 +69,7 @@ pub enum TickCommand {
 pub enum AuthCommand {
     /// Browser login; stores tokens in ~/.config/tick/oauth.json
     Login,
-    /// Show OAuth session status
+    /// Show auth status (API token and/or OAuth session)
     Status,
     /// Remove stored OAuth tokens
     Logout,
@@ -256,7 +257,7 @@ async fn run_auth_command(action: AuthCommand) -> Result<(), Box<dyn std::error:
             oauth::login(&config.oauth).await?;
         }
         AuthCommand::Status => {
-            oauth::print_status().await?;
+            auth_status::print_status().await?;
         }
         AuthCommand::Logout => {
             oauth::delete_tokens()?;

@@ -31,7 +31,8 @@ tick uses **API token** authentication unless you set `auth = "oauth"` in config
 Verify connectivity:
 
 ```bash
-tick --doctor
+tick auth status   # confirms API token (default) or OAuth session
+tick --doctor      # JQL + sprint/board probes per site
 ```
 
 Launch:
@@ -148,8 +149,8 @@ tick --init               # Create default config
 tick --doctor             # Test JQL, bulk fetch, sprint fields, boards
 tick --max-results 200    # Override fetch limit
 tick --page-size 25       # Scroll step for [ ]
-tick auth login           # OAuth (see OAUTH.md)
-tick auth status
+tick auth status          # API token + OAuth login status (per site)
+tick auth login           # OAuth only (see OAUTH.md)
 ```
 
 ## Tips

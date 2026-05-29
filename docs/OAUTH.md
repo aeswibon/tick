@@ -74,8 +74,10 @@ Tokens refresh automatically when expired (requires `TICK_OAUTH_CLIENT_SECRET`).
 | Command | Description |
 |---------|-------------|
 | `tick auth login` | Browser OAuth flow |
-| `tick auth status` | Show session expiry and accessible sites |
+| `tick auth status` | Show **API token** login (per site) and **OAuth** session if present |
 | `tick auth logout` | Delete `oauth.json` |
+
+With the default API token setup, run `tick auth status` to confirm the token works and which Jira sites accept it — no OAuth login required.
 
 ## Troubleshooting
 

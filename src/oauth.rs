@@ -301,7 +301,7 @@ pub async fn print_status() -> Result<(), String> {
     Ok(())
 }
 
-async fn print_accessible_resources(access_token: &str) {
+pub(crate) async fn print_accessible_resources(access_token: &str) {
     let http = reqwest::Client::new();
     let resp = match http
         .get(RESOURCES_URL)
