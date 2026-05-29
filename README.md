@@ -27,6 +27,7 @@ A k9s-inspired Jira Cloud TUI for the terminal. Multi-site ticket dashboard with
 
 | Guide | Description |
 |-------|-------------|
+| **[docs/FEATURES.md](docs/FEATURES.md)** | Complete feature reference (all capabilities) |
 | **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** | Start here — setup, workflow, tips |
 | **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** | Full `config.toml` reference |
 | **[docs/OAUTH.md](docs/OAUTH.md)** | OAuth app setup and `tick auth` |
@@ -74,7 +75,8 @@ tick --list-themes        # List themes
 | Keys | Action |
 |------|--------|
 | `j`/`k`, `g`/`G`, `[`/`]` | Navigate / scroll |
-| `/`, `s` | Filter / sort |
+| `/`, `s`, `S` | Filter / sort field / sort direction |
+| `o`, `O` | Open selected / open from clipboard or key |
 | `Enter`, `h`/`l` | Detail pane / tabs |
 | `t`, `c`, `w` | Transition, comment, worklog |
 | `S`, `P`, `L`, `M`, `D` | Edit summary, priority, labels, sprint, description |

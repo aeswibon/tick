@@ -194,16 +194,10 @@ impl JiraClient {
         status.is_success() || status == StatusCode::FORBIDDEN
     }
 
-    /// Probe all configured sites concurrently; return browse URL for the first match in config order.
+    /// Probe sites in config order; return browse URL for the first match.
     pub async fn find_issue_browse_url(&self, sites: &[Site], key: &str) -> Option<String> {
-        let exists = futures::future::join_all(
-            sites
-                .iter()
-                .map(|site| self.issue_exists(&site.base_url, key)),
-        )
-        .await;
-        for (site, found) in sites.iter().zip(exists) {
-            if found {
+        for site in sites {
+            if self.issue_exists(&site.base_url, key).await {
                 let base = site.base_url.trim_end_matches('/');
                 return Some(format!("{base}/browse/{key}"));
             }
@@ -901,5 +895,153 @@ mod field_updates {
         let list = client.list_priorities(&server.uri()).await.unwrap();
         assert_eq!(list.len(), 2);
         assert_eq!(list[0].1, "High");
+    }
+
+    #[tokio::test]
+    async fn assign_to_account_sends_put() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("PUT"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/DEMO-1"))
+            .and(wiremock::matchers::body_json(serde_json::json!({
+                "fields": { "assignee": { "accountId": "acc-99" } }
+            })))
+            .respond_with(wiremock::ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        client
+            .assign_to_account(&server.uri(), "DEMO-1", "acc-99")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn unassign_clears_assignee() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("PUT"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/DEMO-1"))
+            .and(wiremock::matchers::body_json(serde_json::json!({
+                "fields": { "assignee": null }
+            })))
+            .respond_with(wiremock::ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        client.unassign(&server.uri(), "DEMO-1").await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn get_transition_options_parses_response() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path(
+                "/rest/api/3/issue/DEMO-1/transitions",
+            ))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "transitions": [
+                        { "id": "21", "name": "Done" },
+                        { "id": "31", "name": "In Progress" }
+                    ]
+                })),
+            )
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        let options = client
+            .get_transition_options(&server.uri(), "DEMO-1")
+            .await
+            .unwrap();
+        assert_eq!(
+            options,
+            vec![
+                ("21".into(), "Done".into()),
+                ("31".into(), "In Progress".into()),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn transition_issue_posts_transition_id() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path(
+                "/rest/api/3/issue/DEMO-1/transitions",
+            ))
+            .and(wiremock::matchers::body_json(
+                serde_json::json!({ "transition": { "id": "21" } }),
+            ))
+            .respond_with(wiremock::ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        client
+            .transition_issue(&server.uri(), "DEMO-1", "21")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn add_worklog_sends_time_spent() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/DEMO-1/worklog"))
+            .and(wiremock::matchers::body_json(
+                serde_json::json!({ "timeSpent": "30m" }),
+            ))
+            .respond_with(wiremock::ResponseTemplate::new(201))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        client
+            .add_worklog(&server.uri(), "DEMO-1", "30m")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn issue_exists_on_success_and_missing() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/FOUND-1"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({ "key": "FOUND-1" })),
+            )
+            .mount(&server)
+            .await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/MISSING-1"))
+            .respond_with(wiremock::ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        assert!(client.issue_exists(&server.uri(), "FOUND-1").await);
+        assert!(!client.issue_exists(&server.uri(), "MISSING-1").await);
+    }
+
+    #[tokio::test]
+    async fn current_user_account_id_reads_myself() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/rest/api/3/myself"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({ "accountId": "me-42" })),
+            )
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        let id = client.current_user_account_id(&server.uri()).await.unwrap();
+        assert_eq!(id, "me-42");
+        let cached = client.current_user_account_id(&server.uri()).await.unwrap();
+        assert_eq!(cached, "me-42");
     }
 }

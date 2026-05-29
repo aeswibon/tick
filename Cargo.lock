@@ -2289,13 +2289,12 @@ dependencies = [
 
 [[package]]
 name = "tick"
-version = "0.6.5"
+version = "0.6.6"
 dependencies = [
  "chrono",
  "clap",
  "crossterm 0.28.1",
  "dirs",
- "futures",
  "ratatui",
  "reqwest",
  "serde",

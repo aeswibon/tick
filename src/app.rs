@@ -138,6 +138,8 @@ pub struct App {
     /// When the active view was last fetched to disk (shown while `live_data` is false).
     pub view_fetched_at: Option<DateTime<Utc>>,
     pub loading: bool,
+    /// Shown in header/footer while `loading` (e.g. multi-site issue lookup).
+    pub loading_message: Option<String>,
     pub status: FetchStatus,
     pub columns: Vec<Column>,
     pub selected: usize,
@@ -200,6 +202,7 @@ impl App {
             last_refresh: Instant::now(),
             view_fetched_at: None,
             loading: true,
+            loading_message: None,
             status: FetchStatus::default(),
             columns,
             selected: 0,
@@ -258,7 +261,7 @@ impl App {
     }
 
     /// Build a browse URL for pasted text (issue key or Jira `/browse/` URL).
-    pub async fn resolve_ticket_url(&self, raw: &str) -> Result<String, String> {
+    pub async fn resolve_ticket_url(&mut self, raw: &str) -> Result<String, String> {
         let key = parse_issue_key(raw)
             .ok_or_else(|| "Paste an issue key (e.g. PROJ-123) or Jira browse URL".to_string())?;
         if let Some(link) = read_tickets(&self.tickets)
@@ -279,11 +282,18 @@ impl App {
         }
 
         if self.config.sites.len() > 1 {
-            return self
-                .jira
-                .find_issue_browse_url(&self.config.sites, &key)
-                .await
-                .ok_or_else(|| format!("Issue {key} not found on any configured site"));
+            let total = self.config.sites.len();
+            for (i, site) in self.config.sites.iter().enumerate() {
+                self.loading_message =
+                    Some(format!("Checking {} ({}/{})…", site.name, i + 1, total));
+                if self.jira.issue_exists(&site.base_url, &key).await {
+                    self.loading_message = None;
+                    let base = site.base_url.trim_end_matches('/');
+                    return Ok(format!("{base}/browse/{key}"));
+                }
+            }
+            self.loading_message = None;
+            return Err(format!("Issue {key} not found on any configured site"));
         }
 
         let site = self
@@ -344,16 +354,21 @@ impl App {
 
     pub fn refresh_status_label(&self) -> String {
         if self.loading {
-            return "loading".into();
+            return self
+                .loading_message
+                .clone()
+                .unwrap_or_else(|| "loading".into());
         }
         if self.live_data {
             let mins = self.last_refresh.elapsed().as_secs() / 60;
             return format!("live · refresh {mins}m ago");
         }
+        let offline = self.status.has_warnings() && !read_tickets(&self.tickets).is_empty();
+        let prefix = if offline { "offline" } else { "cached" };
         if let Some(at) = self.view_fetched_at {
-            return format!("cached · {}", format_cache_age(at));
+            return format!("{prefix} · {}", format_cache_age(at));
         }
-        "cached".into()
+        prefix.into()
     }
 
     pub fn save_cache(&self, mode: ViewMode) {
@@ -926,14 +941,14 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_ticket_url_from_key_single_site() {
-        let app = App::new(test_config(20), Theme::default(), test_jira(), false);
+        let mut app = App::new(test_config(20), Theme::default(), test_jira(), false);
         let url = app.resolve_ticket_url("demo-9").await.unwrap();
         assert_eq!(url, "https://acme.atlassian.net/browse/DEMO-9");
     }
 
     #[tokio::test]
     async fn resolve_ticket_url_uses_loaded_ticket_link() {
-        let app = App::new(test_config(20), Theme::default(), test_jira(), false);
+        let mut app = App::new(test_config(20), Theme::default(), test_jira(), false);
         *write_tickets(&app.tickets) = vec![sample_ticket("WEB-1", "x", "Open")];
         let url = app.resolve_ticket_url("WEB-1").await.unwrap();
         assert_eq!(url, "https://acme.atlassian.net/browse/WEB-1");
@@ -949,7 +964,7 @@ mod tests {
             board_id: None,
             boards: Default::default(),
         });
-        let app = App::new(cfg, Theme::default(), test_jira(), false);
+        let mut app = App::new(cfg, Theme::default(), test_jira(), false);
         let url = app
             .resolve_ticket_url("https://other.atlassian.net/browse/OTH-2")
             .await

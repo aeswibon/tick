@@ -96,7 +96,7 @@ columns = ["site", "key", "labels", "sprint", "summary", "status", "assignee"]
 
 ## Themes
 
-Built-in: `default`, `light`, `tokyo-night`, `dracula`
+Built-in: `default`, `catppuccin-mocha`, `light`, `tokyo-night`, `dracula`, `gruvbox-dark`, `nord`, `one-dark`, `solarized-dark`, `rose-pine`
 
 Custom: `~/.config/tick/themes/<name>.toml` — copy from [themes/](../themes/)
 

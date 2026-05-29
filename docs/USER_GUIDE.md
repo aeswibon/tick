@@ -2,6 +2,8 @@
 
 tick is a terminal UI for **Jira Cloud**. It aggregates issues from one or more sites, lets you triage with filters and sorts, and perform common actions without opening the browser.
 
+**Full feature reference:** [FEATURES.md](FEATURES.md) — every capability in one place.
+
 ## First-time setup
 
 ```bash
@@ -73,13 +75,15 @@ Each view is **cached** under `~/.config/tick/cache/`. On startup, tick loads ca
 
 - **`/`** — incremental filter across key, summary, status, assignee, reporter, labels, sprint, parent
 - **`s`** — cycle sort modes (default preserves JQL order, or sort by age, priority, status, key)
+- **`S`** — toggle sort ascending ↑ / descending ↓ (table only)
 
 ## Refresh and offline behavior
 
 | Indicator | Meaning |
 |-----------|---------|
 | `live · refresh Nm ago` | Last fetch succeeded for active view |
-| `cached · Nh ago` | Showing disk cache; fetch failed or not yet completed |
+| `cached · Nh ago` | Showing disk cache; fetch pending or partial failure |
+| `offline · Nh ago` | All sites failed but cached tickets are still shown |
 
 - **`r`** — refresh active view now
 - Background refresh runs after startup and repeats after each cycle
@@ -105,7 +109,8 @@ If Jira is unreachable, tick **keeps the last cached tickets** instead of cleari
 | Set labels | `L` (comma-separated) |
 | Move to sprint/backlog | `M` |
 | Edit description | `D` (markdown: `#` headings, `-` lists, `**bold**`, `@` mentions) |
-| Open in browser | `o` (from table) |
+| Open in browser | `o` (selected row) |
+| Open by key/clipboard | `O` (multi-site: checks each instance) |
 | Copy key | `y` |
 
 After writes, tick refreshes all views.
@@ -163,6 +168,7 @@ tick auth login           # OAuth only (see OAUTH.md)
 
 ## Getting help
 
+- [FEATURES.md](FEATURES.md) — complete feature reference
 - [KEYBINDINGS.md](KEYBINDINGS.md) — full key list
 - [CONFIGURATION.md](CONFIGURATION.md) — all options
 - [GitHub Issues](https://github.com/aeswibon/tick/issues)

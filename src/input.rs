@@ -193,8 +193,15 @@ async fn start_open_ticket(app: &mut App) {
     let prefilled = crate::platform::read_from_clipboard().unwrap_or_default();
     if !prefilled.is_empty() {
         app.loading = true;
+        if app.config.sites.len() > 1 {
+            app.loading_message = Some(format!(
+                "Looking up issue ({} sites)…",
+                app.config.sites.len()
+            ));
+        }
         let result = app.resolve_ticket_url(&prefilled).await;
         app.loading = false;
+        app.loading_message = None;
         if let Ok(url) = result {
             if crate::platform::open_url(&url).is_ok() {
                 return;
@@ -210,8 +217,15 @@ async fn submit_open_ticket(app: &mut App) {
     app.input_mode = InputMode::None;
     app.input_buffer.clear();
     app.loading = true;
+    if app.config.sites.len() > 1 {
+        app.loading_message = Some(format!(
+            "Looking up issue ({} sites)…",
+            app.config.sites.len()
+        ));
+    }
     let result = app.resolve_ticket_url(&buffer).await;
     app.loading = false;
+    app.loading_message = None;
     match result {
         Ok(url) => {
             if crate::platform::open_url(&url).is_err() {

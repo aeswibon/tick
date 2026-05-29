@@ -1,6 +1,6 @@
 [package]
 name = "tick"
-version = "0.6.5"
+version = "0.6.6"
 edition = "2021"
 license = "MIT"
 
@@ -15,7 +15,6 @@ toml = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
 dirs = "5"
-futures = "0.3"
 
 [dev-dependencies]
 wiremock = "0.6"

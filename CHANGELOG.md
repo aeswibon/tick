@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.6] - 2026-05-29
+
+### Added
+
+- [docs/FEATURES.md](docs/FEATURES.md) — comprehensive feature reference
+- Wiremock tests for assign, unassign, transitions, worklog, issue existence, `/myself`
+- Multi-site `O` lookup shows progress (`Checking site (2/3)…`) in header/footer
+
+### Changed
+
+- Header shows **offline** when all sites failed but cached tickets remain
+- Multi-site issue probe runs in config order (enables per-site progress)
+
 ## [0.6.5] - 2026-05-29
 
 ### Added
@@ -10,7 +23,7 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
-- Multi-site `O` open: probe all Jira instances in parallel, still prefer first match in config order
+- Multi-site `O` open: probe each Jira instance via API, first match in config order
 
 ## [0.6.4] - 2026-05-29
 

@@ -150,7 +150,8 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             app.theme.accent,
         )
     } else if app.loading {
-        (" Loading...".into(), app.theme.loading_fg)
+        let msg = app.loading_message.as_deref().unwrap_or(" Loading...");
+        (format!(" {msg}"), app.theme.loading_fg)
     } else if let Some(ref err) = app.status.action_error {
         (format!(" Error: {err}"), app.theme.error_fg)
     } else if app.status.has_warnings() {
