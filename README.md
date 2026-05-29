@@ -93,6 +93,8 @@ base_url = "https://my-team.atlassian.net"
 | `token` | file / env | [Atlassian API token](https://id.atlassian.com/manage-profile/security/api-tokens); also `~/.config/tick/token` or `TICK_TOKEN` |
 | `[views]` | built-in JQL | Override JQL for Assigned, Updated, Mentions, Watched, Sprint (see examples) |
 | `sprint_field` | — | Per-site Jira field id for sprint column (see `tick --doctor`) |
+| `board_id` | — | Default agile board for sprint moves (`M`; see `tick --doctor`) |
+| `boards` | — | Per-project board overrides, e.g. `{ DEMO = 7 }` |
 | `max_results` | `50` | Max tickets to fetch per site |
 | `page_size` | `10` | Rows to scroll with `[` / `]` (table fills terminal height) |
 | `notify_on_refresh` | `false` | Desktop alert when a refresh finds new issues in the active view |

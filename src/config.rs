@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+use crate::api::agile::BoardConfig;
 use crate::view_mode::ViewMode;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,6 +13,31 @@ pub struct Site {
     /// Jira field id for sprint (e.g. customfield_10020). Use `tick --doctor` to discover.
     #[serde(default)]
     pub sprint_field: Option<String>,
+    /// Default agile board id for sprint moves (`M`). See `tick --doctor`.
+    #[serde(default)]
+    pub board_id: Option<u64>,
+    /// Per-project board overrides: `boards = { DEMO = 7, WEB = 12 }`
+    #[serde(default)]
+    pub boards: HashMap<String, u64>,
+}
+
+impl Site {
+    pub fn board_config(&self) -> BoardConfig {
+        BoardConfig {
+            default_board_id: self.board_id,
+            project_boards: self.boards.clone(),
+        }
+    }
+
+    pub fn is_board_configured(&self, board_id: u64, project_key: Option<&str>) -> bool {
+        if self.board_id == Some(board_id) {
+            return true;
+        }
+        if let Some(pk) = project_key {
+            return self.boards.get(pk) == Some(&board_id);
+        }
+        false
+    }
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -223,6 +249,8 @@ theme = "default"
 name = "my-team"
 base_url = "https://my-team.atlassian.net"
 # sprint_field = "customfield_10020"   # run: tick --doctor
+# board_id = 7                         # default board for sprint moves (M)
+# boards = { DEMO = 7, WEB = 12 }      # per-project board overrides
 "#;
         fs::write(&path, default).map_err(|e| format!("Cannot write {}: {}", path.display(), e))?;
         println!("Default config created at {}", path.display());
@@ -285,6 +313,26 @@ sites = []
         let mut cfg: Config = toml::from_str(raw).unwrap();
         cfg.view_jql = Config::build_view_jql(&cfg.views);
         assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn parses_board_config() {
+        let raw = r#"
+email = "a@b.com"
+token = "secret"
+
+[[sites]]
+name = "one"
+base_url = "https://one.atlassian.net"
+board_id = 7
+boards = { DEMO = 12, WEB = 15 }
+"#;
+        let mut cfg: Config = toml::from_str(raw).unwrap();
+        cfg.view_jql = Config::build_view_jql(&cfg.views);
+        let site = &cfg.sites[0];
+        assert_eq!(site.board_id, Some(7));
+        assert_eq!(site.boards.get("DEMO"), Some(&12));
+        assert_eq!(site.board_config().project_boards.get("WEB"), Some(&15));
     }
 
     #[test]

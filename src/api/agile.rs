@@ -1,4 +1,17 @@
 use super::JiraClient;
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, Default)]
+pub struct BoardConfig {
+    pub default_board_id: Option<u64>,
+    pub project_boards: HashMap<String, u64>,
+}
+
+pub struct BoardInfo {
+    pub id: u64,
+    pub name: String,
+    pub project_key: Option<String>,
+}
 
 /// Sprint picker entries: `("backlog", "Backlog")` or `(sprint_id, display name)`.
 impl JiraClient {
@@ -6,14 +19,55 @@ impl JiraClient {
         &self,
         base_url: &str,
         project_key: &str,
+        board: Option<&BoardConfig>,
     ) -> Result<Vec<(String, String)>, String> {
         let mut options = vec![("backlog".into(), "Backlog (no sprint)".into())];
-        let board_id = self.find_board_id(base_url, project_key).await?;
+        let board_id = self.resolve_board_id(base_url, project_key, board).await?;
         let sprints = self.list_board_sprints(base_url, board_id).await?;
         for (id, name, state) in sprints {
             options.push((id, format!("{name} ({state})")));
         }
         Ok(options)
+    }
+
+    pub async fn list_boards(&self, base_url: &str) -> Result<Vec<BoardInfo>, String> {
+        let base = base_url.trim_end_matches('/');
+        let url = format!("{base}/rest/agile/1.0/board?maxResults=50");
+        let resp = self
+            .http
+            .get(&url)
+            .basic_auth(&self.email, Some(&self.token))
+            .send()
+            .await
+            .map_err(|e| format!("HTTP error: {}", e))?;
+        if !resp.status().is_success() {
+            return Err(format!(
+                "Board API {}: {}",
+                resp.status(),
+                resp.text().await.unwrap_or_default()
+            ));
+        }
+        let data: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| format!("Parse error: {}", e))?;
+        Ok(data["values"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|b| {
+                        let id = b["id"].as_u64()?;
+                        let name = b["name"].as_str()?.to_string();
+                        let project_key = b["location"]["projectKey"].as_str().map(String::from);
+                        Some(BoardInfo {
+                            id,
+                            name,
+                            project_key,
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default())
     }
 
     pub async fn move_issue_to_sprint_target(
@@ -31,7 +85,28 @@ impl JiraClient {
             .await
     }
 
-    async fn find_board_id(&self, base_url: &str, project_key: &str) -> Result<u64, String> {
+    async fn resolve_board_id(
+        &self,
+        base_url: &str,
+        project_key: &str,
+        board: Option<&BoardConfig>,
+    ) -> Result<u64, String> {
+        if let Some(cfg) = board {
+            if let Some(id) = cfg.project_boards.get(project_key) {
+                return Ok(*id);
+            }
+            if let Some(id) = cfg.default_board_id {
+                return Ok(id);
+            }
+        }
+        self.find_board_id_by_project(base_url, project_key).await
+    }
+
+    async fn find_board_id_by_project(
+        &self,
+        base_url: &str,
+        project_key: &str,
+    ) -> Result<u64, String> {
         let base = base_url.trim_end_matches('/');
         let url = format!("{base}/rest/agile/1.0/board?projectKeyOrId={project_key}");
         let resp = self
@@ -56,7 +131,11 @@ impl JiraClient {
             .as_array()
             .and_then(|arr| arr.first())
             .and_then(|b| b["id"].as_u64())
-            .ok_or_else(|| format!("No agile board found for project {project_key}"))?;
+            .ok_or_else(|| {
+                format!(
+                    "No agile board found for project {project_key} (set board_id or boards in config)"
+                )
+            })?;
         Ok(board_id)
     }
 
@@ -190,12 +269,63 @@ mod tests {
 
         let client = JiraClient::new("u@example.com", "token", false);
         let list = client
-            .list_sprint_targets(&server.uri(), "DEMO")
+            .list_sprint_targets(&server.uri(), "DEMO", None)
             .await
             .unwrap();
         assert_eq!(list[0].0, "backlog");
         assert_eq!(list[1].0, "42");
         assert!(list[1].1.contains("Sprint 1"));
+    }
+
+    #[tokio::test]
+    async fn list_sprint_targets_uses_configured_board() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/rest/agile/1.0/board/99/sprint"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "values": [{ "id": 1, "name": "S", "state": "active" }]
+                })),
+            )
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        let cfg = BoardConfig {
+            default_board_id: Some(99),
+            project_boards: HashMap::new(),
+        };
+        let list = client
+            .list_sprint_targets(&server.uri(), "DEMO", Some(&cfg))
+            .await
+            .unwrap();
+        assert_eq!(list.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn list_sprint_targets_prefers_project_board_override() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/rest/agile/1.0/board/12/sprint"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "values": []
+                })),
+            )
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        let mut boards = HashMap::new();
+        boards.insert("DEMO".into(), 12);
+        let cfg = BoardConfig {
+            default_board_id: Some(99),
+            project_boards: boards,
+        };
+        client
+            .list_sprint_targets(&server.uri(), "DEMO", Some(&cfg))
+            .await
+            .unwrap();
     }
 
     #[tokio::test]

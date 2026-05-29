@@ -11,13 +11,13 @@ Open-source Jira TUI (`aeswibon/tick`).
 - **v0.4.0:** Virtualized table, theme gallery + `--list-themes`
 - **v0.4.1:** Edit labels (`L`), cache age in header when offline
 - **v0.4.2:** Sprint/backlog move (`M`), cache age in footer
+- **v0.4.3:** Configurable agile `board_id` / `boards`, doctor board list
 
 ## Next
 
 | Item | Target |
 |------|--------|
 | OAuth | on demand |
-| Multi-board / project sprint config | backlog |
 
 ## Out of scope
 

@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.3] - 2026-05-29
+
+### Added
+
+- Per-site `board_id` and per-project `boards` map for sprint moves (`M`)
+- `tick --doctor` lists agile boards and marks configured entries
+
 ## [0.4.2] - 2026-05-29
 
 ### Added

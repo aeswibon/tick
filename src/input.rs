@@ -438,7 +438,17 @@ async fn start_sprint_picker(app: &mut App) {
         return;
     };
     let project = ticket.project_key_for_api().to_string();
-    match app.jira.list_sprint_targets(&base_url, &project).await {
+    let board = app
+        .config
+        .sites
+        .iter()
+        .find(|s| s.name == ticket.site)
+        .map(|s| s.board_config());
+    match app
+        .jira
+        .list_sprint_targets(&base_url, &project, board.as_ref())
+        .await
+    {
         Ok(options) if options.len() > 1 => {
             let current = ticket.sprint_name.as_deref().unwrap_or("");
             app.sprint_options = options;

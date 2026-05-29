@@ -91,6 +91,26 @@ pub async fn run_doctor(config: &Config) {
             }
             Err(e) => println!("  Sprint fields: FAILED — {e}"),
         }
+
+        match client.list_boards(&site.base_url).await {
+            Ok(boards) if boards.is_empty() => {
+                println!("  Agile boards: none found (set board_id or boards in config)");
+            }
+            Ok(boards) => {
+                println!("  Agile boards (board_id / boards.PROJ in config):");
+                for board in boards {
+                    let pk = board.project_key.as_deref();
+                    let mark = if site.is_board_configured(board.id, pk) {
+                        " *"
+                    } else {
+                        ""
+                    };
+                    let proj = pk.unwrap_or("-");
+                    println!("    {} — {} ({}){mark}", board.id, board.name, proj);
+                }
+            }
+            Err(e) => println!("  Agile boards: FAILED — {e}"),
+        }
     }
 }
 

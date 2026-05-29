@@ -579,6 +579,8 @@ mod fetch_integration {
                 name: "test".into(),
                 base_url: base_url.into(),
                 sprint_field: None,
+                board_id: None,
+                boards: Default::default(),
             }],
             columns: None,
             max_results: 50,
