@@ -102,10 +102,58 @@ pub struct ViewQueries {
     pub sprint: Option<String>,
 }
 
+/// Pre-filled issue for `N` (create from template). Minimal edits: summary, then Enter.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct IssueTemplate {
+    /// Short id shown in the template picker (unique in config).
+    pub name: String,
+    /// Limit template to one site; required when you have multiple `[[sites]]`.
+    pub site: Option<String>,
+    pub project: String,
+    #[serde(rename = "issue_type")]
+    pub issue_type: String,
+    pub summary: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub labels: Vec<String>,
+    pub priority: Option<String>,
+    /// Jira account id (not display name).
+    pub assignee_account_id: Option<String>,
+    pub parent_key: Option<String>,
+    /// Extra create fields by id, e.g. `customfield_10001 = "value"`.
+    #[serde(default)]
+    pub extra_fields: HashMap<String, toml::Value>,
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct CreateSettings {
     #[serde(default = "default_clone_summary_prefix")]
     pub clone_summary_prefix: String,
+    #[serde(default)]
+    pub templates: Vec<IssueTemplate>,
+}
+
+impl Config {
+    /// Templates visible for a site (or all when `site_name` is None).
+    pub fn issue_templates_for_site<'a>(
+        &'a self,
+        site_name: Option<&str>,
+    ) -> Vec<&'a IssueTemplate> {
+        self.create
+            .templates
+            .iter()
+            .filter(|t| template_matches_site(t, site_name))
+            .collect()
+    }
+}
+
+fn template_matches_site(template: &IssueTemplate, site_name: Option<&str>) -> bool {
+    match (&template.site, site_name) {
+        (None, _) => true,
+        (Some(tmpl_site), Some(active)) => tmpl_site == active,
+        (Some(_), None) => true,
+    }
 }
 
 fn default_clone_summary_prefix() -> String {
@@ -282,6 +330,36 @@ impl Config {
         if self.sites.is_empty() {
             return Err("config: at least one [[sites]] entry is required".into());
         }
+        let mut template_names = std::collections::HashSet::new();
+        for template in &self.create.templates {
+            let name = template.name.trim();
+            if name.is_empty() {
+                return Err("config: create.templates name must not be empty".into());
+            }
+            if !template_names.insert(name.to_string()) {
+                return Err(format!("config: duplicate template name '{name}'"));
+            }
+            if template.project.trim().is_empty() {
+                return Err(format!("config: template '{name}' needs project"));
+            }
+            if template.issue_type.trim().is_empty() {
+                return Err(format!("config: template '{name}' needs issue_type"));
+            }
+            if template.summary.trim().is_empty() {
+                return Err(format!("config: template '{name}' needs summary"));
+            }
+            if let Some(ref site) = template.site {
+                if !self.sites.iter().any(|s| s.name == *site) {
+                    return Err(format!(
+                        "config: template '{name}' references unknown site '{site}'"
+                    ));
+                }
+            } else if self.sites.len() > 1 {
+                return Err(format!(
+                    "config: template '{name}' needs site = \"...\" when using multiple [[sites]]"
+                ));
+            }
+        }
         for site in &self.sites {
             if site.name.trim().is_empty() {
                 return Err("config: site name must not be empty".into());
@@ -342,6 +420,19 @@ base_url = "https://my-team.atlassian.net"
 # sprint_field = "customfield_10020"   # run: tick --doctor
 # board_id = 7                         # default board for sprint moves (M)
 # boards = { DEMO = 7, WEB = 12 }      # per-project board overrides
+# create_project = "ENG"
+# create_issue_type = "Task"
+
+# Issue templates — press N in tick to create with fields pre-filled
+# [[create.templates]]
+# name = "bug"
+# site = "my-team"                    # required if you have multiple [[sites]]
+# project = "ENG"
+# issue_type = "Bug"
+# summary = "Bug: "
+# description = "Use triple-quotes in your real config for multiline text"
+# labels = ["bug"]
+# priority = "Medium"
 "#;
         fs::write(&path, default).map_err(|e| format!("Cannot write {}: {}", path.display(), e))?;
         println!("Default config created at {}", path.display());
@@ -507,5 +598,54 @@ base_url = "https://one.atlassian.net"
         let t = Config::resolve_token("").unwrap();
         assert_eq!(t, "from-env");
         std::env::remove_var("TICK_TOKEN");
+    }
+
+    #[test]
+    fn parses_issue_templates() {
+        let toml = r#"
+email = "a@b.com"
+token = "t"
+
+[[sites]]
+name = "one"
+base_url = "https://one.atlassian.net"
+
+[[create.templates]]
+name = "bug"
+project = "ONE"
+issue_type = "Bug"
+summary = "Bug: "
+labels = ["a"]
+"#;
+        let mut cfg: Config = toml::from_str(toml).unwrap();
+        cfg.view_jql = Config::build_view_jql(&cfg.views);
+        assert!(cfg.validate().is_ok());
+        assert_eq!(cfg.create.templates.len(), 1);
+        assert_eq!(cfg.issue_templates_for_site(Some("one")).len(), 1);
+    }
+
+    #[test]
+    fn multi_site_template_requires_site_field() {
+        let toml = r#"
+email = "a@b.com"
+token = "t"
+
+[[sites]]
+name = "one"
+base_url = "https://one.atlassian.net"
+
+[[sites]]
+name = "two"
+base_url = "https://two.atlassian.net"
+
+[[create.templates]]
+name = "x"
+project = "P"
+issue_type = "Task"
+summary = "S"
+"#;
+        let mut cfg: Config = toml::from_str(toml).unwrap();
+        cfg.view_jql = Config::build_view_jql(&cfg.views);
+        assert!(cfg.validate().is_err());
     }
 }

@@ -5,8 +5,10 @@ use std::collections::HashMap;
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::api::create::{
-    build_create_fields, enrich_draft_from_clone, seed_draft_from_ticket, CreateDraft,
+    apply_template_to_draft, build_create_fields, enrich_draft_from_clone,
+    seed_draft_from_ticket, template_picker_label, CreateDraft,
 };
+use crate::config::IssueTemplate;
 use crate::api::transition_fields::{self, TransitionField, TransitionFieldKind};
 use crate::app::{App, InputMode};
 use crate::config::Site;
@@ -16,6 +18,7 @@ pub enum CreateStep {
     Site,
     Project,
     IssueType,
+    Template,
     Summary,
     Description,
 }
@@ -53,6 +56,36 @@ fn site_by_name<'a>(sites: &'a [Site], name: &str) -> Option<&'a Site> {
 
 fn clone_prefix(app: &App) -> String {
     app.config.create.clone_summary_prefix.clone()
+}
+
+pub async fn start_create_from_template(app: &mut App) {
+    cancel_create(app);
+    let site_filter = if app.config.sites.len() == 1 {
+        Some(app.config.sites[0].name.as_str())
+    } else {
+        None
+    };
+    let templates: Vec<&IssueTemplate> = app.config.issue_templates_for_site(site_filter);
+    if templates.is_empty() {
+        app.status.set_action_error(
+            "No issue templates in config — add [[create.templates]] (see tick --init comments)",
+        );
+        return;
+    }
+    let picker_options: Vec<(String, String)> = templates
+        .iter()
+        .map(|t| (t.name.clone(), template_picker_label(t)))
+        .collect();
+    app.create_session = Some(CreateSession {
+        draft: CreateDraft::default(),
+        step: CreateStep::Template,
+        picker_options,
+        picker_selected: 0,
+        required_pending: Vec::new(),
+        required_values: HashMap::new(),
+        showing_required_field: false,
+    });
+    app.showing_create_picker = true;
 }
 
 pub async fn start_create_blank(app: &mut App) {
@@ -218,7 +251,7 @@ async fn advance_create_step(app: &mut App) {
             }
             begin_summary_input(app);
         }
-        Some(CreateStep::Summary) | Some(CreateStep::Description) => {}
+        Some(CreateStep::Summary) | Some(CreateStep::Description) | Some(CreateStep::Template) => {}
         None => {}
     }
 }
@@ -611,8 +644,58 @@ async fn apply_create_picker_pick(app: &mut App) {
             app.showing_create_picker = false;
             advance_create_step(app).await;
         }
+        CreateStep::Template => {
+            apply_template_pick(app, &id).await;
+        }
         _ => {}
     }
+}
+
+async fn apply_template_pick(app: &mut App, template_name: &str) {
+    let Some(template) = app
+        .config
+        .create
+        .templates
+        .iter()
+        .find(|t| t.name == template_name)
+        .cloned()
+    else {
+        app.status
+            .set_action_error(format!("Unknown template '{template_name}'"));
+        return;
+    };
+    let site_name = template.site.clone().or_else(|| {
+        if app.config.sites.len() == 1 {
+            Some(app.config.sites[0].name.clone())
+        } else {
+            None
+        }
+    });
+    let Some(site_name) = site_name else {
+        app.status.set_action_error(format!(
+            "Template '{}' needs site = \"...\" in config",
+            template.name
+        ));
+        return;
+    };
+    let Some(site) = site_by_name(&app.config.sites, &site_name) else {
+        app.status
+            .set_action_error(format!("Unknown site '{site_name}' for template"));
+        return;
+    };
+
+    if let Some(session) = app.create_session.as_mut() {
+        apply_template_to_draft(&mut session.draft, &template, site);
+        if !session.draft.priority_name.is_empty() {
+            session.draft.priority_id = app
+                .jira
+                .resolve_priority_id(&session.draft.base_url, &session.draft.priority_name)
+                .await;
+        }
+        session.step = CreateStep::Summary;
+    }
+    app.showing_create_picker = false;
+    begin_summary_input(app);
 }
 
 pub async fn submit_create_input(app: &mut App) {

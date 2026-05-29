@@ -4,6 +4,7 @@ use super::jira_error;
 use super::transition_fields::{self, TransitionField};
 use super::JiraClient;
 use crate::api::types::Ticket;
+use crate::config::{IssueTemplate, Site};
 use chrono::NaiveDate;
 use serde_json::{json, Value};
 
@@ -409,6 +410,41 @@ pub async fn enrich_draft_from_clone(
     }
 }
 
+/// Apply a configured template; caller resolves `priority_id` if `priority` is set.
+pub fn apply_template_to_draft(draft: &mut CreateDraft, template: &IssueTemplate, site: &Site) {
+    draft.site_name = site.name.clone();
+    draft.base_url = site.base_url.clone();
+    draft.project_key = template.project.trim().to_string();
+    draft.issue_type_name = template.issue_type.trim().to_string();
+    draft.summary = template.summary.clone();
+    draft.description = template.description.clone();
+    draft.description_adf = None;
+    draft.labels = template.labels.clone();
+    draft.priority_name = template.priority.clone().unwrap_or_default();
+    draft.priority_id = None;
+    draft.assignee_account_id = template.assignee_account_id.clone();
+    draft.parent_key = template.parent_key.clone();
+    draft.source_key = None;
+    draft.extra_fields.clear();
+    for (key, value) in &template.extra_fields {
+        if let Ok(json) = serde_json::to_value(value) {
+            draft.extra_fields.insert(key.clone(), json);
+        }
+    }
+}
+
+pub fn template_picker_label(template: &IssueTemplate) -> String {
+    let site = template
+        .site
+        .as_deref()
+        .map(|s| format!("{s} · "))
+        .unwrap_or_default();
+    format!(
+        "{}{} — {} / {}",
+        site, template.name, template.project, template.issue_type
+    )
+}
+
 pub fn seed_draft_from_ticket(draft: &mut CreateDraft, ticket: &Ticket, summary_prefix: &str) {
     draft.site_name = ticket.site.clone();
     draft.project_key = ticket.project_key_for_api().to_string();
@@ -445,6 +481,32 @@ mod tests {
         assert_eq!(fields["project"]["key"], "DEMO");
         assert_eq!(fields["summary"], "Test issue");
         assert_eq!(fields["labels"][0], "a");
+    }
+
+    #[test]
+    fn apply_template_fills_draft() {
+        use crate::config::IssueTemplate;
+        let template = IssueTemplate {
+            name: "inc".into(),
+            site: Some("s1".into()),
+            project: "OPS".into(),
+            issue_type: "Task".into(),
+            summary: "Incident: ".into(),
+            description: "details".into(),
+            labels: vec!["ops".into()],
+            priority: Some("High".into()),
+            ..Default::default()
+        };
+        let site = Site {
+            name: "s1".into(),
+            base_url: "https://x.atlassian.net".into(),
+            ..Default::default()
+        };
+        let mut draft = CreateDraft::default();
+        apply_template_to_draft(&mut draft, &template, &site);
+        assert_eq!(draft.project_key, "OPS");
+        assert_eq!(draft.summary, "Incident: ");
+        assert_eq!(draft.labels, vec!["ops"]);
     }
 
     #[test]

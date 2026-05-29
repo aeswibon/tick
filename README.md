@@ -77,7 +77,7 @@ tick --list-themes        # List themes
 | `j`/`k`, `g`/`G`, `[`/`]` | Navigate / scroll |
 | `/`, `s`, `S` | Filter / sort field / sort direction |
 | `o`, `O` | Open selected / open from clipboard or key |
-| `n`, `C` | New issue / duplicate selected (maximal copy) |
+| `n`, `N`, `C` | New issue / from template / duplicate selected |
 | `Enter`, `h`/`l` | Detail pane / tabs |
 | `t`/`T`, `c`, `w` | Status (workflow), comment, worklog |
 | `S`, `P`, `L`, `M`, `D` | Edit summary, priority, labels, sprint, description |

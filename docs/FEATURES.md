@@ -339,7 +339,8 @@ Works from the **table** or **detail pane** (same as `c` / `w`).
 
 | Key | Action |
 |-----|--------|
-| `n` | New issue (wizard) |
+| `n` | New issue (blank wizard) |
+| `N` | New issue from a **config template** (pre-filled fields) |
 | `C` | Duplicate selected issue (maximal field copy) |
 | `Esc` | Cancel wizard |
 
@@ -354,6 +355,26 @@ create_issue_type = "Task"
 ```
 
 During the wizard, `p` reopens the project picker; `t` reopens the issue type picker (when not changing status on the main table).
+
+**Templates (`N`):** define ready-made issues in `config.toml`; tick opens a picker, applies project/type/summary/description/labels/priority/assignee/parent/extra fields, then you edit **summary** (and optional description) with minimal typing:
+
+```toml
+[[create.templates]]
+name = "bug"
+site = "my-team"              # required when you have multiple [[sites]]
+project = "ENG"
+issue_type = "Bug"
+summary = "Bug: "
+description = """## Steps
+
+## Expected
+"""
+labels = ["bug"]
+priority = "Medium"
+# assignee_account_id = "abc123"
+# parent_key = "ENG-100"
+# extra_fields = { customfield_10001 = "value" }
+```
 
 **Duplicate (`C`):** copies project, type, labels, priority, assignee, due date, parent, description, and sprint field (when configured) from the selected row; summary is prefilled as `Copy of: …` (configurable via `[create].clone_summary_prefix`). tick re-fetches the issue for accurate account IDs before create. After success, optionally adds a **Cloners** link to the source (`create_clone_link = true` by default).
 

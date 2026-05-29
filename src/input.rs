@@ -1005,6 +1005,9 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('n') if !app.detail_open && app.create_session.is_none() => {
             crate::create_flow::start_create_blank(app).await;
         }
+        KeyCode::Char('N') if !app.detail_open && app.create_session.is_none() => {
+            crate::create_flow::start_create_from_template(app).await;
+        }
         KeyCode::Char('C') if !app.detail_open && app.create_session.is_none() => {
             crate::create_flow::start_create_duplicate(app).await;
         }

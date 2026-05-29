@@ -9,6 +9,7 @@ All notable changes to this project are documented in this file.
 - Create new issues from the TUI (`n`) — site/project/type pickers, summary, description, required custom fields
 - Duplicate selected issue (`C`) with maximal field copy; optional **Cloners** issue link after create
 - Per-site `create_project`, `create_issue_type`, `create_clone_link`, `clone_link_type`; global `[create].clone_summary_prefix`
+- Issue **templates** (`N`) via `[[create.templates]]` — pre-filled create with minimal summary/description edits
 
 ## [0.6.9] - 2026-05-29
 

@@ -11,6 +11,7 @@ pub fn draw_create_picker(f: &mut Frame, app: &App, area: ratatui::layout::Rect)
         CreateStep::Site => ("Create — site", "Choose Jira site"),
         CreateStep::Project => ("Create — project", "Choose project (p to reopen)"),
         CreateStep::IssueType => ("Create — type", "Choose issue type (t to reopen)"),
+        CreateStep::Template => ("Create — template", "Pre-filled issue; edit summary next"),
         _ => ("Create", ""),
     };
     super::field_picker::draw_field_picker(
