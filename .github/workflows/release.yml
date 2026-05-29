@@ -38,8 +38,9 @@ jobs:
 
       - name: Package
         run: |
-          install -Dm755 "target/${{ matrix.target }}/release/tick" "dist/${{ matrix.asset }}"
-          chmod +x "dist/${{ matrix.asset }}"
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/tick" "dist/${{ matrix.asset }}"
+          chmod 755 "dist/${{ matrix.asset }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
