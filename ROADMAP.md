@@ -19,6 +19,7 @@
 
 | Item | Notes |
 |------|------|
+| **Create & duplicate issues (v0.7.0)** | `n` new, `C` maximal clone; spec [docs/specs/2026-05-29-create-issue-design.md](docs/specs/2026-05-29-create-issue-design.md) |
 | Richer transition fields | Multi-select, components, rich text (web UI today) |
 | User picker `j`/`k` vs typing | Names like “Jack” when list is open |
 | Jira Server / Data Center | Out of scope unless demand |
