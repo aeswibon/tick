@@ -61,7 +61,7 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
             " Jira Actions",
             Style::default().add_modifier(Modifier::UNDERLINED),
         )),
-        Line::from("  t                      Transition ticket status"),
+        Line::from("  t / T                  Change status (workflow transition picker)"),
         Line::from("  c                      Add comment (@ tags users)"),
         Line::from("  w                      Log work time"),
         Line::from("  a / u                  Assign to me / unassign (detail open)"),

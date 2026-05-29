@@ -163,7 +163,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             app.theme.loading_fg,
         )
     } else {
-        let mut left = " ? help  / filter  ! errors  j/k  s/S sort  y copy  o/O open  t trans  [ ] scroll  ←/→ view  1-5 tabs  q quit".to_string();
+        let mut left = " ? help  / filter  ! errors  j/k  s/S sort  y copy  o/O open  t/T status  [ ] scroll  ←/→ view  1-5 tabs  q quit".to_string();
         if app.detail_open {
             left.push_str("  S/P/L/M/D fields  h/l tabs");
         }

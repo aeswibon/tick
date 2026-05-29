@@ -150,7 +150,7 @@ pub struct App {
     pub show_help: bool,
     pub showing_transitions: bool,
     pub transition_selected: usize,
-    pub transition_options: Vec<(String, String)>,
+    pub transition_options: Vec<crate::api::types::WorkflowTransition>,
     pub showing_priorities: bool,
     pub priority_selected: usize,
     pub priority_options: Vec<(String, String)>,

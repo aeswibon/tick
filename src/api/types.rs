@@ -8,6 +8,28 @@ pub struct CachedView {
     pub tickets: Vec<Ticket>,
 }
 
+/// A Jira workflow transition (the only supported way to change issue status).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkflowTransition {
+    pub id: String,
+    /// Workflow action label (e.g. "Start Progress").
+    pub name: String,
+    /// Target status after the transition (e.g. "In Progress").
+    pub to_status: String,
+}
+
+impl WorkflowTransition {
+    pub fn label(&self) -> String {
+        if self.to_status.is_empty() {
+            self.name.clone()
+        } else if self.name.eq_ignore_ascii_case(&self.to_status) {
+            self.to_status.clone()
+        } else {
+            format!("{} → {}", self.name, self.to_status)
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Ticket {
     pub key: String,

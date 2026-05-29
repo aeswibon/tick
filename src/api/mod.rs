@@ -1,6 +1,7 @@
 pub mod adf;
 pub mod adf_export;
 pub mod agile;
+pub mod jira_error;
 pub mod markdown;
 pub mod retry;
 pub mod types;
@@ -420,68 +421,59 @@ impl JiraClient {
         Ok(data.issues)
     }
 
-    pub async fn get_transition_options(
+    /// List workflow transitions available for the issue (status changes go through these).
+    pub async fn get_workflow_transitions(
         &self,
         base_url: &str,
         key: &str,
-    ) -> Result<Vec<(String, String)>, String> {
+    ) -> Result<Vec<types::WorkflowTransition>, String> {
         let url = format!(
-            "{}/rest/api/3/issue/{}/transitions",
+            "{}/rest/api/3/issue/{}/transitions?expand=transitions.fields",
             base_url.trim_end_matches('/'),
             key
         );
         let resp = self.send(|| self.get(&url).send()).await?;
 
-        if !resp.status().is_success() {
-            return Err(format!(
-                "Transitions API {}: {}",
-                resp.status(),
-                resp.text().await.unwrap_or_default()
-            ));
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        if !status.is_success() {
+            return Err(jira_error::format_response_error(status, &body));
         }
 
-        let text = resp
-            .text()
-            .await
-            .map_err(|e| format!("Read error: {}", e))?;
         let data: serde_json::Value =
-            serde_json::from_str(&text).map_err(|e| format!("Parse error: {}", e))?;
-        Ok(data["transitions"]
-            .as_array()
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|t| {
-                        let id = t["id"].as_str()?;
-                        let name = t["name"].as_str()?;
-                        Some((id.to_string(), name.to_string()))
-                    })
-                    .collect()
-            })
-            .unwrap_or_default())
+            serde_json::from_str(&body).map_err(|e| format!("Parse transitions: {e}"))?;
+        Ok(parse_workflow_transitions(&data))
     }
 
     pub async fn transition_issue(
         &self,
         base_url: &str,
         key: &str,
-        transition_id: &str,
+        transition: &types::WorkflowTransition,
     ) -> Result<(), String> {
         let url = format!(
             "{}/rest/api/3/issue/{}/transitions",
             base_url.trim_end_matches('/'),
             key
         );
-        let payload = serde_json::json!({ "transition": { "id": transition_id } });
+        let payload = serde_json::json!({ "transition": { "id": transition.id } });
         let resp = self.send(|| self.post(&url).json(&payload).send()).await?;
 
-        if resp.status().is_success() {
-            Ok(())
-        } else {
-            Err(format!(
-                "Transition failed: {}",
-                resp.text().await.unwrap_or_default()
-            ))
+        let status = resp.status();
+        if status.is_success() {
+            return Ok(());
         }
+        let body = resp.text().await.unwrap_or_default();
+        let detail = jira_error::format_response_error(status, &body);
+        Err(format!(
+            "Cannot apply \"{}\"{}: {detail}",
+            transition.name,
+            if transition.to_status.is_empty() {
+                String::new()
+            } else {
+                format!(" → {}", transition.to_status)
+            },
+        ))
     }
 
     pub async fn search_assignable_users(
@@ -584,6 +576,31 @@ impl JiraClient {
             ))
         }
     }
+}
+
+fn parse_workflow_transitions(data: &serde_json::Value) -> Vec<types::WorkflowTransition> {
+    data["transitions"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|t| {
+                    let id = t["id"].as_str()?.to_string();
+                    let name = t["name"].as_str()?.to_string();
+                    let to_status = t
+                        .get("to")
+                        .and_then(|to| to.get("name"))
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    Some(types::WorkflowTransition {
+                        id,
+                        name,
+                        to_status,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 pub async fn fetch_all(
@@ -933,7 +950,7 @@ mod field_updates {
     }
 
     #[tokio::test]
-    async fn get_transition_options_parses_response() {
+    async fn get_workflow_transitions_parses_target_status() {
         let server = wiremock::MockServer::start().await;
         wiremock::Mock::given(wiremock::matchers::method("GET"))
             .and(wiremock::matchers::path(
@@ -942,8 +959,8 @@ mod field_updates {
             .respond_with(
                 wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({
                     "transitions": [
-                        { "id": "21", "name": "Done" },
-                        { "id": "31", "name": "In Progress" }
+                        { "id": "21", "name": "Done", "to": { "name": "Done" } },
+                        { "id": "31", "name": "Start Progress", "to": { "name": "In Progress" } }
                     ]
                 })),
             )
@@ -952,16 +969,12 @@ mod field_updates {
 
         let client = JiraClient::new("u@example.com", "token", false);
         let options = client
-            .get_transition_options(&server.uri(), "DEMO-1")
+            .get_workflow_transitions(&server.uri(), "DEMO-1")
             .await
             .unwrap();
-        assert_eq!(
-            options,
-            vec![
-                ("21".into(), "Done".into()),
-                ("31".into(), "In Progress".into()),
-            ]
-        );
+        assert_eq!(options.len(), 2);
+        assert_eq!(options[0].to_status, "Done");
+        assert_eq!(options[1].label(), "Start Progress → In Progress");
     }
 
     #[tokio::test]
@@ -979,10 +992,44 @@ mod field_updates {
             .await;
 
         let client = JiraClient::new("u@example.com", "token", false);
+        let tr = types::WorkflowTransition {
+            id: "21".into(),
+            name: "Done".into(),
+            to_status: "Done".into(),
+        };
         client
-            .transition_issue(&server.uri(), "DEMO-1", "21")
+            .transition_issue(&server.uri(), "DEMO-1", &tr)
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn workflow_transition_reports_validation_error() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path(
+                "/rest/api/3/issue/DEMO-1/transitions",
+            ))
+            .respond_with(
+                wiremock::ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                    "errorMessages": ["Resolution is required"],
+                    "errors": {}
+                })),
+            )
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        let tr = types::WorkflowTransition {
+            id: "21".into(),
+            name: "Done".into(),
+            to_status: "Done".into(),
+        };
+        let err = client
+            .transition_issue(&server.uri(), "DEMO-1", &tr)
+            .await
+            .unwrap_err();
+        assert!(err.contains("Resolution is required"));
     }
 
     #[tokio::test]

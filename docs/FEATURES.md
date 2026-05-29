@@ -255,7 +255,7 @@ All writes refresh views after success. Errors show in the footer.
 
 | Key | Action | Notes |
 |-----|--------|-------|
-| `t` | Status transition | Picker: `j`/`k`, `Enter`, `1`–`9` |
+| `t` / `T` | **Change status** (workflow) | See [§10.1](#101-status-workflow-transitions) |
 | `c` | Add comment | Markdown → ADF; `@` user picker |
 | `w` | Log work | Jira time format, e.g. `30m`, `1h` |
 | `a` | Assign to me | Uses `/myself` account id |
@@ -297,6 +297,28 @@ Rich Jira content in description/comments:
 - **Mentions**, links, emoji, hard breaks  
 - Tables, media attachments, expand sections  
 - Unknown blocks shown with a type label  
+
+### 10.1 Status (workflow transitions)
+
+Jira Cloud does **not** allow setting the status field directly. tick loads your project’s **workflow transitions** and applies one via the REST API.
+
+| Step | What happens |
+|------|----------------|
+| `t` or `T` | Fetches `GET /rest/api/3/issue/{key}/transitions` for the selected issue |
+| Picker | Lists each transition as **action → target status** (e.g. `Start Progress → In Progress`) |
+| `Enter` / `1`–`9` | `POST` with `{ "transition": { "id": "…" } }`, then refreshes the view |
+
+**When something is missing or invalid**, tick shows a footer error instead of silently failing:
+
+| Situation | Message |
+|-----------|---------|
+| No row selected | Select a ticket to change status |
+| Site not in config | Unknown site … — cannot change status |
+| API returns no transitions | No workflow transitions … (may be closed or your role cannot move it) |
+| Jira rejects the transition | Includes Jira `errorMessages` / field `errors` (e.g. resolution required, required fields) |
+| Auth / not found | HTTP context + parsed Jira body when available |
+
+Works from the **table** or **detail pane** (same as `c` / `w`).
 
 ---
 

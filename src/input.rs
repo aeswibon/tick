@@ -399,16 +399,21 @@ async fn apply_transition(app: &mut App, idx: usize) {
     if idx >= app.transition_options.len() {
         return;
     }
-    let (trans_id, _) = app.transition_options[idx].clone();
+    let transition = app.transition_options[idx].clone();
     let Some(sel) = app.selected_ticket() else {
+        app.status.set_action_error("Select a ticket first");
         return;
     };
     let Some(base_url) = app.site_base_url(&sel.site) else {
+        app.status
+            .set_action_error(format!("Unknown site {:?} for ticket", sel.site));
         return;
     };
+    app.loading = true;
+    app.loading_message = Some(format!("Applying {}…", transition.label()));
     match app
         .jira
-        .transition_issue(&base_url, &sel.key, &trans_id)
+        .transition_issue(&base_url, &sel.key, &transition)
         .await
     {
         Ok(()) => {
@@ -420,6 +425,8 @@ async fn apply_transition(app: &mut App, idx: usize) {
             app.showing_transitions = false;
         }
     }
+    app.loading = false;
+    app.loading_message = None;
 }
 
 async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
@@ -510,7 +517,7 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('3') => app.switch_to(ViewMode::Mentions).await,
         KeyCode::Char('4') => app.switch_to(ViewMode::Watching).await,
         KeyCode::Char('5') => app.switch_to(ViewMode::Sprint).await,
-        KeyCode::Char('t') => start_transition_picker(app).await,
+        KeyCode::Char('t') | KeyCode::Char('T') => start_status_picker(app).await,
         KeyCode::Char('c') if app.detail_open => {
             app.input_mode = InputMode::Comment;
             app.input_buffer.clear();
@@ -670,20 +677,42 @@ async fn start_sprint_picker(app: &mut App) {
     }
 }
 
-async fn start_transition_picker(app: &mut App) {
+async fn start_status_picker(app: &mut App) {
     let Some(sel) = app.selected_ticket() else {
+        app.status
+            .set_action_error("Select a ticket to change status");
         return;
     };
     let Some(base_url) = app.site_base_url(&sel.site) else {
+        app.status.set_action_error(format!(
+            "Unknown site {:?} in config — cannot change status for {}",
+            sel.site, sel.key
+        ));
         return;
     };
-    match app.jira.get_transition_options(&base_url, &sel.key).await {
+    let current_status = app
+        .selected_ticket_entry()
+        .map(|t| t.status.clone())
+        .unwrap_or_else(|| "Unknown".into());
+
+    app.loading = true;
+    app.loading_message = Some("Loading workflow transitions…".into());
+    let result = app.jira.get_workflow_transitions(&base_url, &sel.key).await;
+    app.loading = false;
+    app.loading_message = None;
+
+    match result {
         Ok(options) if !options.is_empty() => {
             app.transition_options = options;
             app.transition_selected = 0;
             app.showing_transitions = true;
         }
-        Ok(_) => app.status.set_action_error("No transitions available"),
+        Ok(_) => {
+            app.status.set_action_error(format!(
+                "No workflow transitions for {} (status: \"{}\"). The issue may be closed, or your role cannot move it in this workflow.",
+                sel.key, current_status
+            ));
+        }
         Err(e) => app.status.set_action_error(e),
     }
 }

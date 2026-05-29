@@ -12,6 +12,7 @@
 | **0.6.5** | `cargo-deny` in CI; clippy fix for async ticket resolve |
 | **0.6.6** | [FEATURES.md](docs/FEATURES.md); offline header; open-ticket progress; API wiremock tests |
 | **0.6.7** | ADF round-trip (`adf-json` fences, lists, strike); mention restore on `D` |
+| **0.6.8** | Status via workflow transitions; Jira validation errors; `T` alias |
 
 ## Next — product
 

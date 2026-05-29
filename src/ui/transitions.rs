@@ -8,21 +8,31 @@ use ratatui::{
 };
 
 pub fn draw_transitions(f: &mut Frame, app: &App, area: Rect) {
-    let popup = centered_rect(50, app.transition_options.len() as u16 + 4, area);
+    let height = (app.transition_options.len() as u16).saturating_add(6);
+    let popup = centered_rect(58, height.min(area.height.saturating_sub(2)), area);
     f.render_widget(Clear, popup);
 
     let dl = app.theme.detail_label;
     let dv = app.theme.detail_value;
 
+    let current = app
+        .selected_ticket_entry()
+        .map(|t| format!("{} — {}", t.key, t.status))
+        .unwrap_or_else(|| "Change status".to_string());
+
     let mut lines = vec![
         Line::from(Span::styled(
-            " Select transition",
+            format!(" {current}"),
             Style::default().fg(dl).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            " Workflow transition (Jira does not allow setting status directly)",
+            Style::default().fg(app.theme.border),
         )),
         Line::from(""),
     ];
 
-    for (i, (_, name)) in app.transition_options.iter().enumerate() {
+    for (i, tr) in app.transition_options.iter().enumerate() {
         let selected = i == app.transition_selected;
         let num_style = if selected {
             Style::default()
@@ -40,7 +50,7 @@ pub fn draw_transitions(f: &mut Frame, app: &App, area: Rect) {
         lines.push(Line::from(vec![
             Span::raw(format!(" {marker} ")),
             Span::styled(format!("{}. ", i + 1), num_style),
-            Span::styled(name.as_str(), name_style),
+            Span::styled(tr.label(), name_style),
         ]));
     }
 
@@ -54,7 +64,7 @@ pub fn draw_transitions(f: &mut Frame, app: &App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" Transition ")
+                .title(" Status ")
                 .border_style(Style::default().fg(app.theme.detail_border)),
         )
         .wrap(Wrap { trim: false });

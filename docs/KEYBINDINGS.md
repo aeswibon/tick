@@ -18,7 +18,7 @@
 | `o` | Open selected issue in browser |
 | `O` | Open issue from clipboard, or paste key/URL (`Enter` to open); multi-site: checks each instance via API |
 | `e` | Open config file in editor |
-| `t` | Status transition picker |
+| `t` / `T` | Change status (workflow transition picker) |
 | `!` | Site errors overlay (when warnings exist) |
 | `←` / `→` or `Tab` / `Shift+Tab` | Cycle view tab |
 | `1`–`5` | Jump to Assigned / Updated / Mentions / Watched / Sprint |
@@ -42,7 +42,7 @@
 
 | Context | Keys |
 |---------|------|
-| Transition picker | `j`/`k`, `Enter`, `1`–`9`, `Esc` |
+| Status / transition picker | `j`/`k`, `Enter`, `1`–`9`, `Esc` — shows action → target status |
 | Priority picker | `j`/`k`, `Enter`, `1`–`9`, `Esc` |
 | Sprint picker | `j`/`k`, `Enter`, `1`–`9`, `Esc` |
 | Site errors | `j`/`k`, `!` or `Esc` close |

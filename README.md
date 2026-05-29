@@ -78,7 +78,7 @@ tick --list-themes        # List themes
 | `/`, `s`, `S` | Filter / sort field / sort direction |
 | `o`, `O` | Open selected / open from clipboard or key |
 | `Enter`, `h`/`l` | Detail pane / tabs |
-| `t`, `c`, `w` | Transition, comment, worklog |
+| `t`/`T`, `c`, `w` | Status (workflow), comment, worklog |
 | `S`, `P`, `L`, `M`, `D` | Edit summary, priority, labels, sprint, description |
 | `1`–`5` | View tabs |
 | `?` | Help |

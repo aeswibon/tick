@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.8] - 2026-05-29
+
+### Added
+
+- Status picker (`t` / `T`) shows workflow transitions as **action → target status**
+- Jira error parsing for failed transitions (`errorMessages`, field `errors`)
+
+### Changed
+
+- Transitions API uses `get_workflow_transitions` with target status from `to.name`
+- Clear errors when no ticket, unknown site, empty transitions, or workflow validation fails
+
 ## [0.6.7] - 2026-05-29
 
 ### Added
