@@ -24,6 +24,29 @@ pub struct TicketRef {
     pub link: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SortOrder {
+    #[default]
+    Asc,
+    Desc,
+}
+
+impl SortOrder {
+    pub fn toggle(self) -> Self {
+        match self {
+            Self::Asc => Self::Desc,
+            Self::Desc => Self::Asc,
+        }
+    }
+
+    pub fn suffix(self) -> &'static str {
+        match self {
+            Self::Asc => "↑",
+            Self::Desc => "↓",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SortMode {
     Default,
@@ -51,6 +74,14 @@ impl SortMode {
             Self::Priority => "priority",
             Self::Status => "status",
             Self::Key => "key",
+        }
+    }
+
+    pub fn display(self, order: SortOrder) -> String {
+        if self == Self::Default {
+            self.label().to_string()
+        } else {
+            format!("{} {}", self.label(), order.suffix())
         }
     }
 }
@@ -93,6 +124,7 @@ pub enum InputMode {
 struct FilterCache {
     filter: String,
     sort_mode: SortMode,
+    sort_order: SortOrder,
     ticket_count: usize,
     indices: Vec<usize>,
 }
@@ -127,6 +159,7 @@ pub struct App {
     pub filter: String,
     pub filtering: bool,
     pub sort_mode: SortMode,
+    pub sort_order: SortOrder,
     pub input_mode: InputMode,
     pub input_buffer: String,
     /// `@` mention picker while composing a comment.
@@ -188,6 +221,7 @@ impl App {
             filter: String::new(),
             filtering: false,
             sort_mode: SortMode::Default,
+            sort_order: SortOrder::default(),
             input_mode: InputMode::None,
             input_buffer: String::new(),
             showing_mention_picker: false,
@@ -594,18 +628,21 @@ impl App {
         if let Some(cache) = self.filter_cache.borrow().as_ref() {
             if cache.filter == self.filter
                 && cache.sort_mode == self.sort_mode
+                && cache.sort_order == self.sort_order
                 && cache.ticket_count == ticket_count
             {
                 return cache.indices.clone();
             }
         }
 
-        let indices = compute_filtered_indices(&tickets, &self.filter, self.sort_mode);
+        let indices =
+            compute_filtered_indices(&tickets, &self.filter, self.sort_mode, self.sort_order);
         drop(tickets);
 
         *self.filter_cache.borrow_mut() = Some(FilterCache {
             filter: self.filter.clone(),
             sort_mode: self.sort_mode,
+            sort_order: self.sort_order,
             ticket_count,
             indices: indices.clone(),
         });
@@ -631,6 +668,7 @@ impl App {
         if let Some(cache) = self.filter_cache.borrow().as_ref() {
             if cache.filter == self.filter
                 && cache.sort_mode == self.sort_mode
+                && cache.sort_order == self.sort_order
                 && cache.ticket_count == ticket_count
             {
                 return cache.indices.len();
@@ -722,7 +760,12 @@ fn same_ticket_keys(previous: &[String], tickets: &[Ticket]) -> bool {
     a == b
 }
 
-fn compute_filtered_indices(tickets: &[Ticket], filter: &str, sort_mode: SortMode) -> Vec<usize> {
+fn compute_filtered_indices(
+    tickets: &[Ticket],
+    filter: &str,
+    sort_mode: SortMode,
+    sort_order: SortOrder,
+) -> Vec<usize> {
     let mut indices: Vec<usize> = if filter.is_empty() {
         (0..tickets.len()).collect()
     } else {
@@ -772,6 +815,10 @@ fn compute_filtered_indices(tickets: &[Ticket], filter: &str, sort_mode: SortMod
             indices.sort_by(|&a, &b| tickets[a].status.cmp(&tickets[b].status));
         }
         SortMode::Key => indices.sort_by(|&a, &b| tickets[a].key.cmp(&tickets[b].key)),
+    }
+
+    if sort_mode != SortMode::Default && sort_order == SortOrder::Desc {
+        indices.reverse();
     }
 
     indices
@@ -849,8 +896,21 @@ mod tests {
         t1.labels = vec!["backend".into()];
         let t2 = sample_ticket("A-2", "two", "Open");
         let tickets = vec![t1, t2];
-        let idx = compute_filtered_indices(&tickets, "backend", SortMode::Default);
+        let idx = compute_filtered_indices(&tickets, "backend", SortMode::Default, SortOrder::Asc);
         assert_eq!(idx, vec![0]);
+    }
+
+    #[test]
+    fn sort_order_reverses_age() {
+        let mut t0 = sample_ticket("A-1", "old", "Open");
+        t0.ageing_days = 10;
+        let mut t1 = sample_ticket("A-2", "new", "Open");
+        t1.ageing_days = 1;
+        let list = [t0, t1];
+        let asc = compute_filtered_indices(&list, "", SortMode::Age, SortOrder::Asc);
+        let desc = compute_filtered_indices(&list, "", SortMode::Age, SortOrder::Desc);
+        assert_eq!(asc, vec![1, 0]);
+        assert_eq!(desc, vec![0, 1]);
     }
 
     #[test]
@@ -859,7 +919,7 @@ mod tests {
             sample_ticket("A-1", "login bug", "Open"),
             sample_ticket("A-2", "billing", "Open"),
         ];
-        let idx = compute_filtered_indices(&tickets, "login", SortMode::Default);
+        let idx = compute_filtered_indices(&tickets, "login", SortMode::Default, SortOrder::Asc);
         assert_eq!(idx, vec![0]);
     }
 

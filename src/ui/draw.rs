@@ -154,7 +154,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             app.theme.loading_fg,
         )
     } else {
-        let mut left = " ? help  / filter  ! errors  j/k  s sort  y copy  t trans  [ ] scroll  ←/→ view  1-5 tabs  q quit".to_string();
+        let mut left = " ? help  / filter  ! errors  j/k  s/S sort  y copy  t trans  [ ] scroll  ←/→ view  1-5 tabs  q quit".to_string();
         if app.detail_open {
             left.push_str("  S/P/L/M/D fields  h/l tabs");
         }
@@ -164,7 +164,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         let right = format!(
             " {} | {row}/{total} | Sort: {}{cache}",
             app.active_view.label(),
-            app.sort_mode.label(),
+            app.sort_mode.display(app.sort_order),
         );
         (format!("{left:<72}{right}"), app.theme.footer_fg)
     };

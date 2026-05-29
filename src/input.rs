@@ -416,6 +416,13 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             app.go_to_first();
             app.invalidate_filter_cache();
         }
+        KeyCode::Char('S') if !app.detail_open => {
+            if app.sort_mode != crate::app::SortMode::Default {
+                app.sort_order = app.sort_order.toggle();
+                app.go_to_first();
+                app.invalidate_filter_cache();
+            }
+        }
         KeyCode::Char('h') if app.detail_open => {
             app.detail_tab = app.detail_tab.prev();
         }

@@ -11,7 +11,8 @@
 | `Esc` | Close pane, overlay, or cancel input |
 | `?` | Help overlay |
 | `/` | Filter tickets (matches key, summary, status, assignee, labels, sprint, parent) |
-| `s` | Cycle sort: default → age → priority → status → key |
+| `s` | Cycle sort field: default → age → priority → status → key |
+| `S` | Toggle sort **asc** ↑ / **desc** ↓ (table only; not in detail pane) |
 | `r` | Refresh current view from Jira |
 | `y` | Copy issue key to clipboard |
 | `o` | Open issue in browser |

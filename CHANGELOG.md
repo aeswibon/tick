@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.3] - 2026-05-29
+
+### Added
+
+- Sort direction: `S` toggles ascending ↑ / descending ↓ (with `s` for sort field)
+
 ## [0.6.2] - 2026-05-29
 
 ### Changed
