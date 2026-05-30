@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.15.1] - 2026-05-30
+
+### Changed
+
+- **CI** — `cargo fmt` applied (no user-facing code changes)
+
 ## [0.15.0] - 2026-05-30
 
 ### Added
