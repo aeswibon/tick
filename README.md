@@ -43,7 +43,8 @@ Jira’s web UI is powerful but slow for **daily triage**: too many clicks to mo
 | **Multi-site** | Several `*.atlassian.net` instances in one table |
 | **Triage** | Filter, sort, virtualized scroll, detail pane (summary / description / comments) |
 | **Write-back** | Transitions, comments, worklogs, summary, priority, labels, description, sprint |
-| **Create** | New issue (`n`), template (`N`), duplicate (`C`), export template (`X`) |
+| **Create** | New (`n`), template (`N`), duplicate (`C`), export (`X`), manage templates (`Shift+E`) |
+| **Views+** | Custom JQL tabs (`7`–`9`), Closed search persist, custom field columns |
 | **Offline** | Per-view disk cache; `live` / `cached` / `offline` header |
 | **Themes** | Built-in + custom TOML — [`themes/`](themes/) |
 
@@ -80,7 +81,9 @@ base_url = "https://my-team.atlassian.net"
 |------|--------|
 | `j` / `k`, `g` / `G`, `[` / `]` | Navigate / scroll |
 | `1`–`6` | Assigned · Mentions · Watched · Updated · Sprint · Closed |
-| `/` | Filter (or JQL search on Closed tab) |
+| `7`–`9`, `v` | Custom JQL views (config) |
+| `/` | Filter (Closed: JQL search); `f` = local filter on Closed results |
+| `Shift+E` | Edit/delete config templates |
 | `Enter` | Detail pane (Links tab: jump to link/subtask) |
 | `t` / `T`, `c`, `w` | Status transition, comment, worklog |
 | `W` / `Shift+W` | Watch / unwatch issue |

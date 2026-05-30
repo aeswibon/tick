@@ -7,6 +7,13 @@ use std::path::{Path, PathBuf};
 use crate::api::types::{CachedView, Ticket};
 use crate::view_mode::ViewMode;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ClosedPrefs {
+    pub query: String,
+    pub ever_assigned: bool,
+}
 
 pub struct ViewCache {
     pub(crate) dir: PathBuf,
@@ -65,6 +72,45 @@ impl ViewCache {
     fn path_for(&self, mode: ViewMode) -> PathBuf {
         self.dir.join(format!("{}.json", mode.cache_key()))
     }
+
+    fn custom_path(&self, slug: &str) -> PathBuf {
+        self.dir.join(format!("custom-{slug}.json"))
+    }
+
+    pub fn load_custom_view(&self, slug: &str) -> Option<Vec<Ticket>> {
+        let content = fs::read_to_string(self.custom_path(slug)).ok()?;
+        serde_json::from_str::<CachedView>(&content)
+            .ok()
+            .map(|c| c.tickets)
+    }
+
+    pub fn save_custom_view(&self, slug: &str, tickets: &[Ticket]) {
+        let cached = CachedView {
+            fetched_at: chrono::Utc::now().to_rfc3339(),
+            tickets: tickets.to_vec(),
+        };
+        if let Ok(content) = serde_json::to_string(&cached) {
+            let _ = fs::write(self.custom_path(slug), content);
+        }
+    }
+
+    pub fn closed_prefs_path(&self) -> PathBuf {
+        self.dir.join("closed_prefs.json")
+    }
+
+    pub fn load_closed_prefs(&self) -> ClosedPrefs {
+        let path = self.closed_prefs_path();
+        let Ok(content) = fs::read_to_string(path) else {
+            return ClosedPrefs::default();
+        };
+        serde_json::from_str(&content).unwrap_or_default()
+    }
+
+    pub fn save_closed_prefs(&self, prefs: &ClosedPrefs) {
+        if let Ok(content) = serde_json::to_string(prefs) {
+            let _ = fs::write(self.closed_prefs_path(), content);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -95,6 +141,7 @@ mod tests {
             labels: vec![],
             sprint_name: None,
             project_key: String::new(),
+            custom_fields: std::collections::HashMap::new(),
         }
     }
 

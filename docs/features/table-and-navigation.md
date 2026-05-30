@@ -36,6 +36,9 @@ Footer shows `row/total` and sort mode when applicable.
 - Labels  
 - Sprint name (if column configured)  
 - Parent key  
+- Custom field column values (`customfield_*` in config)
+
+On the **Closed** tab, use **`f`** (not `/`) to filter already-fetched results locally.
 
 ### Example
 
@@ -92,6 +95,7 @@ columns = ["site", "key", "labels", "sprint", "summary", "status", "assignee"]
 | `labels` | `label` | Labels |
 | `sprint` | | Sprint name (needs `sprint_field`) |
 | `summary` | | Summary |
+| `customfield_*` | | Read-only custom field (discover id via Jira or `tick --doctor`) |
 
 Sprint column requires:
 

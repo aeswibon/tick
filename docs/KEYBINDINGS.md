@@ -38,7 +38,11 @@ For workflows and examples, see the [feature guides](features/README.md).
 | `4` | **Updated** tab | |
 | `5` | **Sprint** tab | |
 | `6` | **Closed** tab | On-demand search |
+| `7`–`9` | **Custom JQL** views | When `[[views.custom]]` configured |
+| `v` / `Shift+V` | Cycle custom views | Wraps through `views.custom` |
+| `Shift+E` | Template manager | Edit/delete config templates |
 | `h` | **Closed tab only:** toggle assignee / ever-assigned | Re-runs search if query set |
+| `f` | **Closed tab only:** local filter | After fetch; does not call Jira |
 | `n` | New issue wizard | |
 | `N` | New from template | |
 | `C` | Duplicate selected | |
@@ -62,10 +66,13 @@ Esc      # exit filter mode
 ```text
 6
 / refund api
-Enter    # JQL: ... AND text ~ "refund api" ...
+Enter    # JQL: ... AND text ~ "refund api" ... ; prefs saved to disk
+f pay    # local filter within results (no new JQL)
 h        # toggle assignee was currentUser()
 r        # repeat search
 ```
+
+Search text and `h` mode persist across restarts (`cache/closed_prefs.json`).
 
 ---
 

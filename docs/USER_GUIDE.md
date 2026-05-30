@@ -71,9 +71,10 @@ Press **`Enter`** on a row to open the **detail pane** (table shrinks to 60%, de
 | Watched | `3` | Issues you watch |
 | Updated | `4` | Assigned, updated last 7 days |
 | Sprint | `5` | Your work in open sprints |
-| Closed | `6` | Done issues — press `/` to search (`h` = ever-assigned history) |
+| Closed | `6` | Done issues — `/` JQL search; `f` local filter; `h` ever-assigned |
+| Custom | `7`–`9` | Your `[[views.custom]]` JQL tabs (`v` cycles) |
 
-Override any view with `[views]` in config — see [CONFIGURATION.md](CONFIGURATION.md#custom-jql-views).
+Override built-in views with `[views]` in config. Add extra tabs with `[[views.custom]]` — see [features/saved-views-templates-columns.md](features/saved-views-templates-columns.md).
 
 Each view is **cached** under `~/.config/tick/cache/`. On startup, tick loads cache immediately, then refreshes open tabs in the background (Closed is fetched when you search).
 

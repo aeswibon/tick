@@ -113,9 +113,20 @@ closed_history = "assignee was currentUser() AND statusCategory = Done"
 | `/` | Edit search text (`Enter` to fetch) |
 | `h` | Toggle assignee vs ever-assigned |
 | `r` | Re-run last search |
+| `f` | **Local filter** on fetched results (does not call Jira) |
 | `j`/`k`, `g`/`G` | Navigate results (after fetch) |
 
-**Note:** On tabs `1`–`5`, **`/`** is the **local** filter (key, summary, labels, etc.). Only on **Closed** does **`/`** trigger server-side JQL search.
+### Persisted search (v0.10+)
+
+Last Closed search text and **`h`** (ever-assigned) mode are saved to:
+
+`~/.config/tick/cache/closed_prefs.json`
+
+Restored on startup so you can press **`6`** and **`r`** without retyping.
+
+**Note:** On tabs `1`–`5`, **`/`** is the **local** filter. On **Closed**, **`/`** is server JQL search; use **`f`** for local filter after results load.
+
+See [saved-views-templates-columns.md](saved-views-templates-columns.md) for custom JQL tabs (`7`–`9`).
 
 ## Related
 

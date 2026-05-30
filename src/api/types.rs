@@ -56,6 +56,9 @@ pub struct Ticket {
     pub sprint_name: Option<String>,
     #[serde(default)]
     pub project_key: String,
+    /// Read-only custom field values keyed by field id (e.g. `customfield_10042`).
+    #[serde(default)]
+    pub custom_fields: HashMap<String, String>,
 }
 
 pub(crate) fn project_key_from_issue_key(key: &str) -> &str {
@@ -281,6 +284,7 @@ impl Ticket {
         site_name: &str,
         base_url: &str,
         sprint_field: Option<&str>,
+        custom_field_ids: &[&str],
     ) -> Self {
         let ageing_days = NaiveDate::parse_from_str(&issue.fields.created[..10], "%Y-%m-%d")
             .map(|d| (chrono::Utc::now().date_naive() - d).num_days())
@@ -356,7 +360,48 @@ impl Ticket {
             sprint_name: sprint_field
                 .and_then(|field| issue.fields.custom.get(field).and_then(extract_sprint_name)),
             project_key: issue.fields.project.key.clone(),
+            custom_fields: custom_field_ids
+                .iter()
+                .filter_map(|id| {
+                    issue
+                        .fields
+                        .custom
+                        .get(*id)
+                        .map(|v| (id.to_string(), format_custom_field_value(v)))
+                })
+                .collect(),
         }
+    }
+}
+
+/// Display string for a Jira custom field JSON value (read-only table column).
+pub fn format_custom_field_value(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Null => "-".to_string(),
+        serde_json::Value::String(s) if s.is_empty() => "-".to_string(),
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Array(arr) => {
+            let parts: Vec<String> = arr.iter().map(format_custom_field_value).collect();
+            let joined = parts
+                .into_iter()
+                .filter(|p| p != "-")
+                .collect::<Vec<_>>()
+                .join(", ");
+            if joined.is_empty() {
+                "-".to_string()
+            } else {
+                joined
+            }
+        }
+        serde_json::Value::Object(m) => m
+            .get("name")
+            .or_else(|| m.get("value"))
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .unwrap_or_else(|| "-".to_string()),
     }
 }
 
@@ -459,7 +504,8 @@ mod tests {
                 custom: HashMap::new(),
             },
         };
-        let ticket = Ticket::from_bulk_fetch(issue, "acme", "https://acme.atlassian.net", None);
+        let ticket =
+            Ticket::from_bulk_fetch(issue, "acme", "https://acme.atlassian.net", None, &[]);
         assert_eq!(ticket.key, "PROJ-1");
         assert_eq!(ticket.site, "acme");
         assert_eq!(ticket.status, "In Progress");
@@ -516,6 +562,7 @@ mod tests {
             "acme",
             "https://acme.atlassian.net",
             Some("customfield_10020"),
+            &["customfield_10020"],
         );
         assert_eq!(ticket.sprint_name.as_deref(), Some("Board Sprint"));
     }

@@ -456,6 +456,7 @@ impl JiraClient {
         base_url: &str,
         ids: &[String],
         sprint_field: Option<&str>,
+        custom_field_ids: &[String],
     ) -> Result<Vec<BulkFetchIssue>, String> {
         if ids.is_empty() {
             return Ok(Vec::new());
@@ -483,6 +484,11 @@ impl JiraClient {
         if let Some(sf) = sprint_field {
             if !fields.contains(&sf) {
                 fields.push(sf);
+            }
+        }
+        for cf in custom_field_ids {
+            if !fields.iter().any(|f| f == cf) {
+                fields.push(cf.as_str());
             }
         }
 
@@ -1001,11 +1007,14 @@ pub async fn fetch_all(
     client: &JiraClient,
     config: &Config,
     jql: &str,
+    site_filter: Option<&str>,
+    custom_field_ids: &[String],
 ) -> (Vec<Ticket>, Vec<String>) {
     let mut all = Vec::new();
     let mut errors = Vec::new();
+    let cf_refs: Vec<&str> = custom_field_ids.iter().map(String::as_str).collect();
 
-    for site in &config.sites {
+    for site in config.sites_for_fetch(site_filter) {
         if client.debug {
             eprintln!("[DEBUG] Processing site: {} ({})", site.name, site.base_url);
         }
@@ -1022,7 +1031,10 @@ pub async fn fetch_all(
         };
 
         let sprint_field = site.sprint_field.as_deref();
-        match client.bulk_fetch(&site.base_url, &ids, sprint_field).await {
+        match client
+            .bulk_fetch(&site.base_url, &ids, sprint_field, custom_field_ids)
+            .await
+        {
             Ok(issues) => {
                 for issue in issues {
                     all.push(Ticket::from_bulk_fetch(
@@ -1030,6 +1042,7 @@ pub async fn fetch_all(
                         &site.name,
                         &site.base_url,
                         sprint_field,
+                        &cf_refs,
                     ));
                 }
             }
@@ -1110,7 +1123,7 @@ mod fetch_integration {
         let config = test_config(&server.uri());
         let client = JiraClient::new("user@example.com", "token", false);
         let jql = config.jql_for(crate::view_mode::ViewMode::MyIssues);
-        let (tickets, errors) = fetch_all(&client, &config, jql).await;
+        let (tickets, errors) = fetch_all(&client, &config, jql, None, &[]).await;
 
         assert!(errors.is_empty(), "{errors:?}");
         assert_eq!(tickets.len(), 1);

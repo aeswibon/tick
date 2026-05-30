@@ -44,6 +44,9 @@ pub fn render(f: &mut Frame, app: &mut App) {
             super::template_export::draw_template_export(f, session, &app.theme, f.area());
         }
     }
+    if let Some(ref session) = app.template_manage {
+        super::template_manage::draw_template_manage(f, session, &app.theme, f.area());
+    }
     if app.showing_transitions {
         super::transitions::draw_transitions(f, app, f.area());
     }
@@ -143,7 +146,7 @@ fn render_tabs(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     let tabs = ViewMode::all();
     let mut tab_spans = Vec::new();
     for tab in tabs {
-        let is_active = tab == app.active_view;
+        let is_active = !app.is_custom_view_active() && tab == app.active_view;
         let label = tab.label();
         let style = if is_active {
             Style::default()
@@ -152,6 +155,26 @@ fn render_tabs(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         } else {
             Style::default().fg(app.theme.border)
         };
+        tab_spans.push(Span::styled(
+            if is_active {
+                format!(" [{label}]")
+            } else {
+                format!("  {label}")
+            },
+            style,
+        ));
+    }
+    for (key, index) in app.config.custom_view_keys() {
+        let is_active = app.custom_view_index == Some(index);
+        let name = app.config.views.custom[index].name.as_str();
+        let style = if is_active {
+            Style::default()
+                .fg(app.theme.accent)
+                .add_modifier(ratatui::style::Modifier::BOLD)
+        } else {
+            Style::default().fg(app.theme.border)
+        };
+        let label = format!("{key}:{name}");
         tab_spans.push(Span::styled(
             if is_active {
                 format!(" [{label}]")
@@ -242,6 +265,21 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             ),
             app.theme.accent,
         )
+    } else if app.input_mode == crate::app::InputMode::TemplateEditSummary {
+        (
+            format!(" Template summary (Enter): {}_", app.input_buffer),
+            app.theme.accent,
+        )
+    } else if app.input_mode == crate::app::InputMode::TemplateEditProject {
+        (
+            format!(" Template project (Enter): {}_", app.input_buffer),
+            app.theme.accent,
+        )
+    } else if app.input_mode == crate::app::InputMode::TemplateEditIssueType {
+        (
+            format!(" Template issue type (Enter): {}_", app.input_buffer),
+            app.theme.accent,
+        )
     } else if app.input_mode == crate::app::InputMode::ClosedSearchQuery {
         let scope = if app.closed_search_ever_assigned {
             "ever assigned"
@@ -270,7 +308,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         };
         (
             format!(
-                " Closed [{scope}]: \"{}\" — / refine · h scope · r refresh",
+                " Closed [{scope}]: \"{}\" — / refine · f filter results · h scope · r refresh",
                 app.closed_search_query
             ),
             app.theme.border,

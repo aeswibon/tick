@@ -11,4 +11,5 @@ pub mod priorities;
 pub mod sprints;
 mod table;
 pub mod template_export;
+pub mod template_manage;
 pub mod transitions;

@@ -135,6 +135,9 @@ pub enum InputMode {
     TemplateExportName,
     /// Closed tab: JQL text search in footer.
     ClosedSearchQuery,
+    TemplateEditSummary,
+    TemplateEditProject,
+    TemplateEditIssueType,
     /// Add issue link: target KEY after picking link type.
     AddIssueLinkTarget,
     /// Create subtask under current issue (summary only).
@@ -180,6 +183,7 @@ pub struct App {
     pub transition_collect: Option<TransitionCollect>,
     pub create_session: Option<crate::create_flow::CreateSession>,
     pub template_export: Option<crate::template_export_flow::TemplateExportSession>,
+    pub template_manage: Option<crate::template_manage_flow::TemplateManageSession>,
     pub showing_create_picker: bool,
     pub showing_transition_field: bool,
     /// True when the modal is showing a footer text prompt (no option list).
@@ -237,7 +241,11 @@ pub struct App {
     /// Viewport height in rows (set each frame from terminal size).
     pub table_viewport_rows: usize,
     pub active_view: ViewMode,
+    /// When set, table shows a `[[views.custom]]` JQL view instead of `active_view`.
+    pub custom_view_index: Option<usize>,
     pub view_cache: HashMap<ViewMode, Vec<Ticket>>,
+    pub custom_view_cache: HashMap<String, Vec<Ticket>>,
+    pub custom_field_ids: Vec<String>,
     cache: ViewCache,
     pub pending_bg_update: Arc<Mutex<Option<BgResult>>>,
     filter_cache: RefCell<Option<FilterCache>>,
@@ -247,7 +255,9 @@ impl App {
     pub fn new(config: Config, theme: Theme, jira: Arc<JiraClient>, debug: bool) -> Self {
         let cache = ViewCache::open();
         let columns = Column::resolve(config.columns.as_deref());
+        let custom_field_ids = Column::custom_field_ids(&columns);
         let page_size = config.page_size as usize;
+        let closed_prefs = cache.load_closed_prefs();
 
         let mut app = Self {
             tickets: Arc::new(RwLock::new(Vec::new())),
@@ -270,6 +280,7 @@ impl App {
             transition_collect: None,
             create_session: None,
             template_export: None,
+            template_manage: None,
             showing_create_picker: false,
             showing_transition_field: false,
             transition_field_text_mode: false,
@@ -296,8 +307,8 @@ impl App {
             live_data: false,
             filter: String::new(),
             filtering: false,
-            closed_search_query: String::new(),
-            closed_search_ever_assigned: false,
+            closed_search_query: closed_prefs.query,
+            closed_search_ever_assigned: closed_prefs.ever_assigned,
             sort_mode: SortMode::Default,
             sort_order: SortOrder::default(),
             input_mode: InputMode::None,
@@ -312,7 +323,10 @@ impl App {
             scroll_offset: 0,
             table_viewport_rows: 20,
             active_view: ViewMode::MyIssues,
+            custom_view_index: None,
             view_cache: HashMap::new(),
+            custom_view_cache: HashMap::new(),
+            custom_field_ids,
             cache,
             pending_bg_update: Arc::new(Mutex::new(None)),
             filter_cache: RefCell::new(None),
@@ -323,6 +337,39 @@ impl App {
 
     pub fn invalidate_filter_cache(&self) {
         *self.filter_cache.borrow_mut() = None;
+    }
+
+    pub fn is_custom_view_active(&self) -> bool {
+        self.custom_view_index.is_some()
+    }
+
+    pub fn active_custom_view(&self) -> Option<&crate::config::CustomView> {
+        self.custom_view_index
+            .and_then(|i| self.config.views.custom.get(i))
+    }
+
+    pub fn save_closed_prefs(&self) {
+        self.cache.save_closed_prefs(&crate::cache::ClosedPrefs {
+            query: self.closed_search_query.clone(),
+            ever_assigned: self.closed_search_ever_assigned,
+        });
+    }
+
+    /// `(jql, optional site name filter)`.
+    pub fn jql_for_current_fetch(&self) -> (String, Option<String>) {
+        if let Some(view) = self.active_custom_view() {
+            return (view.jql.clone(), view.site.clone());
+        }
+        if self.active_view == ViewMode::ClosedSearch {
+            return (
+                self.config.build_closed_search_jql(
+                    &self.closed_search_query,
+                    self.closed_search_ever_assigned,
+                ),
+                None,
+            );
+        }
+        (self.config.jql_for(self.active_view).to_string(), None)
     }
 
     pub fn site_base_url(&self, site_name: &str) -> Option<String> {
@@ -634,18 +681,11 @@ impl App {
         }
     }
 
-    pub fn jql_for_fetch(&self, mode: ViewMode) -> String {
-        if mode == ViewMode::ClosedSearch {
-            self.config.build_closed_search_jql(
-                &self.closed_search_query,
-                self.closed_search_ever_assigned,
-            )
-        } else {
-            self.config.jql_for(mode).to_string()
-        }
-    }
-
     pub async fn refresh(&mut self) {
+        if self.is_custom_view_active() {
+            self.refresh_custom_view().await;
+            return;
+        }
         if self.active_view == ViewMode::ClosedSearch && self.closed_search_query.trim().is_empty()
         {
             self.status.set_action_error(
@@ -654,10 +694,39 @@ impl App {
             return;
         }
         self.loading = true;
-        let jql = self.jql_for_fetch(self.active_view);
-        let (tickets, errors) = api::fetch_all(&self.jira, &self.config, &jql).await;
+        let (jql, site_filter) = self.jql_for_current_fetch();
+        let (tickets, errors) = api::fetch_all(
+            &self.jira,
+            &self.config,
+            &jql,
+            site_filter.as_deref(),
+            &self.custom_field_ids,
+        )
+        .await;
         self.view_cache.insert(self.active_view, tickets.clone());
         self.save_cache(self.active_view);
+        self.apply_fetch_result(tickets, errors, true);
+        self.loading = false;
+        self.last_refresh = Instant::now();
+        self.view_fetched_at = Some(Utc::now());
+    }
+
+    pub async fn refresh_custom_view(&mut self) {
+        let Some(view) = self.active_custom_view().cloned() else {
+            return;
+        };
+        self.loading = true;
+        let (tickets, errors) = api::fetch_all(
+            &self.jira,
+            &self.config,
+            &view.jql,
+            view.site.as_deref(),
+            &self.custom_field_ids,
+        )
+        .await;
+        let slug = view.cache_slug();
+        self.custom_view_cache.insert(slug.clone(), tickets.clone());
+        self.cache.save_custom_view(&slug, &tickets);
         self.apply_fetch_result(tickets, errors, true);
         self.loading = false;
         self.last_refresh = Instant::now();
@@ -711,12 +780,14 @@ impl App {
         views: &[ViewMode],
     ) -> Vec<(ViewMode, Vec<Ticket>, Vec<String>)> {
         let mut set = tokio::task::JoinSet::new();
+        let cf = self.custom_field_ids.clone();
         for &mode in views {
             let jira = Arc::clone(&self.jira);
             let config = self.config.clone();
+            let cf = cf.clone();
             set.spawn(async move {
                 let jql = config.jql_for(mode);
-                let (tickets, errors) = api::fetch_all(&jira, &config, jql).await;
+                let (tickets, errors) = api::fetch_all(&jira, &config, jql, None, &cf).await;
                 (mode, tickets, errors)
             });
         }
@@ -748,12 +819,14 @@ impl App {
         for (mode, tickets, errs) in results {
             self.view_cache.insert(mode, tickets.clone());
             self.save_cache(mode);
-            if mode == self.active_view {
+            if !self.is_custom_view_active() && mode == self.active_view {
                 active_tickets = Some(tickets);
             }
             all_errors.extend(errs);
         }
-        if let Some(tickets) = active_tickets {
+        if self.is_custom_view_active() {
+            self.status.set_site_warnings(all_errors);
+        } else if let Some(tickets) = active_tickets {
             let reset = !(preserve_ui && same_ticket_keys(&previous_keys, &tickets));
             self.apply_fetch_result(tickets, all_errors, reset);
             if preserve_ui && !reset {
@@ -771,6 +844,7 @@ impl App {
     pub fn spawn_background_refresh(&self) {
         let jira = self.jira.clone();
         let config = self.config.clone();
+        let custom_field_ids = self.custom_field_ids.clone();
         let pending = self.pending_bg_update.clone();
         let views: Vec<ViewMode> = ViewMode::background().to_vec();
         tokio::spawn(async move {
@@ -778,9 +852,10 @@ impl App {
             for mode in views.iter().copied() {
                 let jira = Arc::clone(&jira);
                 let config = config.clone();
+                let cf = custom_field_ids.clone();
                 set.spawn(async move {
                     let (tickets, errors) =
-                        api::fetch_all(&jira, &config, config.jql_for(mode)).await;
+                        api::fetch_all(&jira, &config, config.jql_for(mode), None, &cf).await;
                     (mode, tickets, errors)
                 });
             }
@@ -809,12 +884,14 @@ impl App {
             for (mode, tickets, errs) in results {
                 self.view_cache.insert(mode, tickets.clone());
                 self.save_cache(mode);
-                if mode == self.active_view {
+                if !self.is_custom_view_active() && mode == self.active_view {
                     active_tickets = Some(tickets);
                 }
                 all_errors.extend(errs);
             }
-            if let Some(tickets) = active_tickets {
+            if self.is_custom_view_active() {
+                self.status.set_site_warnings(all_errors);
+            } else if let Some(tickets) = active_tickets {
                 let selected_key = self.selected_ticket().map(|t| t.key);
                 let preserve_ui = same_ticket_keys(&previous_keys, &tickets);
                 self.apply_fetch_result(tickets, all_errors, !preserve_ui);
@@ -834,7 +911,56 @@ impl App {
         }
     }
 
+    pub async fn switch_to_custom(&mut self, index: usize) {
+        if index >= self.config.views.custom.len() {
+            return;
+        }
+        self.custom_view_index = Some(index);
+        self.active_view = ViewMode::MyIssues;
+        self.filter.clear();
+        self.filtering = false;
+        let view = &self.config.views.custom[index];
+        let slug = view.cache_slug();
+        if let Some(cached) = self.custom_view_cache.get(&slug).cloned() {
+            write_tickets(&self.tickets).clone_from(&cached);
+            self.loading = false;
+            self.live_data = false;
+            self.invalidate_filter_cache();
+            self.scroll_offset = 0;
+            self.selected = 0;
+            self.detail_open = false;
+            return;
+        }
+        if let Some(tickets) = self.cache.load_custom_view(&slug) {
+            write_tickets(&self.tickets).clone_from(&tickets);
+            self.custom_view_cache.insert(slug, tickets);
+            self.loading = false;
+            self.live_data = false;
+            self.invalidate_filter_cache();
+            self.scroll_offset = 0;
+            self.selected = 0;
+            self.detail_open = false;
+            return;
+        }
+        self.refresh_custom_view().await;
+        self.detail_open = false;
+    }
+
+    pub async fn cycle_custom_view(&mut self, next: bool) {
+        let n = self.config.views.custom.len();
+        if n == 0 {
+            return;
+        }
+        let idx = match self.custom_view_index {
+            Some(i) if next => (i + 1) % n,
+            Some(i) => (i + n - 1) % n,
+            None => 0,
+        };
+        self.switch_to_custom(idx).await;
+    }
+
     pub async fn switch_to(&mut self, mode: ViewMode) {
+        self.custom_view_index = None;
         self.active_view = mode;
         if let Some(cached) = self.view_cache.get(&mode).cloned() {
             write_tickets(&self.tickets).clone_from(&cached);
@@ -874,12 +1000,15 @@ impl App {
             self.status.set_action_error("Enter search words first (/)");
             return;
         }
+        self.custom_view_index = None;
         self.active_view = ViewMode::ClosedSearch;
+        self.save_closed_prefs();
         self.refresh().await;
     }
 
     pub fn toggle_closed_search_history(&mut self) {
         self.closed_search_ever_assigned = !self.closed_search_ever_assigned;
+        self.save_closed_prefs();
     }
 
     pub fn sites_str(&self) -> String {
@@ -1068,6 +1197,9 @@ fn compute_filtered_indices(
                     || t.sprint_name
                         .as_ref()
                         .is_some_and(|s| s.to_lowercase().contains(&q))
+                    || t.custom_fields
+                        .values()
+                        .any(|v| v.to_lowercase().contains(&q))
             })
             .map(|(i, _)| i)
             .collect()
@@ -1160,6 +1292,7 @@ mod tests {
             labels: vec![],
             sprint_name: None,
             project_key: String::new(),
+            custom_fields: std::collections::HashMap::new(),
         }
     }
 

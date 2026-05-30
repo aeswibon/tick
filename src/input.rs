@@ -6,6 +6,7 @@ use crate::api::assignable_users;
 use crate::api::transition_fields::{self, TransitionField, TransitionFieldKind};
 use crate::api::{self, types::WorkflowTransition};
 use crate::app::{App, InputMode, TransitionCollect};
+use crate::ticket_lock::read_tickets;
 use crate::view_mode::ViewMode;
 
 /// Shown in picker footers (⌘R on macOS; Ctrl+R elsewhere). Both work on macOS when the terminal reports modifiers.
@@ -96,6 +97,18 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         return false;
     }
 
+    if app.template_manage.is_some()
+        && !matches!(
+            app.input_mode,
+            InputMode::TemplateEditSummary
+                | InputMode::TemplateEditProject
+                | InputMode::TemplateEditIssueType
+        )
+    {
+        crate::template_manage_flow::handle_template_manage_key(app, code).await;
+        return false;
+    }
+
     if app.filtering {
         match code {
             KeyCode::Char(c) => app.filter.push(c),
@@ -167,7 +180,20 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                         | InputMode::ClosedSearchQuery
                         | InputMode::AddIssueLinkTarget
                         | InputMode::CreateSubtaskSummary
+                        | InputMode::TemplateEditSummary
+                        | InputMode::TemplateEditProject
+                        | InputMode::TemplateEditIssueType
                 ) {
+                    if matches!(
+                        app.input_mode,
+                        InputMode::TemplateEditSummary
+                            | InputMode::TemplateEditProject
+                            | InputMode::TemplateEditIssueType
+                    ) {
+                        if let Some(session) = app.template_manage.as_mut() {
+                            session.step = crate::template_manage_flow::TemplateManageStep::Actions;
+                        }
+                    }
                     app.input_mode = InputMode::None;
                     app.input_buffer.clear();
                 } else {
@@ -194,7 +220,15 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     app.closed_search_query = app.input_buffer.trim().to_string();
                     app.input_mode = InputMode::None;
                     app.input_buffer.clear();
+                    app.save_closed_prefs();
                     app.refresh_closed_search().await;
+                } else if matches!(
+                    app.input_mode,
+                    InputMode::TemplateEditSummary
+                        | InputMode::TemplateEditProject
+                        | InputMode::TemplateEditIssueType
+                ) {
+                    crate::template_manage_flow::submit_template_edit(app).await;
                 } else {
                     submit_input(app).await;
                 }
@@ -250,6 +284,23 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         && app.detail_tab == crate::app::DetailTab::Links
     {
         crate::issue_relations_flow::start_create_subtask(app);
+        return false;
+    }
+
+    if matches!(code, KeyCode::Char('v') | KeyCode::Char('V')) && !app.detail_open {
+        if key.modifiers.contains(KeyModifiers::SHIFT) {
+            app.cycle_custom_view(false).await;
+        } else {
+            app.cycle_custom_view(true).await;
+        }
+        return false;
+    }
+
+    if matches!(code, KeyCode::Char('E'))
+        && key.modifiers.contains(KeyModifiers::SHIFT)
+        && !app.detail_open
+    {
+        crate::template_manage_flow::start_template_manage(app);
         return false;
     }
 
@@ -513,7 +564,10 @@ async fn submit_input(app: &mut App) {
         | InputMode::TemplateExportName
         | InputMode::ClosedSearchQuery
         | InputMode::AddIssueLinkTarget
-        | InputMode::CreateSubtaskSummary => {
+        | InputMode::CreateSubtaskSummary
+        | InputMode::TemplateEditSummary
+        | InputMode::TemplateEditProject
+        | InputMode::TemplateEditIssueType => {
             return;
         }
         InputMode::OpenTicket | InputMode::None => return,
@@ -1092,7 +1146,7 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char(']') => app.scroll_page_down(),
         KeyCode::Char('/') => {
             app.detail_open = false;
-            if app.active_view == ViewMode::ClosedSearch {
+            if app.active_view == ViewMode::ClosedSearch && !app.is_custom_view_active() {
                 app.input_mode = InputMode::ClosedSearchQuery;
                 app.input_buffer = app.closed_search_query.clone();
             } else {
@@ -1101,6 +1155,16 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
                 app.go_to_first();
                 app.invalidate_filter_cache();
             }
+        }
+        KeyCode::Char('f')
+            if app.active_view == ViewMode::ClosedSearch
+                && !app.is_custom_view_active()
+                && !read_tickets(&app.tickets).is_empty() =>
+        {
+            app.filtering = true;
+            app.filter.clear();
+            app.go_to_first();
+            app.invalidate_filter_cache();
         }
         KeyCode::Enter => {
             if app.show_help {
@@ -1202,6 +1266,9 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('4') => app.switch_to(ViewMode::Updated).await,
         KeyCode::Char('5') => app.switch_to(ViewMode::Sprint).await,
         KeyCode::Char('6') => app.switch_to(ViewMode::ClosedSearch).await,
+        KeyCode::Char('7') => try_switch_custom_key(app, 7).await,
+        KeyCode::Char('8') => try_switch_custom_key(app, 8).await,
+        KeyCode::Char('9') => try_switch_custom_key(app, 9).await,
         KeyCode::Char('n') if !app.detail_open && app.create_session.is_none() => {
             crate::create_flow::start_create_blank(app).await;
         }
@@ -1482,6 +1549,17 @@ async fn start_status_picker(app: &mut App) {
             ));
         }
         Err(e) => app.status.set_action_error(e),
+    }
+}
+
+async fn try_switch_custom_key(app: &mut App, key: u8) {
+    if let Some((_, index)) = app
+        .config
+        .custom_view_keys()
+        .into_iter()
+        .find(|(k, _)| *k == key)
+    {
+        app.switch_to_custom(index).await;
     }
 }
 

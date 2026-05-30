@@ -4,6 +4,7 @@
 
 | Version | Highlights |
 |---------|------------|
+| **0.10.0** | Saved JQL views; template manager; Closed persist; custom columns |
 | **0.9.1** | Remove link; site `link_types`; create subtask |
 | **0.9.0** | Links tab navigation; relations fetch only on Links tab |
 | **0.8.0** | Issue links tab; add link (`I`); subtasks; multi-select components/versions |
@@ -30,7 +31,7 @@ Order for upcoming work (user direction, 2026-05):
 |---------|-------|------------|
 | **0.9.0** | A | Shipped |
 | **0.9.1** | A | Shipped |
-| **0.10.0** | B | Template edit/delete; saved JQL views; Closed tab persist; custom field columns |
+| **0.10.0** | B | Shipped |
 | **0.11.0+** | C | Split `input.rs`; config reload; 429 UX; expanded tests; docs cleanup |
 
 ## Backlog (by priority)
@@ -49,10 +50,10 @@ Order for upcoming work (user direction, 2026-05):
 
 | Item | Target |
 |------|--------|
-| Template edit/delete in TUI | 0.10.0 |
-| Saved JQL / extra views | 0.10.0 |
-| Closed tab: persist query, local filter | 0.10.0 |
-| Custom field columns | 0.10.0 |
+| Template edit/delete in TUI | 0.10.0 ✅ |
+| Saved JQL / extra views | 0.10.0 ✅ |
+| Closed tab: persist query, local filter | 0.10.0 ✅ |
+| Custom field columns | 0.10.0 ✅ |
 
 ### C — platform & quality
 

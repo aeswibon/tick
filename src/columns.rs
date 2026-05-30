@@ -3,7 +3,7 @@ use ratatui::{text::Span, widgets::Cell};
 use crate::api::types::Ticket;
 use crate::theme::Theme;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Column {
     Site,
     Key,
@@ -18,48 +18,62 @@ pub enum Column {
     Labels,
     Sprint,
     Summary,
+    /// Read-only Jira custom field (`customfield_*` id from config).
+    Custom(String),
 }
 
 impl Column {
     #[allow(dead_code)]
-    pub fn id(self) -> &'static str {
+    pub fn id(self) -> String {
         match self {
-            Self::Site => "site",
-            Self::Key => "key",
-            Self::Type => "type",
-            Self::Status => "status",
-            Self::Priority => "priority",
-            Self::Age => "age",
-            Self::Due => "due",
-            Self::Assignee => "assignee",
-            Self::Reporter => "reporter",
-            Self::Parent => "parent",
-            Self::Labels => "labels",
-            Self::Sprint => "sprint",
-            Self::Summary => "summary",
+            Self::Site => "site".into(),
+            Self::Key => "key".into(),
+            Self::Type => "type".into(),
+            Self::Status => "status".into(),
+            Self::Priority => "priority".into(),
+            Self::Age => "age".into(),
+            Self::Due => "due".into(),
+            Self::Assignee => "assignee".into(),
+            Self::Reporter => "reporter".into(),
+            Self::Parent => "parent".into(),
+            Self::Labels => "labels".into(),
+            Self::Sprint => "sprint".into(),
+            Self::Summary => "summary".into(),
+            Self::Custom(id) => id,
         }
     }
 
-    pub fn header(self) -> &'static str {
+    pub fn header(&self) -> String {
         match self {
-            Self::Site => " Site",
-            Self::Key => "Key",
-            Self::Type => "Type",
-            Self::Status => "Status",
-            Self::Priority => "Priority",
-            Self::Age => "Age",
-            Self::Due => "Due",
-            Self::Assignee => "Assignee",
-            Self::Reporter => "Reporter",
-            Self::Parent => "Parent",
-            Self::Labels => "Labels",
-            Self::Sprint => "Sprint",
-            Self::Summary => "Summary",
+            Self::Site => " Site".into(),
+            Self::Key => "Key".into(),
+            Self::Type => "Type".into(),
+            Self::Status => "Status".into(),
+            Self::Priority => "Priority".into(),
+            Self::Age => "Age".into(),
+            Self::Due => "Due".into(),
+            Self::Assignee => "Assignee".into(),
+            Self::Reporter => "Reporter".into(),
+            Self::Parent => "Parent".into(),
+            Self::Labels => "Labels".into(),
+            Self::Sprint => "Sprint".into(),
+            Self::Summary => "Summary".into(),
+            Self::Custom(id) => {
+                if let Some(n) = id.strip_prefix("customfield_") {
+                    format!("CF{n}")
+                } else {
+                    id.clone()
+                }
+            }
         }
     }
 
     pub fn parse_id(s: &str) -> Option<Self> {
-        match s.trim().to_lowercase().as_str() {
+        let t = s.trim();
+        if t.to_ascii_lowercase().starts_with("customfield_") {
+            return Some(Self::Custom(t.to_string()));
+        }
+        match t.to_lowercase().as_str() {
             "site" => Some(Self::Site),
             "key" => Some(Self::Key),
             "type" | "issuetype" => Some(Self::Type),
@@ -103,7 +117,7 @@ impl Column {
         }
     }
 
-    pub fn cell(self, ticket: &Ticket, theme: &Theme) -> Cell<'static> {
+    pub fn cell(&self, ticket: &Ticket, theme: &Theme) -> Cell<'static> {
         match self {
             Self::Site => Cell::from(Span::raw(format!(" {}", ticket.site))),
             Self::Key => Cell::from(Span::raw(ticket.key.clone())),
@@ -143,10 +157,29 @@ impl Column {
                 Cell::from(Span::raw(text.to_string()))
             }
             Self::Summary => Cell::from(Span::raw(ticket.summary.clone())),
+            Self::Custom(id) => {
+                let text = ticket
+                    .custom_fields
+                    .get(id)
+                    .cloned()
+                    .unwrap_or_else(|| "-".into());
+                Cell::from(Span::raw(text))
+            }
         }
     }
 
-    pub fn width_hint(self) -> u16 {
+    /// Custom field ids referenced by the active column set (for bulk fetch).
+    pub fn custom_field_ids(columns: &[Self]) -> Vec<String> {
+        columns
+            .iter()
+            .filter_map(|c| match c {
+                Self::Custom(id) => Some(id.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn width_hint(&self) -> u16 {
         match self {
             Self::Site => 10,
             Self::Key => 12,
@@ -161,6 +194,7 @@ impl Column {
             Self::Labels => 16,
             Self::Sprint => 14,
             Self::Summary => 24,
+            Self::Custom(_) => 14,
         }
     }
 }
@@ -181,7 +215,20 @@ mod tests {
     fn parse_column_ids() {
         assert_eq!(Column::parse_id("ISSUETYPE"), Some(Column::Type));
         assert_eq!(Column::parse_id("summary"), Some(Column::Summary));
+        assert_eq!(
+            Column::parse_id("customfield_10042"),
+            Some(Column::Custom("customfield_10042".into()))
+        );
         assert_eq!(Column::parse_id("nope"), None);
+    }
+
+    #[test]
+    fn custom_field_ids_from_columns() {
+        let cols = Column::resolve(Some(&["key".into(), "customfield_10001".into()]));
+        assert_eq!(
+            Column::custom_field_ids(&cols),
+            vec!["customfield_10001".to_string()]
+        );
     }
 
     #[test]

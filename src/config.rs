@@ -157,6 +157,36 @@ impl Site {
     }
 }
 
+/// Saved JQL view — switch with configured key (`7`–`9`) or `v` / `Shift+V`.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CustomView {
+    pub name: String,
+    pub jql: String,
+    /// Query only this site (must match `[[sites]].name`).
+    #[serde(default)]
+    pub site: Option<String>,
+    /// Tab key `7`, `8`, or `9` (auto-assigned to 7, 8, 9 for first entries).
+    #[serde(default)]
+    pub key: Option<u8>,
+}
+
+impl CustomView {
+    pub fn cache_slug(&self) -> String {
+        self.name
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() {
+                    c.to_ascii_lowercase()
+                } else {
+                    '-'
+                }
+            })
+            .collect::<String>()
+            .trim_matches('-')
+            .to_string()
+    }
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct ViewQueries {
     pub assigned: Option<String>,
@@ -168,6 +198,8 @@ pub struct ViewQueries {
     pub closed: Option<String>,
     /// Closed search: ever assigned to you (`assignee was`).
     pub closed_history: Option<String>,
+    #[serde(default)]
+    pub custom: Vec<CustomView>,
 }
 
 /// Pre-filled issue for `N` (create from template). Minimal edits: summary, then Enter.
@@ -404,6 +436,31 @@ impl Config {
         crate::view_mode::build_closed_search_jql(base, query)
     }
 
+    /// Sites to query for a fetch (`site_filter` = `[[sites]].name`).
+    pub fn sites_for_fetch(&self, site_filter: Option<&str>) -> Vec<&Site> {
+        match site_filter {
+            Some(name) => self.sites.iter().filter(|s| s.name == name).collect(),
+            None => self.sites.iter().collect(),
+        }
+    }
+
+    /// Resolve tab keys for custom views (defaults 7, 8, 9).
+    pub fn custom_view_keys(&self) -> Vec<(u8, usize)> {
+        let mut used = std::collections::HashSet::new();
+        let mut out = Vec::new();
+        for (i, view) in self.views.custom.iter().enumerate() {
+            let key = view.key.unwrap_or(match i {
+                0 => 7,
+                1 => 8,
+                _ => 9,
+            });
+            if (7..=9).contains(&key) && used.insert(key) {
+                out.push((key, i));
+            }
+        }
+        out
+    }
+
     /// Apply CLI overrides and re-validate (call after `load()`).
     pub fn apply_cli_overrides(
         &mut self,
@@ -471,6 +528,37 @@ impl Config {
                 ));
             }
         }
+        let mut custom_names = std::collections::HashSet::new();
+        let mut custom_keys = std::collections::HashSet::new();
+        for view in &self.views.custom {
+            let name = view.name.trim();
+            if name.is_empty() {
+                return Err("config: views.custom name must not be empty".into());
+            }
+            if !custom_names.insert(name.to_string()) {
+                return Err(format!("config: duplicate custom view '{name}'"));
+            }
+            if view.jql.trim().is_empty() {
+                return Err(format!("config: custom view '{name}' needs jql"));
+            }
+            if let Some(ref site) = view.site {
+                if !self.sites.iter().any(|s| s.name == *site) {
+                    return Err(format!(
+                        "config: custom view '{name}' references unknown site '{site}'"
+                    ));
+                }
+            }
+            if let Some(key) = view.key {
+                if !(7..=9).contains(&key) {
+                    return Err(format!(
+                        "config: custom view '{name}' key must be 7, 8, or 9 (got {key})"
+                    ));
+                }
+                if !custom_keys.insert(key) {
+                    return Err(format!("config: duplicate custom view key {key}"));
+                }
+            }
+        }
         for site in &self.sites {
             if site.name.trim().is_empty() {
                 return Err("config: site name must not be empty".into());
@@ -523,6 +611,11 @@ theme = "default"
 # sprint = "sprint in openSprints() AND assignee = currentUser() ORDER BY updated DESC"
 # closed = "assignee = currentUser() AND statusCategory = Done"   # 6th tab — add text via /
 # closed_history = "assignee was currentUser() AND statusCategory = Done"   # h toggles on Closed tab
+#
+# [[views.custom]]
+# name = "My bugs"
+# jql = "project = DEMO AND assignee = currentUser() ORDER BY updated DESC"
+# key = 7   # tab key 7, 8, or 9
 
 # Optional table columns (ids: site, key, type, status, priority, age, due, assignee, reporter, parent, labels, sprint, summary)
 # columns = ["site", "key", "labels", "sprint", "summary", "status", "assignee"]

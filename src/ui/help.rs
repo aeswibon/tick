@@ -25,6 +25,9 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
         Line::from("  [ / ]                  Scroll up / down by page_size rows"),
         Line::from("  g / G                  Go to first / last row"),
         Line::from("  1–6                    Jump to view tab"),
+        Line::from("  7–9                    Custom JQL views (if configured)"),
+        Line::from("  v / Shift+V            Cycle custom views"),
+        Line::from("  Shift+E                Manage templates (edit/delete)"),
         Line::from(""),
         Line::from(Span::styled(
             " Actions",
@@ -62,7 +65,8 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
             Style::default().add_modifier(Modifier::UNDERLINED),
         )),
         Line::from("  ?                      Toggle this help"),
-        Line::from("  /                      Filter tickets (/ on Closed tab = JQL search)"),
+        Line::from("  /                      Filter (Closed tab: JQL search)"),
+        Line::from("  f                      Closed tab: local filter on results"),
         Line::from(
             "  1–6                    Assigned · Mentions · Watched · Updated · Sprint · Closed",
         ),

@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.10.0] - 2026-05-30
+
+### Added
+
+- **Saved JQL views** — `[[views.custom]]` with name, jql, optional `site` and tab key `7`–`9`; `v` / `Shift+V` cycle custom views
+- **Template manager** — `Shift+E` to list, edit summary/project/type, or delete templates; rewrites `config.toml` or `create.templates_file`
+- **Closed tab persist** — last search query and ever-assigned toggle saved to `~/.config/tick/cache/closed_prefs.json`
+- **Closed local filter** — `f` filters fetched Closed results without a new JQL call
+- **Custom field columns** — `columns` may include `customfield_*` ids (read-only in table; included in bulk fetch and local filter)
+
+### Documentation
+
+- New guide: [docs/features/saved-views-templates-columns.md](docs/features/saved-views-templates-columns.md)
+- Updated [KEYBINDINGS.md](docs/KEYBINDINGS.md), [CONFIGURATION.md](docs/CONFIGURATION.md), [FEATURES.md](docs/FEATURES.md)
+
 ## [0.9.1] - 2026-05-30
 
 ### Added

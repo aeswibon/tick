@@ -5,6 +5,7 @@ Use these when you want **depth** on one capability. For a single scrollable ove
 ## Views and data
 
 - **[views-and-tabs.md](views-and-tabs.md)** — Tab order (`1`–`6`), custom JQL, disk cache, Closed-tab JQL search, `assignee was` history
+- **[saved-views-templates-columns.md](saved-views-templates-columns.md)** — Custom JQL tabs (`7`–`9`), template manager (`Shift+E`), Closed persist, custom columns
 
 ## Table and reading
 
@@ -17,7 +18,7 @@ Use these when you want **depth** on one capability. For a single scrollable ove
 - **[comments-and-worklogs.md](comments-and-worklogs.md)** — Comments with `@`, worklog time formats
 - **[editing-fields.md](editing-fields.md)** — Inline edits, sprint/backlog moves, watch/unwatch, due date
 - **[issue-links-subtasks.md](issue-links-subtasks.md)** — Links tab, subtasks, add link (`I`)
-- **[create-duplicate-templates.md](create-duplicate-templates.md)** — Create, duplicate, templates, export `X`
+- **[create-duplicate-templates.md](create-duplicate-templates.md)** — Create, duplicate, templates, export `X`, manage `Shift+E`
 
 ## Workflow extras
 

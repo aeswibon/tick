@@ -519,6 +519,7 @@ mod tests {
             labels: Vec::new(),
             sprint_name: None,
             project_key: "DEMO".into(),
+            custom_fields: std::collections::HashMap::new(),
         };
         let mut draft = CreateDraft::default();
         seed_draft_from_ticket(&mut draft, &ticket, "Copy of: ");

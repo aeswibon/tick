@@ -10,6 +10,7 @@ Create and duplicate work from the **table** (detail pane can be open or closed)
 | `N` | New issue from **config template** |
 | `C` | **Duplicate** selected issue |
 | `X` | **Export** selected issue as a new template |
+| `Shift+E` | **Manage** templates (edit fields, delete) |
 | `p` | During wizard: re-pick project |
 | `t` | During wizard: re-pick issue type (not status) |
 
@@ -139,6 +140,16 @@ templates_file = "templates/zeta.toml"
 ```
 
 Or paste blocks into `[[create.templates]]` in `config.toml`.
+
+## Manage templates (`Shift+E`)
+
+Edit or remove templates without leaving the TUI. See [saved-views-templates-columns.md](saved-views-templates-columns.md#template-manager-shifte).
+
+```text
+Shift+E → pick template → e/p/i to edit → d to delete
+```
+
+Writes to `create.templates_file` when set, otherwise updates `[[create.templates]]` in `config.toml`.
 
 ## Related
 

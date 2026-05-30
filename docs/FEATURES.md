@@ -30,8 +30,18 @@ Single-page map of everything tick can do. For **step-by-step guides with exampl
 | Updated | `4` | |
 | Sprint | `5` | |
 | Closed (JQL search) | `6` | [views-and-tabs.md#closed-tab--search-done-tickets](features/views-and-tabs.md) |
+| Custom JQL views | `7`–`9`, `v` | [saved-views-templates-columns.md](features/saved-views-templates-columns.md) |
 
-Custom JQL: `[views]` in config. Cache: `~/.config/tick/cache/`.
+Custom JQL: `[views]` and `[[views.custom]]` in config. Cache: `~/.config/tick/cache/`.
+
+### v0.10 highlights
+
+| Feature | Guide |
+|---------|--------|
+| Template edit/delete | [saved-views-templates-columns.md](features/saved-views-templates-columns.md#template-manager-shifte) — `Shift+E` |
+| Saved JQL views | `[[views.custom]]`, keys `7`–`9` |
+| Closed persist + local filter | `closed_prefs.json`, `f` on Closed tab |
+| Custom field columns | `customfield_*` in `columns` |
 
 ---
 
@@ -51,7 +61,7 @@ Custom JQL: `[views]` in config. Cache: `~/.config/tick/cache/`.
 | Transitions | `t` / `T` | [status-transitions.md](features/status-transitions.md) |
 | Comment / worklog | `c`, `w` | [comments-and-worklogs.md](features/comments-and-worklogs.md) |
 | Edit fields | `S`, `P`, `L`, `D`, `M`, `a`, `u` | [editing-fields.md](features/editing-fields.md) |
-| Create / duplicate / templates | `n`, `N`, `C`, `X` | [create-duplicate-templates.md](features/create-duplicate-templates.md) |
+| Create / duplicate / templates | `n`, `N`, `C`, `X`, `Shift+E` | [create-duplicate-templates.md](features/create-duplicate-templates.md) |
 | Open / multi-site | `o`, `O`, `y`, `!` | [open-and-multi-site.md](features/open-and-multi-site.md) |
 
 ---

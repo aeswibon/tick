@@ -93,13 +93,43 @@ assigned = "assignee = currentUser() AND statusCategory != Done ORDER BY updated
 sprint = "sprint in openSprints() AND assignee = currentUser() ORDER BY rank"
 ```
 
+## Saved JQL views (`[[views.custom]]`)
+
+Extra tabs beyond `1`–`6`. See [saved-views-templates-columns.md](features/saved-views-templates-columns.md).
+
+```toml
+[[views.custom]]
+name = "My open bugs"
+jql = "project = ENG AND assignee = currentUser() ORDER BY updated DESC"
+key = 7
+
+[[views.custom]]
+name = "Zeta backlog"
+jql = "project = HIN AND status = Backlog ORDER BY rank"
+site = "zeta"
+key = 8
+```
+
+| Field | Description |
+|-------|-------------|
+| `name` | Tab label |
+| `jql` | Full JQL query |
+| `site` | Optional: only query this `[[sites]].name` |
+| `key` | Optional: `7`, `8`, or `9` (auto-assigned if omitted) |
+
 ## Table columns
 
 Default: `site`, `key`, `type`, `status`, `priority`, `age`, `due`, `assignee`, `reporter`, `summary`
 
-All column ids:
+Built-in column ids:
 
 `site`, `key`, `type`, `status`, `priority`, `age`, `due`, `assignee`, `reporter`, `parent`, `labels`, `sprint`, `summary`
+
+**Custom fields (read-only):** any `customfield_*` id Jira returns on bulk fetch:
+
+```toml
+columns = ["site", "key", "customfield_10042", "summary", "status", "assignee"]
+```
 
 ```toml
 columns = ["site", "key", "labels", "sprint", "summary", "status", "assignee"]
@@ -117,9 +147,11 @@ theme = "dracula"
 
 ## Cache
 
-Per-view JSON cache: `~/.config/tick/cache/{assigned,updated,mentions,watched,sprint}.json`
+Per-view JSON cache: `~/.config/tick/cache/{assigned,updated,mentions,watched,sprint,closed,custom-*}.json`
 
 Each file stores `fetched_at` and tickets for offline startup.
+
+Closed tab preferences: `~/.config/tick/cache/closed_prefs.json` (`query`, `ever_assigned`).
 
 ## Environment variables
 

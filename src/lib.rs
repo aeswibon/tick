@@ -14,6 +14,8 @@ pub mod oauth;
 pub mod platform;
 pub mod template_export;
 pub mod template_export_flow;
+pub mod template_manage_flow;
+pub mod template_persist;
 pub mod theme;
 pub mod ticket_lock;
 pub mod ui;
@@ -129,7 +131,7 @@ pub async fn run_doctor(config: &Config) {
         match client.search_jql(&site.base_url, probe_jql, 2).await {
             Ok(ids) => {
                 let sf = site.sprint_field.as_deref();
-                match client.bulk_fetch(&site.base_url, &ids, sf).await {
+                match client.bulk_fetch(&site.base_url, &ids, sf, &[]).await {
                     Ok(issues) => println!(
                         "  Bulk fetch: OK ({} ids → {} issues)",
                         ids.len(),
