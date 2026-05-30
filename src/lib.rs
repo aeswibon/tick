@@ -11,6 +11,7 @@ pub mod config;
 pub mod config_check;
 pub mod create_flow;
 pub mod fetch_status;
+pub mod global_search;
 pub mod input;
 pub mod issue_key;
 pub mod issue_relations_flow;
@@ -91,6 +92,13 @@ pub enum TickCommand {
     Issue {
         #[command(subcommand)]
         action: cli::issue::IssueCommand,
+    },
+    /// Search issues via JQL (JSON)
+    Search(cli::search::SearchArgs),
+    /// Bulk operations on multiple issue keys
+    Bulk {
+        #[command(subcommand)]
+        action: cli::bulk_cmd::BulkCommand,
     },
 }
 
@@ -207,6 +215,18 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     if let Some(TickCommand::Issue { action }) = cli.command {
         return cli::issue::run(action).await;
+    }
+
+    if let Some(TickCommand::Search(args)) = cli.command {
+        return cli::search::run(args)
+            .await
+            .map_err(|e| -> Box<dyn std::error::Error> { e.into() });
+    }
+
+    if let Some(TickCommand::Bulk { action }) = cli.command {
+        return cli::bulk_cmd::run(action)
+            .await
+            .map_err(|e| -> Box<dyn std::error::Error> { e.into() });
     }
 
     if cli.init {

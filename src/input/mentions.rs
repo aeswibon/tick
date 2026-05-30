@@ -255,7 +255,8 @@ pub(crate) async fn submit_input(app: &mut App) {
         | InputMode::TemplateEditIssueType
         | InputMode::TemplateEditDescription
         | InputMode::TemplateEditLabels
-        | InputMode::BulkEditLabels => {
+        | InputMode::BulkEditLabels
+        | InputMode::GlobalSearchQuery => {
             return;
         }
         InputMode::OpenTicket | InputMode::None => return,

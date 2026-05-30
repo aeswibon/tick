@@ -105,6 +105,11 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         return false;
     }
 
+    if app.showing_global_search {
+        handle_global_search_key(app, code).await;
+        return false;
+    }
+
     if app.template_export.is_some() && app.input_mode != InputMode::TemplateExportName {
         crate::template_export_flow::handle_template_export_key(app, code).await;
         return false;
@@ -144,7 +149,11 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         match code {
             KeyCode::Char(c) => {
                 app.input_buffer.push(c);
-                if mentions_enabled(app.input_mode) {
+                if app.input_mode == InputMode::GlobalSearchQuery {
+                    app.global_search_hits =
+                        crate::global_search::refresh_hits(app, &app.input_buffer);
+                    app.global_search_selected = 0;
+                } else if mentions_enabled(app.input_mode) {
                     refresh_mention_picker(app).await;
                 } else if app.input_mode == InputMode::TransitionField
                     && app.transition_field_user_search
@@ -162,7 +171,11 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
             }
             KeyCode::Backspace => {
                 app.input_buffer.pop();
-                if mentions_enabled(app.input_mode) {
+                if app.input_mode == InputMode::GlobalSearchQuery {
+                    app.global_search_hits =
+                        crate::global_search::refresh_hits(app, &app.input_buffer);
+                    app.global_search_selected = 0;
+                } else if mentions_enabled(app.input_mode) {
                     refresh_mention_picker(app).await;
                 } else if app.input_mode == InputMode::TransitionField
                     && app.transition_field_user_search
@@ -263,6 +276,18 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     crate::template_manage_flow::submit_template_edit(app).await;
                 } else if app.input_mode == InputMode::BulkEditLabels {
                     crate::bulk::submit_bulk_labels(app).await;
+                } else if app.input_mode == InputMode::GlobalSearchQuery {
+                    if !app.global_search_hits.is_empty() {
+                        let idx = app
+                            .global_search_selected
+                            .min(app.global_search_hits.len() - 1);
+                        let hit = app.global_search_hits[idx].clone();
+                        crate::global_search::jump_to_hit(app, &hit).await;
+                    } else {
+                        app.showing_global_search = false;
+                        app.input_mode = InputMode::None;
+                        app.input_buffer.clear();
+                    }
                 } else {
                     submit_input(app).await;
                 }
@@ -344,6 +369,19 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         return false;
     }
 
+    if matches!(code, KeyCode::Char('g') | KeyCode::Char('G'))
+        && key.modifiers.contains(KeyModifiers::CONTROL)
+        && !app.detail_open
+        && app.input_mode == InputMode::None
+    {
+        app.showing_global_search = true;
+        app.input_mode = InputMode::GlobalSearchQuery;
+        app.input_buffer.clear();
+        app.global_search_hits = crate::global_search::refresh_hits(app, "");
+        app.global_search_selected = 0;
+        return false;
+    }
+
     if matches!(code, KeyCode::Char(' ')) && crate::bulk::bulk_table_active(app) {
         if key.modifiers.contains(KeyModifiers::SHIFT) {
             crate::bulk::mark_all_filtered(app);
@@ -357,6 +395,31 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
     }
 
     handle_normal_key(app, code).await
+}
+
+async fn handle_global_search_key(app: &mut App, code: KeyCode) {
+    let hit_count = app.global_search_hits.len();
+    match code {
+        KeyCode::Esc => {
+            app.showing_global_search = false;
+            app.global_search_hits.clear();
+            app.global_search_selected = 0;
+            app.input_mode = InputMode::None;
+            app.input_buffer.clear();
+        }
+        KeyCode::Enter if hit_count > 0 => {
+            let idx = app.global_search_selected.min(hit_count - 1);
+            let hit = app.global_search_hits[idx].clone();
+            crate::global_search::jump_to_hit(app, &hit).await;
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.global_search_selected = app.global_search_selected.saturating_sub(1);
+        }
+        KeyCode::Down | KeyCode::Char('j') if app.global_search_selected + 1 < hit_count => {
+            app.global_search_selected += 1;
+        }
+        _ => {}
+    }
 }
 
 fn handle_site_errors_key(app: &mut App, code: KeyCode) {

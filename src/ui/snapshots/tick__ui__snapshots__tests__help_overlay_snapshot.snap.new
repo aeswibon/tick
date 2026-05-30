@@ -1,5 +1,6 @@
 ---
 source: src/ui/snapshots.rs
+assertion_line: 60
 expression: buffer_to_string(&terminal)
 ---
 

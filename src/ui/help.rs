@@ -24,6 +24,7 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
         Line::from("  j/k  or  Up/Down      Move selection"),
         Line::from("  [ / ]                  Scroll up / down by page_size rows"),
         Line::from("  g / G                  Go to first / last row"),
+        Line::from("  Ctrl+g                 Search cached views (all tabs)"),
         Line::from("  1–6                    Jump to view tab"),
         Line::from("  7–9                    Custom JQL views (if configured)"),
         Line::from("  v / Shift+V            Cycle custom views"),

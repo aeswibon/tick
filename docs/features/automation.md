@@ -4,36 +4,43 @@ Headless commands use the same `config.toml` and auth as the TUI.
 
 ## `tick issue show`
 
-Print core issue fields as JSON:
-
 ```bash
 tick issue show HIN-123 --site zeta
 ```
 
-When only one `[[sites]]` entry exists, `--site` is optional.
-
-Output fields: `key`, `site`, `summary`, `status`, `priority`, `assignee`, `labels`, `url`.
+Prints JSON: key, summary, status, assignee, labels, url.
 
 ## `tick issue transition`
-
-Apply a workflow transition **by name** (same matching as bulk transition in the TUI):
 
 ```bash
 tick issue transition HIN-123 --to "In Progress" --site zeta
 ```
 
-Exits with code `1` on failure (e.g. transition requires extra fields — use the TUI for those).
+Applies a workflow transition **by name**. Fails if the transition requires extra fields (use the TUI for those).
+
+## `tick search`
+
+```bash
+tick search --jql 'project = HIN AND assignee = currentUser() ORDER BY updated DESC' --site zeta
+```
+
+Prints JSON: `{ "issues": [...], "warnings": [...] }`. Respects `max_results` in config.
+
+## `tick bulk`
+
+All bulk commands require `--site` and `--keys` (comma-separated or repeated).
+
+```bash
+tick bulk transition --site zeta --keys HIN-1,HIN-2 --to Done
+tick bulk assign --site zeta --keys HIN-1,HIN-2 --me
+tick bulk labels --site zeta --keys HIN-1 --set "bug,triage"
+```
+
+Output is JSON with `ok` and `failed` arrays. Exit code `1` if any issue fails. Use `--quiet` for compact JSON on stdout only.
 
 ## Config validation
 
 ```bash
 tick --check    # offline structural validation
-tick --doctor   # live Jira API probes per site
+tick --doctor   # live Jira API probes
 ```
-
-## Planned (v0.14+)
-
-- `tick search --jql '...'`
-- `tick bulk` (transition, assign, labels from the shell)
-
-See [bulk-actions.md](bulk-actions.md) for interactive bulk operations today.

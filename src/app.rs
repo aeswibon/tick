@@ -146,6 +146,8 @@ pub enum InputMode {
     AddIssueLinkTarget,
     /// Create subtask under current issue (summary only).
     CreateSubtaskSummary,
+    /// Search all cached views (`Ctrl+g`).
+    GlobalSearchQuery,
 }
 
 /// Collecting values for a workflow transition before POST.
@@ -256,6 +258,10 @@ pub struct App {
     /// Bulk table selection: `(site, key)`.
     pub bulk_marked: HashSet<(String, String)>,
     pub bulk_action: Option<crate::bulk::BulkAction>,
+    /// Cached cross-view search (`g`).
+    pub showing_global_search: bool,
+    pub global_search_hits: Vec<crate::global_search::GlobalSearchHit>,
+    pub global_search_selected: usize,
 }
 
 impl App {
@@ -339,6 +345,9 @@ impl App {
             filter_cache: RefCell::new(None),
             bulk_marked: HashSet::new(),
             bulk_action: None,
+            showing_global_search: false,
+            global_search_hits: Vec::new(),
+            global_search_selected: 0,
         };
         app.load_cache();
         app
@@ -735,7 +744,7 @@ impl App {
         }
     }
 
-    fn ensure_selection_visible(&mut self) {
+    pub(crate) fn ensure_selection_visible(&mut self) {
         let viewport = self.table_viewport_rows.max(1);
         if self.selected < self.scroll_offset {
             self.scroll_offset = self.selected;

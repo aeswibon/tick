@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.14.0] - 2026-05-30
+
+### Added
+
+- **Quick search** — `Ctrl+g` searches key/summary/labels across all cached view tickets; `Enter` jumps to issue
+- **CLI search** — `tick search --jql '...' [--site NAME]` (JSON issues + warnings)
+- **CLI bulk** — `tick bulk transition|assign|labels` with `--keys` and `--site`; JSON result; exit 1 on partial failure
+
+### Documentation
+
+- [docs/features/quick-search.md](docs/features/quick-search.md), expanded [automation.md](docs/features/automation.md)
+
 ## [0.13.0] - 2026-05-30
 
 ### Added

@@ -34,6 +34,13 @@ Single-page map of everything tick can do. For **step-by-step guides with exampl
 
 Custom JQL: `[views]` and `[[views.custom]]` in config. Cache: `~/.config/tick/cache/`.
 
+### v0.14 highlights
+
+| Feature | Guide |
+|---------|--------|
+| Quick search (cached) | [quick-search.md](features/quick-search.md) — `Ctrl+g` |
+| CLI search / bulk | [automation.md](features/automation.md) — `tick search`, `tick bulk` |
+
 ### v0.13 highlights
 
 | Feature | Guide |

@@ -11,7 +11,8 @@ Use these when you want **depth** on one capability. For a single scrollable ove
 
 - **[table-and-navigation.md](table-and-navigation.md)** — Row selection, filter, sort, `page_size`, column ids
 - **[bulk-actions.md](bulk-actions.md)** — Multi-select (`Space`), bulk transition, assign, labels, watch
-- **[automation.md](automation.md)** — Headless CLI (`tick issue`, `tick --check`)
+- **[automation.md](automation.md)** — Headless CLI (`tick issue`, `tick search`, `tick bulk`, `tick --check`)
+- **[quick-search.md](quick-search.md)** — Search cached views (`g`)
 - **[detail-pane.md](detail-pane.md)** — Detail layout, ADF rendering, markdown round-trip
 
 ## Jira write-back

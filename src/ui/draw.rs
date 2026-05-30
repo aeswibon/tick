@@ -50,6 +50,9 @@ pub fn render(f: &mut Frame, app: &mut App) {
     if app.showing_transitions {
         super::transitions::draw_transitions(f, app, f.area());
     }
+    if app.showing_global_search {
+        super::global_search::draw_global_search(f, app, f.area());
+    }
     if app.showing_priorities {
         super::priorities::draw_priorities(f, app, f.area());
     }
@@ -210,6 +213,11 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     } else if app.input_mode == crate::app::InputMode::EditLabels {
         (
             format!(" Labels (comma-separated): {}_", app.input_buffer),
+            app.theme.accent,
+        )
+    } else if app.input_mode == crate::app::InputMode::GlobalSearchQuery {
+        (
+            format!(" Search cached views (Ctrl+g): {}_", app.input_buffer),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::BulkEditLabels {

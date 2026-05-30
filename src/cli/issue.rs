@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
-use serde::Serialize;
 
 use crate::api::types::Ticket;
 use crate::api::JiraClient;
+use crate::cli::util::{self, IssueJson};
 use crate::config::{Config, Site};
-use crate::issue_key;
 
 #[derive(Parser)]
 pub struct IssueShowArgs {
@@ -32,18 +31,6 @@ pub enum IssueCommand {
     Transition(IssueTransitionArgs),
 }
 
-#[derive(Serialize)]
-struct IssueShowJson {
-    key: String,
-    site: String,
-    summary: String,
-    status: String,
-    priority: String,
-    assignee: String,
-    labels: Vec<String>,
-    url: String,
-}
-
 pub async fn run(action: IssueCommand) -> Result<(), Box<dyn std::error::Error>> {
     let result = match action {
         IssueCommand::Show(args) => run_show(args).await,
@@ -58,30 +45,21 @@ pub async fn run(action: IssueCommand) -> Result<(), Box<dyn std::error::Error>>
 
 async fn run_show(args: IssueShowArgs) -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::load().map_err(|e| format!("Config error: {e}"))?;
-    let key = parse_key(&args.key)?;
-    let site = resolve_site(&config, &key, args.site.as_deref())?;
+    let key = util::parse_issue_key_arg(&args.key)?;
+    let site = util::resolve_site(&config, &key, args.site.as_deref())?;
     let jira = JiraClient::from_config(&config, false)
         .await
         .map_err(|e| format!("Auth error: {e}"))?;
     let ticket = fetch_ticket(&jira, site, &key).await?;
-    let dto = IssueShowJson {
-        key: ticket.key.clone(),
-        site: site.name.clone(),
-        summary: ticket.summary,
-        status: ticket.status,
-        priority: ticket.priority,
-        assignee: ticket.assignee,
-        labels: ticket.labels,
-        url: ticket.link,
-    };
+    let dto = IssueJson::from_ticket(&ticket, &site.name);
     println!("{}", serde_json::to_string_pretty(&dto)?);
     Ok(())
 }
 
 async fn run_transition(args: IssueTransitionArgs) -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::load().map_err(|e| format!("Config error: {e}"))?;
-    let key = parse_key(&args.key)?;
-    let site = resolve_site(&config, &key, args.site.as_deref())?;
+    let key = util::parse_issue_key_arg(&args.key)?;
+    let site = util::resolve_site(&config, &key, args.site.as_deref())?;
     let jira = Arc::new(
         JiraClient::from_config(&config, false)
             .await
@@ -100,30 +78,6 @@ async fn run_transition(args: IssueTransitionArgs) -> Result<(), Box<dyn std::er
         })
     );
     Ok(())
-}
-
-fn parse_key(raw: &str) -> Result<String, String> {
-    issue_key::parse_issue_key(raw).ok_or_else(|| format!("Invalid issue key: {raw}"))
-}
-
-fn resolve_site<'a>(
-    config: &'a Config,
-    key: &str,
-    site_arg: Option<&str>,
-) -> Result<&'a Site, String> {
-    if let Some(name) = site_arg {
-        return config
-            .sites
-            .iter()
-            .find(|s| s.name == name)
-            .ok_or_else(|| format!("Unknown site '{name}'"));
-    }
-    if config.sites.len() == 1 {
-        return Ok(&config.sites[0]);
-    }
-    Err(format!(
-        "Multiple sites configured; pass --site <name> for {key}"
-    ))
 }
 
 async fn fetch_ticket(jira: &JiraClient, site: &Site, key: &str) -> Result<Ticket, String> {

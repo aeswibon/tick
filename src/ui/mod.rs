@@ -4,6 +4,7 @@ pub mod detail;
 pub mod draw;
 pub mod errors;
 pub mod field_picker;
+pub mod global_search;
 pub mod help;
 pub mod issue_links;
 pub mod mentions;
