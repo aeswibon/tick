@@ -42,9 +42,7 @@ fn hook_matches_view(hook: &RefreshHook, view_id: &str) -> bool {
     if hook.views.is_empty() {
         return true;
     }
-    hook.views
-        .iter()
-        .any(|v| v.eq_ignore_ascii_case(view_id))
+    hook.views.iter().any(|v| v.eq_ignore_ascii_case(view_id))
 }
 
 async fn run_on_refresh_hook(

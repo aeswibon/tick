@@ -136,11 +136,9 @@ mod tests {
     #[test]
     fn empty_sites_is_error() {
         let config = minimal_config(vec![]);
-        assert!(
-            validate_config(&config)
-                .iter()
-                .any(|f| f.level == "error" && f.message.contains("sites"))
-        );
+        assert!(validate_config(&config)
+            .iter()
+            .any(|f| f.level == "error" && f.message.contains("sites")));
     }
 
     #[test]
@@ -151,11 +149,9 @@ mod tests {
             ..Default::default()
         };
         let config = minimal_config(vec![site.clone(), site]);
-        assert!(
-            validate_config(&config)
-                .iter()
-                .any(|f| f.message.contains("Duplicate"))
-        );
+        assert!(validate_config(&config)
+            .iter()
+            .any(|f| f.message.contains("Duplicate")));
     }
 
     #[test]

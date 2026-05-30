@@ -37,12 +37,7 @@ fn sample_tickets(n: usize) -> Vec<Ticket> {
 fn bench_jql(c: &mut Criterion) {
     let base = ViewMode::closed_search_base(true);
     c.bench_function("build_closed_search_jql", |b| {
-        b.iter(|| {
-            black_box(build_closed_search_jql(
-                base,
-                "regression login \"quoted\"",
-            ))
-        });
+        b.iter(|| black_box(build_closed_search_jql(base, "regression login \"quoted\"")));
     });
 }
 
@@ -79,5 +74,11 @@ fn bench_issue_key(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_jql, bench_filter, bench_theme, bench_issue_key);
+criterion_group!(
+    benches,
+    bench_jql,
+    bench_filter,
+    bench_theme,
+    bench_issue_key
+);
 criterion_main!(benches);

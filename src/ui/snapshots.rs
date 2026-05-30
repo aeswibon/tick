@@ -2,6 +2,7 @@
 
 #[cfg(test)]
 mod tests {
+    use crate::api::JiraClient;
     use crate::app::App;
     use crate::columns::Column;
     use crate::config::Config;
@@ -11,7 +12,6 @@ mod tests {
     use ratatui::layout::Rect;
     use ratatui::Terminal;
     use std::sync::Arc;
-    use crate::api::JiraClient;
 
     fn test_config() -> Config {
         Config {

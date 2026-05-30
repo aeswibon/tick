@@ -90,7 +90,13 @@ fn collect_cached_tickets(app: &App) -> Vec<GlobalSearchHit> {
         GlobalSearchTarget::BuiltIn(app.active_view)
     };
     for t in tickets.iter() {
-        push_hit(&mut seen, &mut out, current_label.clone(), t.clone(), target.clone());
+        push_hit(
+            &mut seen,
+            &mut out,
+            current_label.clone(),
+            t.clone(),
+            target.clone(),
+        );
     }
 
     out

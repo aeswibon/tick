@@ -18,7 +18,10 @@ pub async fn apply_transition_by_name(
     };
 
     if transition_fields::transition_needs_detail_fetch(&transition) {
-        if let Ok(detail) = jira.get_transition_detail(base_url, key, &transition.id).await {
+        if let Ok(detail) = jira
+            .get_transition_detail(base_url, key, &transition.id)
+            .await
+        {
             transition = detail;
         }
     }

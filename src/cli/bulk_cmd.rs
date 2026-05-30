@@ -96,15 +96,16 @@ async fn run_transition(args: BulkTransitionArgs) -> Result<(), String> {
     if !args.quiet {
         eprintln!("Bulk transition ({} issues)…", keys.len());
     }
-    let outcome = batch::run_batch(keys, |key| {
-        let jira = jira.clone();
-        let base = base.clone();
-        let name = name.clone();
-        async move {
-            operations::transition::apply_transition_by_name(&jira, &base, &key, &name).await
-        }
-    })
-    .await;
+    let outcome =
+        batch::run_batch(keys, |key| {
+            let jira = jira.clone();
+            let base = base.clone();
+            let name = name.clone();
+            async move {
+                operations::transition::apply_transition_by_name(&jira, &base, &key, &name).await
+            }
+        })
+        .await;
     print_bulk_result("Bulk transition", &outcome, args.quiet);
     exit_if_failures(&outcome)
 }
@@ -183,7 +184,10 @@ fn print_bulk_result(label: &str, outcome: &BatchOutcome, quiet: bool) {
     if quiet {
         println!("{}", serde_json::to_string(&json).unwrap_or_default());
     } else {
-        println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json).unwrap_or_default()
+        );
     }
     if !quiet && !outcome.failures.is_empty() {
         eprintln!("{}", batch::format_batch_notice(label, outcome));

@@ -51,10 +51,7 @@ pub fn draw_global_search(f: &mut Frame, app: &App, area: Rect) {
         chunks[0],
     );
     f.render_widget(
-        ratatui::widgets::Paragraph::new(format!(
-            " Query: {} ",
-            app.input_buffer
-        )),
+        ratatui::widgets::Paragraph::new(format!(" Query: {} ", app.input_buffer)),
         chunks[1],
     );
 }

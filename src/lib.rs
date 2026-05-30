@@ -1,9 +1,9 @@
 pub mod api;
 pub mod app;
-pub mod batch;
-pub mod bulk;
 pub mod auth;
 pub mod auth_status;
+pub mod batch;
+pub mod bulk;
 pub mod cache;
 pub mod cli;
 pub mod columns;

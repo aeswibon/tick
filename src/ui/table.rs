@@ -34,9 +34,7 @@ pub fn draw_table(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
                 Style::default().fg(app.theme.row_fg)
             };
 
-            let marked = app
-                .bulk_marked
-                .contains(&(t.site.clone(), t.key.clone()));
+            let marked = app.bulk_marked.contains(&(t.site.clone(), t.key.clone()));
             let cells: Vec<Cell> = columns
                 .iter()
                 .map(|col| {

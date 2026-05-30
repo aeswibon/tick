@@ -207,8 +207,7 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                         InputMode::TemplateEditDescription | InputMode::TemplateEditLabels
                     ) {
                         if let Some(session) = app.template_manage.as_mut() {
-                            session.step =
-                                crate::template_manage_flow::TemplateManageStep::Actions;
+                            session.step = crate::template_manage_flow::TemplateManageStep::Actions;
                         }
                         app.input_mode = InputMode::None;
                         app.input_buffer.clear();

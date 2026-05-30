@@ -149,9 +149,7 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("GET"))
             .and(path("/ping"))
-            .respond_with(
-                ResponseTemplate::new(429).insert_header("retry-after", "0"),
-            )
+            .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "0"))
             .up_to_n_times(1)
             .mount(&server)
             .await;

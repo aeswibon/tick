@@ -32,8 +32,7 @@ pub fn mark_all_filtered(app: &mut App) {
             break;
         }
         let t = &tickets[idx];
-        app.bulk_marked
-            .insert((t.site.clone(), t.key.clone()));
+        app.bulk_marked.insert((t.site.clone(), t.key.clone()));
     }
 }
 
@@ -111,14 +110,18 @@ pub async fn bulk_assign_to_me(app: &mut App) {
     let jira = app.jira.clone();
     let base = base_url.clone();
     let aid = account_id.clone();
-    let outcome = run_bulk_with_progress(app, &keys, "Bulk assign", |i, total| {
-        format!("Bulk assign {i}/{total}…")
-    }, |key| {
-        let jira = jira.clone();
-        let base = base.clone();
-        let aid = aid.clone();
-        async move { jira.assign_to_account(&base, &key, &aid).await }
-    })
+    let outcome = run_bulk_with_progress(
+        app,
+        &keys,
+        "Bulk assign",
+        |i, total| format!("Bulk assign {i}/{total}…"),
+        |key| {
+            let jira = jira.clone();
+            let base = base.clone();
+            let aid = aid.clone();
+            async move { jira.assign_to_account(&base, &key, &aid).await }
+        },
+    )
     .await;
     app.refresh().await;
     bulk_result_notice(app, "Bulk assign", &outcome);
@@ -153,14 +156,18 @@ pub async fn submit_bulk_labels(app: &mut App) {
     let jira = app.jira.clone();
     let base = base_url.clone();
 
-    let outcome = run_bulk_with_progress(app, &keys, "Bulk labels", |i, total| {
-        format!("Bulk labels {i}/{total}…")
-    }, |key| {
-        let jira = jira.clone();
-        let base = base.clone();
-        let labels = labels.clone();
-        async move { jira.update_labels(&base, &key, &labels).await }
-    })
+    let outcome = run_bulk_with_progress(
+        app,
+        &keys,
+        "Bulk labels",
+        |i, total| format!("Bulk labels {i}/{total}…"),
+        |key| {
+            let jira = jira.clone();
+            let base = base.clone();
+            let labels = labels.clone();
+            async move { jira.update_labels(&base, &key, &labels).await }
+        },
+    )
     .await;
     app.input_mode = crate::app::InputMode::None;
     app.input_buffer.clear();
@@ -200,19 +207,23 @@ async fn bulk_watch_toggle(app: &mut App, unwatch: bool) {
     let keys: Vec<String> = refs.iter().map(|r| r.key.clone()).collect();
     let jira = app.jira.clone();
     let base = base_url.clone();
-    let outcome = run_bulk_with_progress(app, &keys, label, |i, total| {
-        format!("{label} {i}/{total}…")
-    }, |key| {
-        let jira = jira.clone();
-        let base = base.clone();
-        async move {
-            if unwatch {
-                jira.unwatch_issue(&base, &key).await
-            } else {
-                jira.watch_issue(&base, &key).await
+    let outcome = run_bulk_with_progress(
+        app,
+        &keys,
+        label,
+        |i, total| format!("{label} {i}/{total}…"),
+        |key| {
+            let jira = jira.clone();
+            let base = base.clone();
+            async move {
+                if unwatch {
+                    jira.unwatch_issue(&base, &key).await
+                } else {
+                    jira.watch_issue(&base, &key).await
+                }
             }
-        }
-    })
+        },
+    )
     .await;
     app.refresh().await;
     bulk_result_notice(app, label, &outcome);
@@ -225,7 +236,8 @@ pub async fn apply_bulk_transition_by_name(
     chosen: &WorkflowTransition,
 ) {
     let Some(base_url) = app.site_base_url(site) else {
-        app.status.set_action_error("Unknown site for bulk transition");
+        app.status
+            .set_action_error("Unknown site for bulk transition");
         return;
     };
 
@@ -234,16 +246,21 @@ pub async fn apply_bulk_transition_by_name(
     let jira = app.jira.clone();
     let base = base_url.clone();
     let name = transition_name.clone();
-    let outcome = run_bulk_with_progress(app, &keys_owned, "Bulk transition", |i, total| {
-        format!("Bulk transition {i}/{total}…")
-    }, |key| {
-        let jira = jira.clone();
-        let base = base.clone();
-        let name = name.clone();
-        async move {
-            crate::operations::transition::apply_transition_by_name(&jira, &base, &key, &name).await
-        }
-    })
+    let outcome = run_bulk_with_progress(
+        app,
+        &keys_owned,
+        "Bulk transition",
+        |i, total| format!("Bulk transition {i}/{total}…"),
+        |key| {
+            let jira = jira.clone();
+            let base = base.clone();
+            let name = name.clone();
+            async move {
+                crate::operations::transition::apply_transition_by_name(&jira, &base, &key, &name)
+                    .await
+            }
+        },
+    )
     .await;
     app.refresh().await;
     bulk_result_notice(app, "Bulk transition", &outcome);
