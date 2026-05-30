@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.18.0] - 2026-05-30
+
+### Added
+
+- **Create description preview** — `Ctrl+P` while editing the create/duplicate wizard description shows a live markdown preview (ADF rendering)
+
+### Documentation
+
+- [create-duplicate-templates.md](docs/features/create-duplicate-templates.md)
+
 ## [0.17.0] - 2026-05-30
 
 ### Added

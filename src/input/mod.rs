@@ -146,6 +146,30 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
     }
 
     if app.input_mode != InputMode::None {
+        if matches!(code, KeyCode::Char('p') | KeyCode::Char('P'))
+            && key.modifiers.contains(KeyModifiers::CONTROL)
+            && app.input_mode == InputMode::CreateDescription
+        {
+            crate::create_flow::toggle_create_description_preview(app);
+            return false;
+        }
+
+        if crate::create_flow::create_description_preview_active(app) {
+            match code {
+                KeyCode::Esc => {
+                    if let Some(session) = app.create_session.as_mut() {
+                        session.description_preview = false;
+                    }
+                    return false;
+                }
+                KeyCode::Enter => {
+                    submit_input(app).await;
+                    return false;
+                }
+                _ => return false,
+            }
+        }
+
         match code {
             KeyCode::Char(c) => {
                 app.input_buffer.push(c);
@@ -195,6 +219,15 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                 clear_mention_picker(app);
                 if app.input_mode == InputMode::TransitionField {
                     cancel_transition_collect(app);
+                } else if app.input_mode == InputMode::CreateDescription
+                    && app
+                        .create_session
+                        .as_ref()
+                        .is_some_and(|s| s.description_preview)
+                {
+                    if let Some(session) = app.create_session.as_mut() {
+                        session.description_preview = false;
+                    }
                 } else if matches!(
                     app.input_mode,
                     InputMode::CreateField

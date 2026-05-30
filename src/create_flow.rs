@@ -34,6 +34,8 @@ pub struct CreateSession {
     pub required_values: HashMap<String, serde_json::Value>,
     /// Reuse transition-field modal for required create fields.
     pub showing_required_field: bool,
+    /// Live markdown preview while editing description (`Ctrl+P`).
+    pub description_preview: bool,
 }
 
 pub fn cancel_create(app: &mut App) {
@@ -87,6 +89,7 @@ pub async fn start_create_from_template(app: &mut App) {
         required_pending: Vec::new(),
         required_values: HashMap::new(),
         showing_required_field: false,
+        description_preview: false,
     });
     app.showing_create_picker = true;
 }
@@ -107,6 +110,7 @@ pub async fn start_create_blank(app: &mut App) {
             required_pending: Vec::new(),
             required_values: HashMap::new(),
             showing_required_field: false,
+            description_preview: false,
         });
         advance_create_step(app).await;
     } else {
@@ -124,6 +128,7 @@ pub async fn start_create_blank(app: &mut App) {
             required_pending: Vec::new(),
             required_values: HashMap::new(),
             showing_required_field: false,
+            description_preview: false,
         });
         app.showing_create_picker = true;
     }
@@ -179,6 +184,7 @@ pub async fn start_create_duplicate(app: &mut App) {
         required_pending: Vec::new(),
         required_values: HashMap::new(),
         showing_required_field: false,
+        description_preview: false,
     });
     begin_summary_input(app);
 }
@@ -333,10 +339,31 @@ fn begin_summary_input(app: &mut App) {
 fn begin_description_input(app: &mut App) {
     if let Some(session) = app.create_session.as_mut() {
         session.step = CreateStep::Description;
+        session.description_preview = false;
         app.input_buffer = session.draft.description.clone();
         app.input_mentions.clear();
     }
     app.input_mode = InputMode::CreateDescription;
+}
+
+pub fn toggle_create_description_preview(app: &mut App) {
+    if app.input_mode != InputMode::CreateDescription {
+        return;
+    }
+    if let Some(session) = app.create_session.as_mut() {
+        session.description_preview = !session.description_preview;
+        if session.description_preview {
+            app.showing_mention_picker = false;
+        }
+    }
+}
+
+pub fn create_description_preview_active(app: &App) -> bool {
+    app.input_mode == InputMode::CreateDescription
+        && app
+            .create_session
+            .as_ref()
+            .is_some_and(|s| s.description_preview)
 }
 
 async fn load_required_and_prompt(app: &mut App) {
@@ -576,6 +603,7 @@ pub async fn submit_create(app: &mut App) {
                 required_pending: pending,
                 required_values,
                 showing_required_field: false,
+                description_preview: false,
             });
             app.status.set_action_error(e.message);
             if !begin_next_create_required(app) {

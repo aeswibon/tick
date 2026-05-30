@@ -39,6 +39,9 @@ pub fn render(f: &mut Frame, app: &mut App) {
     if app.showing_create_picker {
         super::create::draw_create_picker(f, app, f.area());
     }
+    if crate::create_flow::create_description_preview_active(app) {
+        super::create_preview::draw_create_description_preview(f, app, f.area());
+    }
     if let Some(ref session) = app.template_export {
         if session.step != crate::template_export_flow::TemplateExportStep::Name {
             super::template_export::draw_template_export(f, session, &app.theme, f.area());
@@ -283,13 +286,20 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         };
         (format!(" {label}: {}_", app.input_buffer), app.theme.accent)
     } else if app.input_mode == crate::app::InputMode::CreateDescription {
-        (
-            format!(
-                " Description (markdown, Enter empty OK): {}_",
-                app.input_buffer
-            ),
-            app.theme.accent,
-        )
+        if crate::create_flow::create_description_preview_active(app) {
+            (
+                " Description preview — Ctrl+P edit · Enter submit · Esc edit".into(),
+                app.theme.border,
+            )
+        } else {
+            (
+                format!(
+                    " Description (markdown, Ctrl+P preview): {}_",
+                    app.input_buffer
+                ),
+                app.theme.accent,
+            )
+        }
     } else if app.input_mode == crate::app::InputMode::TemplateExportName {
         (
             format!(

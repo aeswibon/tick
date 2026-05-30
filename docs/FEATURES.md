@@ -34,6 +34,12 @@ Single-page map of everything tick can do. For **step-by-step guides with exampl
 
 Custom JQL: `[views]` and `[[views.custom]]` in config. Cache: `~/.config/tick/cache/`.
 
+### v0.18 highlights
+
+| Feature | Guide |
+|---------|--------|
+| Create description preview | [create-duplicate-templates.md](features/create-duplicate-templates.md) — `Ctrl+P` in create wizard |
+
 ### v0.17 highlights
 
 | Feature | Guide |

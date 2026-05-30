@@ -13,6 +13,7 @@ Create and duplicate work from the **table** (detail pane can be open or closed)
 | `Shift+E` | **Manage** templates (edit fields, delete) |
 | `p` | During wizard: re-pick project |
 | `t` | During wizard: re-pick issue type (not status) |
+| `Ctrl+P` | While editing create description: toggle markdown preview |
 
 ## New issue (`n`)
 
@@ -22,7 +23,7 @@ Create and duplicate work from the **table** (detail pane can be open or closed)
 2. Project picker (skipped if `create_project` set)  
 3. Issue type picker (skipped if `create_issue_type` set)  
 4. Summary (required)  
-5. Description (optional markdown)  
+5. Description (optional markdown) — **`Ctrl+P`** toggles live preview (same rendering as the detail Description tab)  
 6. Required custom fields from create metadata (same UI as transition fields)
 
 ### Config shortcuts
