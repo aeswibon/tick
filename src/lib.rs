@@ -19,6 +19,7 @@ pub mod issue_key;
 pub mod issue_relations_flow;
 pub mod oauth;
 pub mod operations;
+pub mod plugins;
 pub mod platform;
 pub mod template_export;
 pub mod template_export_flow;
@@ -201,6 +202,12 @@ pub async fn run_doctor(config: &Config) {
             }
             Err(e) => println!("  Agile boards: FAILED — {e}"),
         }
+    }
+
+    println!("\n--- Plugins ---");
+    let host = plugins::PluginHost::load();
+    for line in host.doctor_lines() {
+        println!("{line}");
     }
 }
 

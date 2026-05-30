@@ -274,6 +274,7 @@ pub struct App {
     pub custom_field_editing: Option<crate::config::EditableFieldConfig>,
     /// Loading description/comments for the open detail pane.
     pub detail_loading: bool,
+    pub plugins: crate::plugins::PluginHost,
 }
 
 impl App {
@@ -367,7 +368,11 @@ impl App {
             custom_field_select_selected: 0,
             custom_field_editing: None,
             detail_loading: false,
+            plugins: crate::plugins::PluginHost::load(),
         };
+        for err in &app.plugins.load_errors {
+            eprintln!("[tick plugin] {err}");
+        }
         app.load_cache();
         app
     }
@@ -562,6 +567,10 @@ impl App {
         self.columns = Column::resolve(self.config.columns.as_deref());
         self.custom_field_ids = self.config.custom_field_ids_for_fetch();
         self.page_size = self.config.page_size as usize;
+        self.plugins = crate::plugins::PluginHost::load();
+        for err in &self.plugins.load_errors {
+            eprintln!("[tick plugin] {err}");
+        }
         self.invalidate_filter_cache();
         self.status
             .set_action_notice("Config reloaded — press r to refresh views");
@@ -571,10 +580,9 @@ impl App {
     fn load_cache(&mut self) {
         self.view_cache = self.cache.load_all();
         if let Some(cached) = self.view_cache.get(&self.active_view).cloned() {
-            write_tickets(&self.tickets).clone_from(&cached);
+            self.install_ticket_list(cached);
             self.loading = false;
             self.live_data = false;
-            self.invalidate_filter_cache();
         }
         self.sync_view_fetched_at(self.active_view);
     }
@@ -773,12 +781,26 @@ impl App {
         self.clamp_scroll_offset();
     }
 
+    fn apply_plugin_filters(&mut self, tickets: &mut Vec<Ticket>) {
+        if let Err(e) = self.plugins.filter_tickets(tickets) {
+            self.status
+                .set_action_notice(format!("Plugin filter failed: {e}"));
+        }
+    }
+
+    fn install_ticket_list(&mut self, mut tickets: Vec<Ticket>) {
+        self.apply_plugin_filters(&mut tickets);
+        write_tickets(&self.tickets).clone_from(&tickets);
+        self.invalidate_filter_cache();
+    }
+
     fn apply_fetch_result(
         &mut self,
-        tickets: Vec<Ticket>,
+        mut tickets: Vec<Ticket>,
         errors: Vec<String>,
         reset_cursor: bool,
     ) {
+        self.apply_plugin_filters(&mut tickets);
         let no_errors = errors.is_empty();
         let had_tickets = !read_tickets(&self.tickets).is_empty();
 
@@ -1126,17 +1148,16 @@ impl App {
         let view = &self.config.views.custom[index];
         let slug = view.cache_slug();
         if let Some(cached) = self.custom_view_cache.get(&slug).cloned() {
-            write_tickets(&self.tickets).clone_from(&cached);
+            self.install_ticket_list(cached);
             self.loading = false;
             self.live_data = false;
-            self.invalidate_filter_cache();
             self.scroll_offset = 0;
             self.selected = 0;
             self.detail_open = false;
             return;
         }
         if let Some(tickets) = self.cache.load_custom_view(&slug) {
-            write_tickets(&self.tickets).clone_from(&tickets);
+            self.install_ticket_list(tickets.clone());
             self.custom_view_cache.insert(slug, tickets);
             self.loading = false;
             self.live_data = false;
@@ -1167,19 +1188,17 @@ impl App {
         self.custom_view_index = None;
         self.active_view = mode;
         if let Some(cached) = self.view_cache.get(&mode).cloned() {
-            write_tickets(&self.tickets).clone_from(&cached);
+            self.install_ticket_list(cached);
             self.loading = false;
             self.live_data = false;
-            self.invalidate_filter_cache();
             self.scroll_offset = 0;
             self.selected = 0;
             self.sync_view_fetched_at(mode);
         } else if let Some(tickets) = self.cache.load_view(mode) {
-            write_tickets(&self.tickets).clone_from(&tickets);
-            self.view_cache.insert(mode, tickets.clone());
+            self.install_ticket_list(tickets.clone());
+            self.view_cache.insert(mode, tickets);
             self.loading = false;
             self.live_data = false;
-            self.invalidate_filter_cache();
             self.scroll_offset = 0;
             self.selected = 0;
             self.sync_view_fetched_at(mode);

@@ -53,6 +53,7 @@ tick is a **single-binary async TUI**:
 | `ticket_lock` | `Arc<RwLock<Vec<Ticket>>>` read/write helpers |
 | `fetch_status` | Footer errors, site warnings, action notices |
 | `platform` | Open browser, desktop notifications |
+| `plugins` | Lua `filter_tickets` plugins under `~/.config/tick/plugins/` |
 
 Entry points:
 
@@ -98,7 +99,7 @@ See [testing.md](testing.md) for how to test without a live Jira site.
 
 ## Related docs
 
-- [plugin-rfc.md](plugin-rfc.md) — draft plugin runtime (track C; not implemented)
+- [plugin-rfc.md](plugin-rfc.md) — plugin runtime design (C.1 `filter_tickets` shipped in v0.21)
 - [testing.md](testing.md) — unit, wiremock, insta, proptest, benches
 - [CONTRIBUTING.md](../../CONTRIBUTING.md) — first PR and CI checks
 - [CHANGELOG.md](../../CHANGELOG.md) — shipped versions

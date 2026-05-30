@@ -1,4 +1,6 @@
-# Automation (CLI)
+# Automation
+
+For in-process Lua filters (hide epics, etc.), see [plugins.md](plugins.md). (CLI)
 
 Headless commands use the same `config.toml` and auth as the TUI.
 
@@ -86,3 +88,7 @@ timeout_secs = 30   # optional; default 30
 Hooks run even when some issues fail (so you can alert or log partial failures). Same background + stderr `[tick hook] …` behavior as refresh hooks.
 
 Example scripts: [examples/automation/](../../examples/automation/).
+
+## Plugins (Lua)
+
+For in-process table filters (e.g. hide epics), see [plugins.md](plugins.md).

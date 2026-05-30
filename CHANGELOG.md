@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.21.0] - 2026-05-30
+
+### Added
+
+- **Lua plugins (C.1)** — `~/.config/tick/plugins/<name>/` with `tick.plugin.toml` and `filter_tickets()` in `main.lua`; runs after each fetch and on cached view load
+- Example: `examples/plugins/hide-epics/`
+- `tick --doctor` lists plugin directory and load status
+
+### Documentation
+
+- [plugins.md](docs/features/plugins.md), [plugin-rfc.md](docs/architecture/plugin-rfc.md)
+
 ## [0.20.0] - 2026-05-30
 
 ### Fixed

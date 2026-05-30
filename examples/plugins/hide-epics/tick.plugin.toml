@@ -1,0 +1,8 @@
+name = "hide-epics"
+version = "0.1.0"
+api = "1"
+runtime = "lua"
+entry = "main.lua"
+
+[capabilities]
+filter_tickets = true
