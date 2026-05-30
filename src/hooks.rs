@@ -8,7 +8,8 @@ use tokio::process::Command;
 use tokio::time::{timeout, Duration};
 
 use crate::api::types::Ticket;
-use crate::config::{Config, RefreshHook};
+use crate::batch::{self, BatchOutcome};
+use crate::config::{BulkCompleteHook, Config, RefreshHook};
 
 #[derive(Serialize)]
 struct HookTicketJson {
@@ -32,6 +33,23 @@ pub fn fire_on_refresh(config: &Config, view_id: &str, tickets: &[Ticket]) {
         let tickets = tickets.to_vec();
         tokio::spawn(async move {
             if let Err(e) = run_on_refresh_hook(&hook, &view_id, &tickets).await {
+                eprintln!("[tick hook] {}", e);
+            }
+        });
+    }
+}
+
+/// Fire all `[[hooks.on_bulk_complete]]` entries after a bulk action (TUI or CLI).
+pub fn fire_on_bulk_complete(config: &Config, label: &str, outcome: &BatchOutcome) {
+    if config.hooks.on_bulk_complete.is_empty() {
+        return;
+    }
+    for hook in &config.hooks.on_bulk_complete {
+        let hook = hook.clone();
+        let label = label.to_string();
+        let outcome = batch::bulk_result_payload(&label, outcome);
+        tokio::spawn(async move {
+            if let Err(e) = run_on_bulk_complete_hook(&hook, &outcome).await {
                 eprintln!("[tick hook] {}", e);
             }
         });
@@ -67,7 +85,7 @@ async fn run_on_refresh_hook(
         })
         .collect();
 
-    let json_path = write_hook_json(&payload)?;
+    let json_path = write_hook_json_file("refresh", &payload)?;
     let count = tickets.len().to_string();
 
     let mut cmd = Command::new("sh");
@@ -93,11 +111,47 @@ async fn run_on_refresh_hook(
     }
 }
 
-fn write_hook_json(payload: &[HookTicketJson]) -> Result<String, String> {
+async fn run_on_bulk_complete_hook(
+    hook: &BulkCompleteHook,
+    payload: &batch::BulkResultPayload,
+) -> Result<(), String> {
+    if hook.command.trim().is_empty() {
+        return Err("hook command is empty".into());
+    }
+
+    let json_path = write_hook_json_file("bulk", payload)?;
+    let ok_count = payload.ok.to_string();
+    let fail_count = payload.failed.len().to_string();
+
+    let mut cmd = Command::new("sh");
+    cmd.arg("-c")
+        .arg(&hook.command)
+        .env("TICK_BULK_LABEL", &payload.label)
+        .env("TICK_JSON_PATH", &json_path)
+        .env("TICK_OK_COUNT", &ok_count)
+        .env("TICK_FAIL_COUNT", &fail_count)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit());
+
+    let secs = hook.timeout_secs.max(1);
+    let run = cmd.status();
+    match timeout(Duration::from_secs(secs), run).await {
+        Ok(Ok(status)) if status.success() => Ok(()),
+        Ok(Ok(status)) => Err(format!(
+            "hook exited with status {}",
+            status.code().unwrap_or(-1)
+        )),
+        Ok(Err(e)) => Err(format!("hook failed to start: {e}")),
+        Err(_) => Err(format!("hook timed out after {secs}s")),
+    }
+}
+
+fn write_hook_json_file(prefix: &str, payload: &impl Serialize) -> Result<String, String> {
     let dir = std::env::temp_dir().join("tick-hooks");
     std::fs::create_dir_all(&dir).map_err(|e| format!("create hook temp dir: {e}"))?;
     let path: PathBuf = dir.join(format!(
-        "refresh-{}-{}.json",
+        "{prefix}-{}-{}.json",
         std::process::id(),
         chrono::Utc::now().timestamp_millis()
     ));

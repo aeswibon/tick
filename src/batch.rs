@@ -1,6 +1,8 @@
-//! Shared per-issue batch loops for TUI bulk and future CLI.
+//! Shared per-issue batch loops for TUI bulk and CLI bulk.
 
 use std::borrow::Borrow;
+
+use serde::Serialize;
 
 #[derive(Debug, Default)]
 pub struct BatchOutcome {
@@ -42,6 +44,41 @@ where
     outcome
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct BulkFailure {
+    pub key: String,
+    pub error: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BulkResultPayload {
+    pub label: String,
+    pub ok: usize,
+    pub failed: Vec<BulkFailure>,
+}
+
+pub fn bulk_result_payload(label: &str, outcome: &BatchOutcome) -> BulkResultPayload {
+    BulkResultPayload {
+        label: label.to_string(),
+        ok: outcome.ok,
+        failed: parse_bulk_failures(outcome),
+    }
+}
+
+pub fn parse_bulk_failures(outcome: &BatchOutcome) -> Vec<BulkFailure> {
+    outcome
+        .failures
+        .iter()
+        .filter_map(|s| {
+            let (key, error) = s.split_once(": ")?;
+            Some(BulkFailure {
+                key: key.to_string(),
+                error: error.to_string(),
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -60,6 +97,18 @@ mod tests {
         assert_eq!(outcome.ok, 2);
         assert_eq!(outcome.failures.len(), 1);
         assert!(outcome.failures[0].contains("A-2"));
+    }
+
+    #[test]
+    fn parse_bulk_failures_splits_key_error() {
+        let outcome = BatchOutcome {
+            ok: 1,
+            failures: vec!["HIN-1: not found".into()],
+        };
+        let f = parse_bulk_failures(&outcome);
+        assert_eq!(f.len(), 1);
+        assert_eq!(f[0].key, "HIN-1");
+        assert_eq!(f[0].error, "not found");
     }
 
     #[test]

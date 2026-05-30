@@ -259,10 +259,20 @@ fn default_hook_timeout_secs() -> u64 {
     30
 }
 
+/// Shell command run after TUI or CLI bulk actions finish (`[[hooks.on_bulk_complete]]`).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BulkCompleteHook {
+    pub command: String,
+    #[serde(default = "default_hook_timeout_secs")]
+    pub timeout_secs: u64,
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct HooksSettings {
     #[serde(default, rename = "on_refresh")]
     pub on_refresh: Vec<RefreshHook>,
+    #[serde(default, rename = "on_bulk_complete")]
+    pub on_bulk_complete: Vec<BulkCompleteHook>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -777,6 +787,27 @@ base_url = "https://one.atlassian.net"
         let mut cfg: Config = toml::from_str(raw).unwrap();
         cfg.view_jql = Config::build_view_jql(&cfg.views);
         assert!(cfg.notify_on_refresh);
+    }
+
+    #[test]
+    fn parses_on_bulk_complete_hooks() {
+        let raw = r#"
+email = "a@b.com"
+token = "secret"
+
+[[sites]]
+name = "one"
+base_url = "https://one.atlassian.net"
+
+[[hooks.on_bulk_complete]]
+command = "true"
+timeout_secs = 10
+"#;
+        let mut cfg: Config = toml::from_str(raw).unwrap();
+        cfg.view_jql = Config::build_view_jql(&cfg.views);
+        assert_eq!(cfg.hooks.on_bulk_complete.len(), 1);
+        assert_eq!(cfg.hooks.on_bulk_complete[0].command, "true");
+        assert_eq!(cfg.hooks.on_bulk_complete[0].timeout_secs, 10);
     }
 
     #[test]

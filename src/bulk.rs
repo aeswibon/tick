@@ -296,6 +296,7 @@ where
 fn bulk_result_notice(app: &mut App, label: &str, outcome: &BatchOutcome) {
     app.status
         .set_action_notice(batch::format_batch_notice(label, outcome));
+    crate::hooks::fire_on_bulk_complete(&app.config, label, outcome);
 }
 
 #[cfg(test)]

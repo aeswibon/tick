@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
-use serde::Serialize;
 
 use crate::api::JiraClient;
 use crate::batch::{self, BatchOutcome};
 use crate::cli::util::{parse_keys_list, require_site};
 use crate::config::Config;
+use crate::hooks;
 use crate::operations;
 
 #[derive(Subcommand)]
@@ -56,19 +56,6 @@ pub struct BulkLabelsArgs {
     pub quiet: bool,
 }
 
-#[derive(Serialize)]
-struct BulkResultJson {
-    label: String,
-    ok: usize,
-    failed: Vec<BulkFailureJson>,
-}
-
-#[derive(Serialize)]
-struct BulkFailureJson {
-    key: String,
-    error: String,
-}
-
 pub async fn run(action: BulkCommand) -> Result<(), String> {
     let result = match action {
         BulkCommand::Transition(a) => run_transition(a).await,
@@ -106,7 +93,7 @@ async fn run_transition(args: BulkTransitionArgs) -> Result<(), String> {
             }
         })
         .await;
-    print_bulk_result("Bulk transition", &outcome, args.quiet);
+    finish_bulk(&config, "Bulk transition", &outcome, args.quiet);
     exit_if_failures(&outcome)
 }
 
@@ -135,7 +122,7 @@ async fn run_assign(args: BulkAssignArgs) -> Result<(), String> {
         async move { jira.assign_to_account(&base, &key, &aid).await }
     })
     .await;
-    print_bulk_result("Bulk assign", &outcome, args.quiet);
+    finish_bulk(&config, "Bulk assign", &outcome, args.quiet);
     exit_if_failures(&outcome)
 }
 
@@ -160,27 +147,17 @@ async fn run_labels(args: BulkLabelsArgs) -> Result<(), String> {
         async move { jira.update_labels(&base, &key, &labels).await }
     })
     .await;
-    print_bulk_result("Bulk labels", &outcome, args.quiet);
+    finish_bulk(&config, "Bulk labels", &outcome, args.quiet);
     exit_if_failures(&outcome)
 }
 
+fn finish_bulk(config: &Config, label: &str, outcome: &BatchOutcome, quiet: bool) {
+    print_bulk_result(label, outcome, quiet);
+    hooks::fire_on_bulk_complete(config, label, outcome);
+}
+
 fn print_bulk_result(label: &str, outcome: &BatchOutcome, quiet: bool) {
-    let failed: Vec<BulkFailureJson> = outcome
-        .failures
-        .iter()
-        .filter_map(|s| {
-            let (key, error) = s.split_once(": ")?;
-            Some(BulkFailureJson {
-                key: key.to_string(),
-                error: error.to_string(),
-            })
-        })
-        .collect();
-    let json = BulkResultJson {
-        label: label.to_string(),
-        ok: outcome.ok,
-        failed,
-    };
+    let json = batch::bulk_result_payload(label, outcome);
     if quiet {
         println!("{}", serde_json::to_string(&json).unwrap_or_default());
     } else {

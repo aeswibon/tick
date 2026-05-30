@@ -195,6 +195,23 @@ timeout_secs = 30                               # optional, default 30
 
 See [features/automation.md](features/automation.md#refresh-hooks).
 
+### Bulk-complete hooks
+
+```toml
+[[hooks.on_bulk_complete]]
+command = "~/.local/bin/on-tick-bulk.sh"
+timeout_secs = 30
+```
+
+| Variable | Meaning |
+|----------|---------|
+| `TICK_BULK_LABEL` | e.g. `Bulk assign`, `Bulk labels` |
+| `TICK_JSON_PATH` | Temp file: `{ label, ok, failed: [{ key, error }] }` |
+| `TICK_OK_COUNT` | Success count |
+| `TICK_FAIL_COUNT` | Failure count |
+
+Fires after TUI bulk table actions and `tick bulk` (including partial failures). See [features/automation.md](features/automation.md#bulk-complete-hooks).
+
 ## Example full config
 
 ```toml

@@ -65,3 +65,24 @@ timeout_secs = 30                  # optional; default 30
 Hooks run in the background. Failures print to stderr as `[tick hook] …`. Not run when the fetch returns site errors.
 
 Details: [CONFIGURATION.md](../CONFIGURATION.md#refresh-hooks).
+
+## Bulk-complete hooks
+
+After **TUI** bulk actions (assign, labels, transition, watch/unwatch) or **`tick bulk`** finishes, tick can run shell commands:
+
+```toml
+[[hooks.on_bulk_complete]]
+command = "~/.local/bin/on-tick-bulk.sh"
+timeout_secs = 30   # optional; default 30
+```
+
+| Variable | Content |
+|----------|---------|
+| `TICK_BULK_LABEL` | Action label, e.g. `Bulk assign`, `Bulk transition` |
+| `TICK_JSON_PATH` | Temp JSON: `{ "label", "ok", "failed": [{ "key", "error" }] }` |
+| `TICK_OK_COUNT` | Successful issue count |
+| `TICK_FAIL_COUNT` | Failed issue count |
+
+Hooks run even when some issues fail (so you can alert or log partial failures). Same background + stderr `[tick hook] …` behavior as refresh hooks.
+
+Example scripts: [examples/automation/](../../examples/automation/).

@@ -58,6 +58,14 @@ pub fn validate_config(config: &Config) -> Vec<CheckFinding> {
         }
     }
 
+    for (i, hook) in config.hooks.on_bulk_complete.iter().enumerate() {
+        if hook.command.trim().is_empty() {
+            out.push(err(format!(
+                "hooks.on_bulk_complete[{i}] has empty command"
+            )));
+        }
+    }
+
     for t in &config.create.templates {
         if t.name.trim().is_empty() {
             out.push(err("Template with empty name"));
@@ -152,6 +160,25 @@ mod tests {
         assert!(validate_config(&config)
             .iter()
             .any(|f| f.message.contains("Duplicate")));
+    }
+
+    #[test]
+    fn empty_bulk_hook_command_is_error() {
+        let mut config = minimal_config(vec![crate::config::Site {
+            name: "zeta".into(),
+            base_url: "https://zeta.atlassian.net".into(),
+            ..Default::default()
+        }]);
+        config
+            .hooks
+            .on_bulk_complete
+            .push(crate::config::BulkCompleteHook {
+                command: "  ".into(),
+                timeout_secs: 30,
+            });
+        assert!(validate_config(&config)
+            .iter()
+            .any(|f| f.message.contains("on_bulk_complete")));
     }
 
     #[test]

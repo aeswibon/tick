@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.16.0] - 2026-05-30
+
+### Added
+
+- **Bulk-complete hooks** — `[[hooks.on_bulk_complete]]` after TUI bulk actions and `tick bulk`; env `TICK_BULK_LABEL`, `TICK_JSON_PATH`, `TICK_OK_COUNT`, `TICK_FAIL_COUNT`
+- **Automation examples** — `examples/automation/` sample scripts for hooks
+
+### Documentation
+
+- [CONFIGURATION.md](docs/CONFIGURATION.md#bulk-complete-hooks), [automation.md](docs/features/automation.md#bulk-complete-hooks)
+
 ## [0.15.1] - 2026-05-30
 
 ### Changed
