@@ -4,6 +4,9 @@ Config file: `~/.config/tick/config.toml`
 
 Generate a template: `tick --init`
 
+Validate structure (offline): `tick --check`  
+Probe live Jira APIs: `tick --doctor`
+
 **Examples by feature:** [features/](features/README.md) · **Keys:** [KEYBINDINGS.md](KEYBINDINGS.md)
 
 ## Top-level options

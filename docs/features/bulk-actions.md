@@ -36,6 +36,14 @@ Bulk **transition**, **assign**, and **watch** require every marked issue to be 
 
 With marks active on the table (detail closed), `a` assigns the **current Jira user** to every marked issue on that site.
 
+## Bulk labels (`L`)
+
+With marks on the table (detail closed), `L` opens a footer prompt for **comma-separated** labels. The value **replaces** labels on every marked issue (same as single-issue `L` in the detail pane). Empty input clears labels.
+
+**Results:** footer notice like `Bulk labels: 4 ok, 1 failed (PROJ-9: …)`.
+
+Same-site rule and 50-issue cap apply.
+
 ## Bulk watch (`W` / `Shift+W`)
 
 With marks on the table (detail closed):

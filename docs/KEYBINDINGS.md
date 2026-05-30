@@ -46,6 +46,7 @@ For workflows and examples, see the [feature guides](features/README.md).
 | `7`–`9` | **Custom JQL** views | When `[[views.custom]]` configured |
 | `v` / `Shift+V` | Cycle custom views | Wraps through `views.custom` |
 | `Shift+E` | Template manager | Edit summary/project/type/**description**/**labels**; delete |
+| `L` | **Bulk:** set labels on marked rows (table, marks active) | Replaces all labels; comma-separated |
 | `h` | **Closed tab only:** toggle assignee / ever-assigned | Re-runs search if query set |
 | `f` | **Closed tab only:** local filter | After fetch; does not call Jira |
 | `n` | New issue wizard | |

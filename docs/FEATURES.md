@@ -34,6 +34,14 @@ Single-page map of everything tick can do. For **step-by-step guides with exampl
 
 Custom JQL: `[views]` and `[[views.custom]]` in config. Cache: `~/.config/tick/cache/`.
 
+### v0.13 highlights
+
+| Feature | Guide |
+|---------|--------|
+| Bulk labels | [bulk-actions.md](features/bulk-actions.md) — `L` with marks |
+| Headless CLI | [automation.md](features/automation.md) — `tick issue show`, `tick issue transition` |
+| Config check | `tick --check` (offline); `tick --doctor` (live) |
+
 ### v0.12 highlights
 
 | Feature | Guide |

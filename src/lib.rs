@@ -1,17 +1,21 @@
 pub mod api;
 pub mod app;
+pub mod batch;
 pub mod bulk;
 pub mod auth;
 pub mod auth_status;
 pub mod cache;
+pub mod cli;
 pub mod columns;
 pub mod config;
+pub mod config_check;
 pub mod create_flow;
 pub mod fetch_status;
 pub mod input;
 pub mod issue_key;
 pub mod issue_relations_flow;
 pub mod oauth;
+pub mod operations;
 pub mod platform;
 pub mod template_export;
 pub mod template_export_flow;
@@ -51,6 +55,10 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub doctor: bool,
 
+    /// Offline config validation (structural; use --doctor for live Jira probes)
+    #[arg(long, global = true)]
+    pub check: bool,
+
     #[arg(long, global = true)]
     pub debug: bool,
 
@@ -78,6 +86,11 @@ pub enum TickCommand {
     Template {
         #[command(subcommand)]
         action: TemplateCommand,
+    },
+    /// Headless issue operations (JSON output)
+    Issue {
+        #[command(subcommand)]
+        action: cli::issue::IssueCommand,
     },
 }
 
@@ -192,6 +205,10 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         return run_template_command(action).await;
     }
 
+    if let Some(TickCommand::Issue { action }) = cli.command {
+        return cli::issue::run(action).await;
+    }
+
     if cli.init {
         Config::create_default_config().map_err(|e| format!("Config error: {}", e))?;
         return Ok(());
@@ -209,6 +226,10 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     if cli.doctor {
         run_doctor(&config).await;
         return Ok(());
+    }
+
+    if cli.check {
+        std::process::exit(config_check::run_check(&config));
     }
 
     if cli.list_themes {

@@ -261,6 +261,8 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                         | InputMode::TemplateEditLabels
                 ) {
                     crate::template_manage_flow::submit_template_edit(app).await;
+                } else if app.input_mode == InputMode::BulkEditLabels {
+                    crate::bulk::submit_bulk_labels(app).await;
                 } else {
                     submit_input(app).await;
                 }

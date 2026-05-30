@@ -221,6 +221,9 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('P') if app.detail_open => {
             start_priority_picker(app).await;
         }
+        KeyCode::Char('L') if app.bulk_mark_count() > 0 && !app.detail_open => {
+            crate::bulk::start_bulk_labels_edit(app);
+        }
         KeyCode::Char('L') if app.detail_open => {
             if let Some(ticket) = app.selected_ticket_entry() {
                 app.input_mode = InputMode::EditLabels;

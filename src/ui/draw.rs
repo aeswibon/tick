@@ -212,6 +212,15 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             format!(" Labels (comma-separated): {}_", app.input_buffer),
             app.theme.accent,
         )
+    } else if app.input_mode == crate::app::InputMode::BulkEditLabels {
+        (
+            format!(
+                " Bulk labels for {} issues (comma-separated): {}_",
+                app.bulk_mark_count(),
+                app.input_buffer
+            ),
+            app.theme.accent,
+        )
     } else if app.input_mode == crate::app::InputMode::EditDueDate {
         (
             format!(

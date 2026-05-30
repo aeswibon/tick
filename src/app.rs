@@ -140,6 +140,8 @@ pub enum InputMode {
     TemplateEditIssueType,
     TemplateEditDescription,
     TemplateEditLabels,
+    /// Bulk replace labels on marked table rows (comma-separated footer).
+    BulkEditLabels,
     /// Add issue link: target KEY after picking link type.
     AddIssueLinkTarget,
     /// Create subtask under current issue (summary only).

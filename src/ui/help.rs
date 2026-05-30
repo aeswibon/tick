@@ -86,6 +86,7 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
         )),
         Line::from("  t / T                  Change status (bulk if rows marked)"),
         Line::from("  a                      Assign to me (bulk on table when marked)"),
+        Line::from("  L                      Labels (bulk on table when marked)"),
         Line::from("  c                      Add comment (@ tags users)"),
         Line::from("  w                      Log work time"),
         Line::from("  a / u                  Assign to me / unassign (detail open)"),

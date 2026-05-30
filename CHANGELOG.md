@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.13.0] - 2026-05-30
+
+### Added
+
+- **Bulk labels** — with table marks, `L` sets comma-separated labels on all marked issues (same-site, max 50)
+- **Headless CLI** — `tick issue show` (JSON), `tick issue transition --to <name>`
+- **Config check** — `tick --check` for offline structural validation (sites, views, templates, columns)
+
+### Changed
+
+- **Bulk internals** — shared batch runner and transition-by-name module for TUI and CLI
+
+### Documentation
+
+- [docs/features/automation.md](docs/features/automation.md), bulk labels in [bulk-actions.md](docs/features/bulk-actions.md)
+
 ## [0.12.2] - 2026-05-30
 
 ### Added

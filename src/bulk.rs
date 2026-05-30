@@ -1,11 +1,8 @@
 //! Multi-select table actions (transition, assign, watch).
 
-use std::collections::HashMap;
-
-use crate::api::transition_fields;
 use crate::api::types::WorkflowTransition;
-use crate::api::{self};
 use crate::app::App;
+use crate::batch::{self, BatchOutcome};
 
 pub const BULK_MAX_SELECTED: usize = 50;
 
@@ -110,24 +107,65 @@ pub async fn bulk_assign_to_me(app: &mut App) {
         }
     };
 
-    let total = refs.len();
-    let mut ok = 0usize;
-    let mut failures: Vec<String> = Vec::new();
-    for (i, r) in refs.iter().enumerate() {
-        app.loading_message = Some(format!("Bulk assign {}/{}…", i + 1, total));
-        match app
-            .jira
-            .assign_to_account(&base_url, &r.key, &account_id)
-            .await
-        {
-            Ok(()) => ok += 1,
-            Err(e) => failures.push(format!("{}: {e}", r.key)),
-        }
-    }
-    app.loading = false;
-    app.loading_message = None;
+    let keys: Vec<String> = refs.iter().map(|r| r.key.clone()).collect();
+    let jira = app.jira.clone();
+    let base = base_url.clone();
+    let aid = account_id.clone();
+    let outcome = run_bulk_with_progress(app, &keys, "Bulk assign", |i, total| {
+        format!("Bulk assign {i}/{total}…")
+    }, |key| {
+        let jira = jira.clone();
+        let base = base.clone();
+        let aid = aid.clone();
+        async move { jira.assign_to_account(&base, &key, &aid).await }
+    })
+    .await;
     app.refresh().await;
-    bulk_result_notice(app, "Bulk assign", ok, failures);
+    bulk_result_notice(app, "Bulk assign", &outcome);
+}
+
+pub fn start_bulk_labels_edit(app: &mut App) {
+    let refs = app.bulk_marked_refs_in_filter_order();
+    if refs.is_empty() {
+        return;
+    }
+    if app.bulk_same_site().is_none() {
+        app.status
+            .set_action_error("Bulk actions require a single site");
+        return;
+    }
+    app.input_mode = crate::app::InputMode::BulkEditLabels;
+    app.input_buffer.clear();
+}
+
+pub async fn submit_bulk_labels(app: &mut App) {
+    let refs = app.bulk_marked_refs_in_filter_order();
+    if refs.is_empty() {
+        return;
+    }
+    let site = refs[0].site.clone();
+    let Some(base_url) = app.site_base_url(&site) else {
+        app.status.set_action_error("Unknown site for bulk labels");
+        return;
+    };
+    let labels = crate::app::parse_labels_input(&app.input_buffer);
+    let keys: Vec<String> = refs.iter().map(|r| r.key.clone()).collect();
+    let jira = app.jira.clone();
+    let base = base_url.clone();
+
+    let outcome = run_bulk_with_progress(app, &keys, "Bulk labels", |i, total| {
+        format!("Bulk labels {i}/{total}…")
+    }, |key| {
+        let jira = jira.clone();
+        let base = base.clone();
+        let labels = labels.clone();
+        async move { jira.update_labels(&base, &key, &labels).await }
+    })
+    .await;
+    app.input_mode = crate::app::InputMode::None;
+    app.input_buffer.clear();
+    app.refresh().await;
+    bulk_result_notice(app, "Bulk labels", &outcome);
 }
 
 pub async fn bulk_watch(app: &mut App) {
@@ -159,27 +197,25 @@ async fn bulk_watch_toggle(app: &mut App, unwatch: bool) {
     } else {
         "Bulk watch"
     };
-    let total = refs.len();
-    let mut ok = 0usize;
-    let mut failures: Vec<String> = Vec::new();
-
-    app.loading = true;
-    for (i, r) in refs.iter().enumerate() {
-        app.loading_message = Some(format!("{label} {}/{}…", i + 1, total));
-        let result = if unwatch {
-            app.jira.unwatch_issue(&base_url, &r.key).await
-        } else {
-            app.jira.watch_issue(&base_url, &r.key).await
-        };
-        match result {
-            Ok(()) => ok += 1,
-            Err(e) => failures.push(format!("{}: {e}", r.key)),
+    let keys: Vec<String> = refs.iter().map(|r| r.key.clone()).collect();
+    let jira = app.jira.clone();
+    let base = base_url.clone();
+    let outcome = run_bulk_with_progress(app, &keys, label, |i, total| {
+        format!("{label} {i}/{total}…")
+    }, |key| {
+        let jira = jira.clone();
+        let base = base.clone();
+        async move {
+            if unwatch {
+                jira.unwatch_issue(&base, &key).await
+            } else {
+                jira.watch_issue(&base, &key).await
+            }
         }
-    }
-    app.loading = false;
-    app.loading_message = None;
+    })
+    .await;
     app.refresh().await;
-    bulk_result_notice(app, label, ok, failures);
+    bulk_result_notice(app, label, &outcome);
 }
 
 pub async fn apply_bulk_transition_by_name(
@@ -194,86 +230,55 @@ pub async fn apply_bulk_transition_by_name(
     };
 
     let transition_name = chosen.name.clone();
-    let total = keys.len();
-    let mut ok = 0usize;
-    let mut failures: Vec<String> = Vec::new();
+    let keys_owned: Vec<String> = keys.to_vec();
+    let jira = app.jira.clone();
+    let base = base_url.clone();
+    let name = transition_name.clone();
+    let outcome = run_bulk_with_progress(app, &keys_owned, "Bulk transition", |i, total| {
+        format!("Bulk transition {i}/{total}…")
+    }, |key| {
+        let jira = jira.clone();
+        let base = base.clone();
+        let name = name.clone();
+        async move {
+            crate::operations::transition::apply_transition_by_name(&jira, &base, &key, &name).await
+        }
+    })
+    .await;
+    app.refresh().await;
+    bulk_result_notice(app, "Bulk transition", &outcome);
+}
 
+async fn run_bulk_with_progress<F, Fut>(
+    app: &mut App,
+    keys: &[String],
+    _label: &str,
+    progress_msg: impl Fn(usize, usize) -> String,
+    mut op: F,
+) -> BatchOutcome
+where
+    F: FnMut(String) -> Fut,
+    Fut: std::future::Future<Output = Result<(), String>>,
+{
+    let total = keys.len();
     app.loading = true;
+    let mut outcome = BatchOutcome::default();
     for (i, key) in keys.iter().enumerate() {
-        app.loading_message = Some(format!("Bulk transition {}/{}…", i + 1, total));
-        match apply_named_transition(app, &base_url, key, &transition_name).await {
-            Ok(()) => ok += 1,
-            Err(reason) => failures.push(format!("{key}: {reason}")),
+        app.loading_message = Some(progress_msg(i + 1, total));
+        let key = key.clone();
+        match op(key.clone()).await {
+            Ok(()) => outcome.ok += 1,
+            Err(e) => outcome.failures.push(format!("{key}: {e}")),
         }
     }
     app.loading = false;
     app.loading_message = None;
-    app.refresh().await;
-    bulk_result_notice(app, "Bulk transition", ok, failures);
+    outcome
 }
 
-async fn apply_named_transition(
-    app: &App,
-    base_url: &str,
-    key: &str,
-    transition_name: &str,
-) -> Result<(), String> {
-    let options = app
-        .jira
-        .get_workflow_transitions(base_url, key)
-        .await
-        .map_err(|e| e.to_string())?;
-    let Some(mut transition) = options.into_iter().find(|t| t.name == transition_name) else {
-        return Err(format!("no transition '{transition_name}'"));
-    };
-
-    if transition_fields::transition_needs_detail_fetch(&transition) {
-        if let Ok(detail) = app
-            .jira
-            .get_transition_detail(base_url, key, &transition.id)
-            .await
-        {
-            transition = detail;
-        }
-    }
-
-    if transition.required_fields.is_empty() {
-        if let Some(res) = transition_fields::infer_resolution_if_done_transition(
-            &transition.name,
-            &transition.to_status,
-        ) {
-            transition.required_fields.push(res);
-        }
-    }
-
-    let pk = crate::api::types::project_key_from_issue_key(key);
-    api::enrich_transition_fields(&app.jira, base_url, Some(pk), &mut transition).await;
-
-    if !transition.required_fields.is_empty() {
-        return Err("transition requires fields (use single-issue t)".into());
-    }
-
-    app.jira
-        .transition_issue(base_url, key, &transition, &HashMap::new())
-        .await
-        .map_err(|e| e.message)
-}
-
-fn bulk_result_notice(app: &mut App, label: &str, ok: usize, failures: Vec<String>) {
-    if failures.is_empty() {
-        app.status
-            .set_action_notice(format!("{label}: {ok} ok"));
-        return;
-    }
-    let fail_summary = if failures.len() <= 2 {
-        failures.join("; ")
-    } else {
-        format!("{}; …", failures[..2].join("; "))
-    };
-    app.status.set_action_notice(format!(
-        "{label}: {ok} ok, {} failed ({fail_summary})",
-        failures.len()
-    ));
+fn bulk_result_notice(app: &mut App, label: &str, outcome: &BatchOutcome) {
+    app.status
+        .set_action_notice(batch::format_batch_notice(label, outcome));
 }
 
 #[cfg(test)]
