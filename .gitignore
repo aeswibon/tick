@@ -2,3 +2,5 @@ target
 .superpowers
 docs/superpowers/
 releases/
+.DS_Store
+**/.DS_Store

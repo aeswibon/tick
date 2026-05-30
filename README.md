@@ -1,66 +1,102 @@
-# tick
+<p align="center">
+  <img src="assets/logo.png" alt="tick — Jira Cloud TUI" width="160" />
+</p>
 
-A k9s-inspired Jira Cloud TUI for the terminal. Multi-site ticket dashboard with filtering, sorting, transitions, comments, worklogs, field edits, sprint moves, create/duplicate, and templates — without leaving the keyboard.
+<h1 align="center">tick</h1>
 
-```
-████████╗██╗ ██████╗██╗  ██╗
-╚══██╔══╝██║██╔════╝██║ ██╔╝
-   ██║   ██║██║     █████╔╝
-   ██║   ██║██║     ██╔═██╗
-   ██║   ██║╚██████╗██║  ██╗
-   ╚═╝   ╚═╝ ╚═════╝╚═╝  ╚═╝
-```
+<p align="center">
+  <strong>A k9s-inspired Jira Cloud TUI for your terminal.</strong><br />
+  Multi-site inbox, keyboard-first triage, and write-back — without opening the browser.
+</p>
+
+<p align="center">
+  <a href="https://www.producthunt.com/products/tick-4?launch=tick-4">
+    <img src="https://img.shields.io/badge/Product%20Hunt-Vote%20for%20tick-orange?style=for-the-badge&logo=producthunt&logoColor=white" alt="Vote for tick on Product Hunt" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.producthunt.com/products/tick-4?launch=tick-4"><strong>We’re live on Product Hunt — your upvote helps →</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/aeswibon/tick/releases">Releases</a>
+  &nbsp;·&nbsp;
+  <a href="docs/USER_GUIDE.md">User guide</a>
+  &nbsp;·&nbsp;
+  <a href="LICENSE">MIT</a>
+</p>
+
+<p align="center">
+  <img src="assets/product-hunt/gallery-01-social-preview.png" alt="tick dashboard — multi-site Jira table and detail pane" width="720" />
+</p>
+
+---
+
+## Why tick?
+
+Jira’s web UI is powerful but slow for **daily triage**: too many clicks to move issues, comment, check mentions, or scan closed tickets. tick pulls your work into one **fast terminal dashboard** with vim-style keys, per-view caching, and direct API write-back.
 
 ## Features
 
-- **Multi-site** — Several Atlassian Cloud instances in one table
-- **Six views** — Assigned, Mentions, Watched, Updated, Sprint, Closed (JQL search)
-- **Virtualized table** — Scroll hundreds of issues at terminal height
-- **Detail pane** — Summary, description, comments; edit fields in place
-- **Jira write-back** — Transitions, comments, worklogs, summary, priority, labels, description, sprint/backlog
-- **Create & templates** — `n` / `N` / `C` / `X` (export template from ticket)
-- **Auth** — API token by default; optional [OAuth 2.0](docs/OAUTH.md)
-- **Offline-friendly** — Per-view disk cache with staleness indicators
-- **Optional notify** — Desktop alert when refresh finds new issues
-- **Themes** — Built-in + custom TOML ([`themes/`](themes/))
-
-## Documentation
-
-| Guide | Description |
-|-------|-------------|
-| **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** | Start here — setup, workflow, tips |
-| **[docs/features/](docs/features/README.md)** | **Per-feature guides** with examples |
-| **[docs/KEYBINDINGS.md](docs/KEYBINDINGS.md)** | Complete keyboard reference |
-| **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** | Full `config.toml` reference |
-| **[docs/FEATURES.md](docs/FEATURES.md)** | One-page feature map |
-| **[docs/OAUTH.md](docs/OAUTH.md)** | OAuth app setup and `tick auth` |
-| [CHANGELOG.md](CHANGELOG.md) | Version history |
-| [ROADMAP.md](ROADMAP.md) | Plans |
+| Area | What you get |
+|------|----------------|
+| **Inbox** | Six tabs — Assigned, Mentions, Watched, Updated, Sprint, **Closed** (JQL search) |
+| **Multi-site** | Several `*.atlassian.net` instances in one table |
+| **Triage** | Filter, sort, virtualized scroll, detail pane (summary / description / comments) |
+| **Write-back** | Transitions, comments, worklogs, summary, priority, labels, description, sprint |
+| **Create** | New issue (`n`), template (`N`), duplicate (`C`), export template (`X`) |
+| **Offline** | Per-view disk cache; `live` / `cached` / `offline` header |
+| **Themes** | Built-in + custom TOML — [`themes/`](themes/) |
 
 ## Quick start
 
 ```bash
 tick --init
-# Add token: TICK_TOKEN, ~/.config/tick/token, or config.toml — see docs/USER_GUIDE.md
+# Token: TICK_TOKEN, ~/.config/tick/token, or config.toml — see docs/USER_GUIDE.md
 tick --doctor
 tick
 ```
 
-## Installation
+Minimal `config.toml`:
 
-### From source
+```toml
+email = "you@example.com"
 
-```bash
-git clone https://github.com/aeswibon/tick.git
-cd tick
-cargo build --release
-cp target/release/tick /usr/local/bin/
+[[sites]]
+name = "my-team"
+base_url = "https://my-team.atlassian.net"
 ```
 
-### Releases / Homebrew
+## Install
 
-- [GitHub Releases](https://github.com/aeswibon/tick/releases)
-- `brew tap aeswibon/tick && brew install tick` — see [releases](https://github.com/aeswibon/tick/releases) for the formula
+| Method | Command |
+|--------|---------|
+| **GitHub Releases** | [Download binary](https://github.com/aeswibon/tick/releases) for macOS, Linux, Windows |
+| **Homebrew** | `brew tap aeswibon/tick && brew install tick` |
+| **From source** | `git clone https://github.com/aeswibon/tick.git && cd tick && cargo build --release` |
+
+## Keybindings (essentials)
+
+| Keys | Action |
+|------|--------|
+| `j` / `k`, `g` / `G`, `[` / `]` | Navigate / scroll |
+| `1`–`6` | Assigned · Mentions · Watched · Updated · Sprint · Closed |
+| `/` | Filter (or JQL search on Closed tab) |
+| `Enter` | Detail pane |
+| `t` / `T`, `c`, `w` | Status transition, comment, worklog |
+| `n`, `N`, `C`, `X` | New · template · duplicate · export template |
+| `?` | In-app help |
+
+Full reference: [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md)
+
+## Documentation
+
+| Guide | Description |
+|-------|-------------|
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Setup and daily workflow |
+| [docs/features/](docs/features/README.md) | Per-feature guides with examples |
+| [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md) | Complete keyboard map |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | `config.toml` reference |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
 
 ## CLI
 
@@ -68,43 +104,13 @@ cp target/release/tick /usr/local/bin/
 tick                      # Launch TUI
 tick --init               # Create ~/.config/tick/config.toml
 tick --doctor             # Test API, sprint fields, agile boards
-tick auth login           # OAuth browser login
-tick auth status          # Auth summary
+tick auth login           # OAuth (optional)
 tick --list-themes        # List themes
 ```
 
-## Keybindings (summary)
-
-| Keys | Action |
-|------|--------|
-| `j`/`k`, `g`/`G`, `[`/`]` | Navigate / scroll |
-| `/`, `s`, `S` | Filter / sort field / sort direction |
-| `o`, `O` | Open selected / open from clipboard or key |
-| `n`, `N`, `C`, `X` | New / template / duplicate / export template |
-| `Enter`, `h`/`l` | Detail pane / tabs |
-| `t`/`T`, `c`, `w` | Status (workflow), comment, worklog |
-| `S`, `P`, `L`, `M`, `D` | Edit summary, priority, labels, sprint, description |
-| `1`–`6` | View tabs (see docs) |
-| `?` | Help |
-
-Full list: [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md)
-
-## Configuration (minimal)
-
-```toml
-email = "you@example.com"
-max_results = 50
-
-[[sites]]
-name = "my-team"
-base_url = "https://my-team.atlassian.net"
-```
-
-See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for columns, JQL, sprint fields, boards, OAuth, templates, and notifications.
-
 ## Contributing
 
-[CONTRIBUTING.md](CONTRIBUTING.md) · [GitHub Issues](https://github.com/aeswibon/tick/issues)
+[CONTRIBUTING.md](CONTRIBUTING.md) · [GitHub Issues](https://github.com/aeswibon/tick/issues) · [ROADMAP.md](ROADMAP.md)
 
 ## License
 
