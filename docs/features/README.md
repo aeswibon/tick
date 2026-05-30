@@ -24,6 +24,7 @@ Use these when you want **depth** on one capability. For a single scrollable ove
 
 - **[open-and-multi-site.md](open-and-multi-site.md)** — Browser open, clipboard lookup, site errors
 - **[auth-cli-cache.md](auth-cli-cache.md)** — Auth, CLI flags, refresh, desktop notify
+- **[platform.md](platform.md)** — Config reload (`R`), Jira 429 footer UX
 
 ## Example: triage morning routine
 

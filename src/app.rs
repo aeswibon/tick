@@ -448,6 +448,32 @@ impl App {
         self.clamp_selection();
     }
 
+    /// Reload `config.toml` from disk (sites, views, templates, columns). Keeps current tickets.
+    pub async fn reload_config(&mut self, debug: bool) -> Result<(), String> {
+        let mut config = Config::load()?;
+        let max_results = self.config.max_results;
+        let page_size = self.config.page_size;
+        config.apply_cli_overrides(Some(max_results), Some(page_size))?;
+
+        let theme_name = config.theme.clone();
+        self.theme = Theme::resolve(&theme_name)?;
+
+        self.jira = Arc::new(
+            api::JiraClient::from_config(&config, debug)
+                .await
+                .map_err(|e| format!("Auth after reload: {e}"))?,
+        );
+
+        self.config = config;
+        self.columns = Column::resolve(self.config.columns.as_deref());
+        self.custom_field_ids = Column::custom_field_ids(&self.columns);
+        self.page_size = self.config.page_size as usize;
+        self.invalidate_filter_cache();
+        self.status
+            .set_action_notice("Config reloaded — press r to refresh views");
+        Ok(())
+    }
+
     fn load_cache(&mut self) {
         self.view_cache = self.cache.load_all();
         if let Some(cached) = self.view_cache.get(&self.active_view).cloned() {

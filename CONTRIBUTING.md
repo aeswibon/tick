@@ -36,15 +36,16 @@ Maintainers tag releases as `v*` on `master`. Pushing a tag triggers the **Relea
 
 ### Release checklist
 
-1. Ensure `Cargo.toml` version matches the tag (e.g. `0.6.5` → `v0.6.5`).
-2. Run `cargo fmt --all`, `cargo clippy --all-targets -- -D warnings`, `cargo test`, and `cargo deny check`.
-3. Merge to `master`; wait for CI green.
-4. `git tag vX.Y.Z && git push origin vX.Y.Z`
-5. Confirm the GitHub release has all platform binaries, `CHECKSUMS.txt`, and `tick.rb`.
-6. Homebrew tap (choose one):
+1. Ensure `Cargo.toml` version matches the tag (e.g. `0.11.0` → `v0.11.0`).
+2. Run `cargo fmt --all`, `cargo clippy --all-targets -- -D warnings`, and `cargo test`.
+3. Optionally `cargo deny check` (requires [cargo-deny](https://github.com/EmbarkStudios/cargo-deny)).
+4. Merge to `master`; wait for CI green.
+5. `git tag vX.Y.Z && git push origin vX.Y.Z`
+6. Confirm the GitHub release has all platform binaries, `CHECKSUMS.txt`, and `tick.rb`.
+7. Homebrew tap (choose one):
    - **Automated:** Add repo secret `HOMEBREW_TAP_TOKEN` (fine-grained PAT with `contents: write` on `homebrew-tick`). The release workflow pushes `tick.rb` to [homebrew-tick](https://github.com/aeswibon/homebrew-tick).
    - **Manual:** Copy `tick.rb` from the GitHub release into `Formula/tick.rb` and push the tap repo.
-7. Smoke: `brew update && brew upgrade tick`, `tick --help`.
+8. Smoke: `brew update && brew upgrade tick`, `tick --help`.
 
 ## Code of conduct
 

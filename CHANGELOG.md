@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.11.0] - 2026-05-30
+
+### Added
+
+- **Config reload** — `R` reloads `config.toml` from disk (sites, views, templates, columns, theme, auth) without restarting tick
+- **Rate-limit UX** — footer shows backoff countdown when Jira returns HTTP 429 (after automatic retries)
+
+### Documentation
+
+- [KEYBINDINGS.md](docs/KEYBINDINGS.md), [CONFIGURATION.md](docs/CONFIGURATION.md), [ROADMAP.md](ROADMAP.md) updated for v0.11
+
+### Notes
+
+- `input.rs` modular split remains planned; behavior unchanged in this release.
+
 ## [0.10.0] - 2026-05-30
 
 ### Added

@@ -70,6 +70,10 @@ Custom JQL: `[views]` and `[[views.custom]]` in config. Cache: `~/.config/tick/c
 
 [auth-cli-cache.md](features/auth-cli-cache.md) — token, OAuth, `--doctor`, refresh, `notify_on_refresh`.
 
+## Platform (v0.11)
+
+[platform.md](features/platform.md) — **`R`** reload config; HTTP **429** footer backoff hint.
+
 ---
 
 ## Themes

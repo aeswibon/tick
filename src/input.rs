@@ -1126,6 +1126,10 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('r') => {
             app.refresh().await;
         }
+        KeyCode::Char('R') if !app.detail_open => match app.reload_config(app.debug).await {
+            Ok(()) => {}
+            Err(e) => app.status.set_action_error(e),
+        },
         KeyCode::Up | KeyCode::Char('k') => {
             if app.detail_open && app.detail_tab == crate::app::DetailTab::Links {
                 app.links_selected = app.links_selected.saturating_sub(1);

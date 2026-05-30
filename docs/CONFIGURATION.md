@@ -162,6 +162,10 @@ Closed tab preferences: `~/.config/tick/cache/closed_prefs.json` (`query`, `ever
 | `TICK_OAUTH_CLIENT_SECRET` | OAuth client secret |
 | `TICK_OAUTH_REDIRECT_URI` | OAuth callback URL |
 
+## Reloading config in the TUI
+
+After editing `config.toml` (or `e` to open it in your editor), press **`R`** in tick to reload without restarting. tick re-reads sites, views, templates, columns, theme, and auth, then shows a notice — press **`r`** to refresh Jira data.
+
 ## Validation rules
 
 - `email` non-empty

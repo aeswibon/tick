@@ -336,6 +336,12 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     } else if app.loading && !app.showing_transition_field {
         let msg = app.loading_message.as_deref().unwrap_or(" Loading...");
         (format!(" {msg}"), app.theme.loading_fg)
+    } else if crate::api::retry::rate_limit_active() {
+        let secs = crate::api::retry::rate_limit_secs_remaining().unwrap_or(1);
+        (
+            format!(" Jira rate limit — wait ~{secs}s, then r to retry"),
+            app.theme.loading_fg,
+        )
     } else if let Some(ref msg) = app.status.action_notice {
         (format!(" {msg}"), app.theme.accent)
     } else if let Some(ref err) = app.status.action_error {
@@ -349,7 +355,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             app.theme.loading_fg,
         )
     } else {
-        let mut left = " ? help  / filter  ! errors  j/k  s/S sort  y copy  o/O open  t/T status  [ ] scroll  ←/→ view  1-6 tabs  q quit".to_string();
+        let mut left = " ? help  / filter  ! errors  j/k  s/S sort  y copy  o/O open  t/T status  [ ] scroll  ←/→ view  1-6 tabs  R reload  q quit".to_string();
         if app.detail_open {
             left.push_str("  S/P/L/M/D fields  h/l tabs");
             if app.detail_tab == crate::app::DetailTab::Links {

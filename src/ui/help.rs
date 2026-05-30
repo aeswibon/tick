@@ -48,6 +48,7 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
         ),
         Line::from("  y                      Copy ticket key to clipboard"),
         Line::from("  e                      Open config file in editor"),
+        Line::from("  R                      Reload config.toml (after editing)"),
         Line::from(""),
         Line::from(Span::styled(
             " Detail Pane",

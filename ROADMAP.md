@@ -4,6 +4,7 @@
 
 | Version | Highlights |
 |---------|------------|
+| **0.11.0** | Config reload (`R`); 429 footer UX |
 | **0.10.0** | Saved JQL views; template manager; Closed persist; custom columns |
 | **0.9.1** | Remove link; site `link_types`; create subtask |
 | **0.9.0** | Links tab navigation; relations fetch only on Links tab |
@@ -60,8 +61,9 @@ Order for upcoming work (user direction, 2026-05):
 | Item | Target |
 |------|--------|
 | Split `input.rs` | 0.11.0+ |
-| Config reload (`R`) | 0.11.0+ |
-| Rate-limit UX (429) | 0.11.0+ |
+| Config reload (`R`) | 0.11.0 ✅ |
+| Rate-limit UX (429) | 0.11.0 ✅ |
+| Split `input.rs` | 0.11.1+ |
 | Input/key test expansion | 0.11.0+ |
 | CONTRIBUTING release checklist | 0.11.0+ |
 | Consolidate duplicate spec paths | 0.11.0+ |

@@ -28,6 +28,7 @@ For workflows and examples, see the [feature guides](features/README.md).
 | `o` | Open selected in browser | |
 | `O` | Open from clipboard or key | Multi-site: probes API |
 | `e` | Open config file | `$EDITOR` / system default |
+| `R` | Reload `config.toml` | After editing; then `r` to refresh views |
 | `t` / `T` | Workflow transition picker | Not status field directly |
 | `!` | Site errors overlay | When warnings exist |
 | `←` / `→` | Previous / next tab | |
