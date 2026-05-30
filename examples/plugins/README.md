@@ -6,6 +6,10 @@ Plugins are Lua scripts under `~/.config/tick/plugins/<name>/` with a `tick.plug
 
 Removes issues whose `issue_type` is `Epic` from the table after each view refresh.
 
+## count-visible
+
+**Ctrl+Shift+C** — footer notice with the active view name and filtered row count (demonstrates `on_key` + `tick.tickets`).
+
 ```bash
 mkdir -p ~/.config/tick/plugins
 cp -R examples/plugins/hide-epics ~/.config/tick/plugins/

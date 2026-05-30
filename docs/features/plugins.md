@@ -1,6 +1,11 @@
-# Plugins (track C.1)
+# Plugins (track C)
 
-Optional **Lua** extensions in `~/.config/tick/plugins/`. v0.21 ships **`filter_tickets` only** — no custom keys or Jira writes from plugins yet.
+Optional **Lua** extensions in `~/.config/tick/plugins/`.
+
+| Capability | Version | Description |
+|--------------|---------|-------------|
+| `filter_tickets` | v0.21 | Filter rows after each fetch |
+| `on_key` | v0.22 | Custom chords while the table is idle |
 
 ## Install
 
@@ -11,11 +16,10 @@ Optional **Lua** extensions in `~/.config/tick/plugins/`. v0.21 ships **`filter_
     main.lua
 ```
 
-Copy the example:
-
 ```bash
 mkdir -p ~/.config/tick/plugins
 cp -R examples/plugins/hide-epics ~/.config/tick/plugins/
+cp -R examples/plugins/count-visible ~/.config/tick/plugins/
 ```
 
 ## Manifest (`tick.plugin.toml`)
@@ -29,24 +33,40 @@ entry = "main.lua"
 
 [capabilities]
 filter_tickets = true
+on_key = ["ctrl+shift+c"]
 ```
+
+Enable at least one capability. Chords use `ctrl`, `shift`, `alt`, `super`, and a key (`h`, `space`, `f1`, …).
 
 ## `filter_tickets`
 
-Define a global function in `main.lua`:
-
 ```lua
 function filter_tickets(tickets)
-  -- tickets: array of { key, site, summary, status, priority, assignee, issue_type, labels, url }
-  return tickets  -- return filtered array (same shape)
+  -- array of { key, site, summary, status, priority, assignee, issue_type, labels, url }
+  return tickets
 end
 ```
 
-tick calls this **after each Jira fetch** (and when loading a cached view), before the table is shown. Plugins run in **subdirectory name order**; each receives the previous plugin's output.
+Called **after each Jira fetch** and when loading a cached view. Plugins run in **directory name order**.
 
-- **Timeout:** 50 ms per plugin call; failure shows a footer notice and keeps the last good list.
-- **Sandbox:** Lua without `io` / `os` / network; only the `filter_tickets` entrypoint is invoked.
-- **Trust:** plugins are local code you install — not a marketplace.
+## `on_key`
+
+```lua
+function on_key(chord)
+  -- chord matches manifest, e.g. "ctrl+shift+c"
+  -- tick.version, tick.view { name, mode }, tick.tickets (filtered rows)
+  tick._notice = "optional footer message"
+  return "handled"   -- or "passthrough"
+end
+```
+
+Called only for chords listed in the manifest, when the table is idle (no modal, footer input, or local `/` filter). Plugins run in directory order until one returns `"handled"`.
+
+## Limits
+
+- **Timeout:** 50 ms per plugin call
+- **Sandbox:** no `io` / `os` / network
+- **Trust:** local code you install — not a marketplace
 
 ## Doctor
 
@@ -54,9 +74,7 @@ tick calls this **after each Jira fetch** (and when loading a cached view), befo
 tick --doctor
 ```
 
-Lists the plugins directory, loaded filters, and load errors.
-
 ## Related
 
-- [plugin-rfc.md](../architecture/plugin-rfc.md) — full track C plan (`on_key`, transitions)
+- [plugin-rfc.md](../architecture/plugin-rfc.md) — `run_transition` (planned)
 - [automation.md](automation.md) — shell hooks vs plugins

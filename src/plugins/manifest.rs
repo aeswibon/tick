@@ -1,6 +1,8 @@
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
+use super::chord;
+
 /// Plugin API version supported by this tick build (`tick.plugin.toml` `api` field).
 pub const API_VERSION: &str = "1";
 
@@ -19,6 +21,9 @@ pub struct PluginManifest {
 pub struct PluginCapabilities {
     #[serde(default)]
     pub filter_tickets: bool,
+    /// Chords this plugin handles, e.g. `["ctrl+shift+h"]`.
+    #[serde(default)]
+    pub on_key: Vec<String>,
 }
 
 impl PluginManifest {
@@ -41,11 +46,16 @@ impl PluginManifest {
                 self.runtime
             ));
         }
-        if !self.capabilities.filter_tickets {
-            return Err("capabilities.filter_tickets must be true for tick v0.21 plugins".into());
-        }
         if self.name.trim().is_empty() {
             return Err("name is required".into());
+        }
+        if !self.capabilities.filter_tickets && self.capabilities.on_key.is_empty() {
+            return Err(
+                "enable capabilities.filter_tickets and/or capabilities.on_key chords".into(),
+            );
+        }
+        for raw in &self.capabilities.on_key {
+            chord::parse_chord(raw).map_err(|e| format!("on_key chord '{raw}': {e}"))?;
         }
         let entry = plugin_dir.join(&self.entry);
         if !entry.is_file() {
@@ -60,7 +70,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_minimal_manifest() {
+    fn parses_filter_and_on_key() {
         let m: PluginManifest = toml::from_str(
             r#"
 name = "demo"
@@ -71,10 +81,30 @@ entry = "main.lua"
 
 [capabilities]
 filter_tickets = true
+on_key = ["ctrl+shift+h"]
 "#,
         )
         .unwrap();
-        assert_eq!(m.name, "demo");
         assert!(m.capabilities.filter_tickets);
+        assert_eq!(m.capabilities.on_key, vec!["ctrl+shift+h"]);
+    }
+
+    #[test]
+    fn parses_on_key_only() {
+        let m: PluginManifest = toml::from_str(
+            r#"
+name = "keys"
+version = "0.1.0"
+api = "1"
+runtime = "lua"
+entry = "main.lua"
+
+[capabilities]
+on_key = ["ctrl+g"]
+"#,
+        )
+        .unwrap();
+        assert!(!m.capabilities.filter_tickets);
+        assert_eq!(m.capabilities.on_key, vec!["ctrl+g"]);
     }
 }

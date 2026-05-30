@@ -15,6 +15,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
+use crossterm::event::KeyEvent;
 
 type BgResult = Vec<(ViewMode, Vec<Ticket>, Vec<String>)>;
 
@@ -1123,7 +1124,7 @@ impl App {
         }
     }
 
-    fn current_view_hook_id(&self) -> String {
+    pub(crate) fn current_view_hook_id(&self) -> String {
         if let Some(view) = self.active_custom_view() {
             view.name.clone()
         } else {
@@ -1135,6 +1136,43 @@ impl App {
         let view_id = self.current_view_hook_id();
         let tickets = read_tickets(&self.tickets);
         crate::hooks::fire_on_refresh(&self.config, &view_id, &tickets);
+    }
+
+    pub fn plugin_context(&self) -> crate::plugins::PluginContext {
+        let tickets = read_tickets(&self.tickets);
+        let filtered = self
+            .filtered_indices()
+            .iter()
+            .filter_map(|&i| tickets.get(i))
+            .map(crate::plugins::PluginTicket::from)
+            .collect();
+        crate::plugins::PluginContext {
+            view_name: self.current_view_hook_id(),
+            view_mode: if self.is_custom_view_active() {
+                "custom".into()
+            } else {
+                self.active_view.cache_key().to_string()
+            },
+            tickets: filtered,
+        }
+    }
+
+    /// Returns `true` when a plugin consumed the key (skip default handling).
+    pub fn try_plugin_key(&mut self, key: &KeyEvent) -> bool {
+        let ctx = self.plugin_context();
+        match self.plugins.try_handle_key(&ctx, key) {
+            Ok(crate::plugins::PluginKeyResult::Handled) => true,
+            Ok(crate::plugins::PluginKeyResult::HandledWithNotice(msg)) => {
+                self.status.set_action_notice(msg);
+                true
+            }
+            Ok(crate::plugins::PluginKeyResult::Passthrough) => false,
+            Err(e) => {
+                self.status
+                    .set_action_notice(format!("Plugin key failed: {e}"));
+                false
+            }
+        }
     }
 
     pub async fn switch_to_custom(&mut self, index: usize) {

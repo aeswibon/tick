@@ -1,6 +1,6 @@
 # RFC: tick plugin runtime (track C)
 
-**Status:** C.1 implemented (v0.21.0 — `filter_tickets` only); C.2+ planned  
+**Status:** C.1–C.2 implemented (v0.21 `filter_tickets`, v0.22 `on_key`); C.3 planned  
 **Authors:** tick maintainers  
 
 ## Summary

@@ -361,6 +361,14 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         return false;
     }
 
+    if app.input_mode == InputMode::None
+        && !app.filtering
+        && !app.show_help
+        && app.try_plugin_key(&key)
+    {
+        return false;
+    }
+
     if code == KeyCode::Char('W') {
         if app.bulk_mark_count() > 0 && !app.detail_open {
             if key.modifiers.contains(KeyModifiers::SHIFT) {

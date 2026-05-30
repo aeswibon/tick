@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.22.0] - 2026-05-30
+
+### Added
+
+- **Plugin `on_key`** — Register chords in `tick.plugin.toml`; Lua `on_key(chord)` returns `handled` / `passthrough` with `tick.view` and `tick.tickets` context
+- Example: `examples/plugins/count-visible/` (**Ctrl+Shift+C** row count in footer)
+
+### Documentation
+
+- [plugins.md](docs/features/plugins.md)
+
 ## [0.21.0] - 2026-05-30
 
 ### Added

@@ -1,12 +1,15 @@
-//! In-process Lua plugins (`~/.config/tick/plugins/`). Track C.1: `filter_tickets` only.
+//! In-process Lua plugins (`~/.config/tick/plugins/`).
 
+mod chord;
 mod manifest;
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use crossterm::event::{KeyEvent, KeyEventKind, KeyEventState};
 use mlua::{Function, HookTriggers, Lua, LuaSerdeExt, Value, VmState};
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +18,7 @@ use crate::config::Config;
 
 pub use manifest::{PluginManifest, API_VERSION};
 
-const FILTER_TIMEOUT: Duration = Duration::from_millis(50);
+const PLUGIN_TIMEOUT: Duration = Duration::from_millis(50);
 
 /// Ticket shape exposed to Lua (`filter_tickets` in / out).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,22 +50,41 @@ impl From<&Ticket> for PluginTicket {
     }
 }
 
-struct LuaFilterPlugin {
+pub enum PluginKeyResult {
+    Passthrough,
+    Handled,
+    HandledWithNotice(String),
+}
+
+/// Read-only context for `on_key` handlers.
+pub struct PluginContext {
+    pub view_name: String,
+    pub view_mode: String,
+    pub tickets: Vec<PluginTicket>,
+}
+
+struct LuaPlugin {
     name: String,
     lua: Lua,
-    filter: Function,
+    filter: Option<Function>,
+    on_key: Option<Function>,
+    /// Canonical chord labels (see `chord::format_key`).
+    chords: Vec<String>,
 }
 
 /// Loaded plugins and any errors from discovery (shown once at startup / in doctor).
 pub struct PluginHost {
-    filters: Vec<LuaFilterPlugin>,
+    plugins: Vec<LuaPlugin>,
+    /// Chord label → plugin indices (load order).
+    key_index: HashMap<String, Vec<usize>>,
     pub load_errors: Vec<String>,
 }
 
 impl PluginHost {
     pub fn load() -> Self {
         let mut host = Self {
-            filters: Vec::new(),
+            plugins: Vec::new(),
+            key_index: HashMap::new(),
             load_errors: Vec::new(),
         };
         let dir = match plugins_dir() {
@@ -94,8 +116,14 @@ impl PluginHost {
             if !manifest_path.is_file() {
                 continue;
             }
-            match load_filter_plugin(&plugin_dir, &manifest_path) {
-                Ok(p) => host.filters.push(p),
+            match load_plugin(&plugin_dir, &manifest_path) {
+                Ok(p) => {
+                    let idx = host.plugins.len();
+                    for c in &p.chords {
+                        host.key_index.entry(c.clone()).or_default().push(idx);
+                    }
+                    host.plugins.push(p);
+                }
                 Err(e) => {
                     let label = plugin_dir
                         .file_name()
@@ -108,22 +136,44 @@ impl PluginHost {
         host
     }
 
-    pub fn filter_count(&self) -> usize {
-        self.filters.len()
+    pub fn plugin_count(&self) -> usize {
+        self.plugins.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.filters.is_empty() && self.load_errors.is_empty()
+        self.plugins.is_empty() && self.load_errors.is_empty()
     }
 
-    /// Run all filter plugins in directory order. Preserves `Ticket` rows returned by plugins.
+    /// Run all filter plugins in directory order.
     pub fn filter_tickets(&self, tickets: &mut Vec<Ticket>) -> Result<(), String> {
         let mut current = std::mem::take(tickets);
-        for plugin in &self.filters {
-            current = plugin.filter(current)?;
+        for plugin in self.plugins.iter().filter(|p| p.filter.is_some()) {
+            current = plugin.filter_tickets(current)?;
         }
         *tickets = current;
         Ok(())
+    }
+
+    /// Dispatch `on_key` to plugins that registered this chord. Returns `true` if handled.
+    pub fn try_handle_key(
+        &self,
+        ctx: &PluginContext,
+        key: &KeyEvent,
+    ) -> Result<PluginKeyResult, String> {
+        let chord_str = chord::format_key(key);
+        let Some(indices) = self.key_index.get(&chord_str) else {
+            return Ok(PluginKeyResult::Passthrough);
+        };
+        for &idx in indices {
+            let (handled, notice) = self.plugins[idx].call_on_key(&chord_str, ctx)?;
+            if handled {
+                if let Some(msg) = notice {
+                    return Ok(PluginKeyResult::HandledWithNotice(msg));
+                }
+                return Ok(PluginKeyResult::Handled);
+            }
+        }
+        Ok(PluginKeyResult::Passthrough)
     }
 
     pub fn doctor_lines(&self) -> Vec<String> {
@@ -136,11 +186,18 @@ impl PluginHost {
             }
         };
         lines.push(format!("  Plugins dir: {}", dir.display()));
-        if self.filters.is_empty() {
+        if self.plugins.is_empty() {
             lines.push("  Loaded: none".into());
         } else {
-            for p in &self.filters {
-                lines.push(format!("  Loaded: {} (filter_tickets)", p.name));
+            for p in &self.plugins {
+                let mut caps = Vec::new();
+                if p.filter.is_some() {
+                    caps.push("filter_tickets".into());
+                }
+                if p.on_key.is_some() {
+                    caps.push(format!("on_key [{}]", p.chords.join(", ")));
+                }
+                lines.push(format!("  Loaded: {} ({})", p.name, caps.join(", ")));
             }
         }
         for e in &self.load_errors {
@@ -164,16 +221,69 @@ impl PluginHost {
     }
 }
 
-impl LuaFilterPlugin {
-    fn filter(&self, tickets: Vec<Ticket>) -> Result<Vec<Ticket>, String> {
+impl LuaPlugin {
+    fn filter_tickets(&self, tickets: Vec<Ticket>) -> Result<Vec<Ticket>, String> {
+        let Some(filter) = &self.filter else {
+            return Ok(tickets);
+        };
         if tickets.is_empty() {
             return Ok(tickets);
         }
 
         let payload: Vec<PluginTicket> = tickets.iter().map(PluginTicket::from).collect();
+        self.run_with_timeout("filter_tickets", || {
+            let input = self
+                .lua
+                .to_value(&payload)
+                .map_err(|e| lua_err(&self.name, e))?;
+            let result: Value = filter.call(input).map_err(|e| lua_err(&self.name, e))?;
+            let returned: Vec<PluginTicket> = self
+                .lua
+                .from_value(result)
+                .map_err(|e| lua_err(&self.name, e))?;
+            let mut out = Vec::with_capacity(returned.len());
+            for r in &returned {
+                if let Some(t) = tickets.iter().find(|t| t.key == r.key && t.site == r.site) {
+                    out.push(t.clone());
+                }
+            }
+            Ok(out)
+        })
+    }
+
+    fn call_on_key(
+        &self,
+        chord: &str,
+        ctx: &PluginContext,
+    ) -> Result<(bool, Option<String>), String> {
+        let Some(on_key) = &self.on_key else {
+            return Ok((false, None));
+        };
+        self.run_with_timeout("on_key", || {
+            register_tick_api(&self.lua, ctx)?;
+            let result: String = on_key.call(chord).map_err(|e| lua_err(&self.name, e))?;
+            let handled = result.eq_ignore_ascii_case("handled");
+            let notice = self
+                .lua
+                .globals()
+                .get::<mlua::Table>("tick")
+                .ok()
+                .and_then(|t| t.get::<String>("_notice").ok());
+            if let Ok(tick) = self.lua.globals().get::<mlua::Table>("tick") {
+                let _ = tick.set("_notice", mlua::Value::Nil);
+            }
+            Ok((handled, notice))
+        })
+    }
+
+    fn run_with_timeout<T, F>(&self, hook_label: &str, f: F) -> Result<T, String>
+    where
+        F: FnOnce() -> Result<T, String>,
+    {
         let timed_out = Arc::new(AtomicBool::new(false));
         let timed_out_hook = Arc::clone(&timed_out);
         let start = Instant::now();
+        let label = hook_label.to_string();
 
         self.lua.set_hook(
             HookTriggers {
@@ -181,50 +291,51 @@ impl LuaFilterPlugin {
                 ..Default::default()
             },
             move |_, _| {
-                if start.elapsed() > FILTER_TIMEOUT {
+                if start.elapsed() > PLUGIN_TIMEOUT {
                     timed_out_hook.store(true, Ordering::Relaxed);
-                    return Err(mlua::Error::RuntimeError(
-                        "plugin filter_tickets timed out (50ms)".into(),
-                    ));
+                    return Err(mlua::Error::RuntimeError(format!(
+                        "plugin {label} timed out (50ms)"
+                    )));
                 }
                 Ok(VmState::Continue)
             },
         );
 
-        let input: Value = self
-            .lua
-            .to_value(&payload)
-            .map_err(|e| lua_err(&self.name, e))?;
-
-        let result: Value = self
-            .filter
-            .call(input)
-            .map_err(|e| lua_err(&self.name, e))?;
-
+        let out = f();
         self.lua.remove_hook();
         if timed_out.load(Ordering::Relaxed) {
             return Err(format!(
-                "plugin \"{}\": filter_tickets timed out (50ms)",
+                "plugin \"{}\": {hook_label} timed out (50ms)",
                 self.name
             ));
         }
-
-        let returned: Vec<PluginTicket> = self
-            .lua
-            .from_value(result)
-            .map_err(|e| lua_err(&self.name, e))?;
-
-        let mut out = Vec::with_capacity(returned.len());
-        for r in &returned {
-            if let Some(t) = tickets.iter().find(|t| t.key == r.key && t.site == r.site) {
-                out.push(t.clone());
-            }
-        }
-        Ok(out)
+        out
     }
 }
 
-fn load_filter_plugin(plugin_dir: &Path, manifest_path: &Path) -> Result<LuaFilterPlugin, String> {
+fn register_tick_api(lua: &Lua, ctx: &PluginContext) -> Result<(), String> {
+    let tick = lua.create_table().map_err(|e| lua_err("tick", e))?;
+    tick.set("version", API_VERSION)
+        .map_err(|e| lua_err("tick", e))?;
+
+    let view = lua.create_table().map_err(|e| lua_err("tick", e))?;
+    view.set("name", ctx.view_name.as_str())
+        .map_err(|e| lua_err("tick", e))?;
+    view.set("mode", ctx.view_mode.as_str())
+        .map_err(|e| lua_err("tick", e))?;
+    tick.set("view", view).map_err(|e| lua_err("tick", e))?;
+
+    let tickets: Value = lua.to_value(&ctx.tickets).map_err(|e| lua_err("tick", e))?;
+    tick.set("tickets", tickets)
+        .map_err(|e| lua_err("tick", e))?;
+
+    lua.globals()
+        .set("tick", tick)
+        .map_err(|e| lua_err("tick", e))?;
+    Ok(())
+}
+
+fn load_plugin(plugin_dir: &Path, manifest_path: &Path) -> Result<LuaPlugin, String> {
     let manifest = PluginManifest::load(manifest_path)?;
     let entry = manifest.validate(plugin_dir)?;
     let script =
@@ -236,15 +347,44 @@ fn load_filter_plugin(plugin_dir: &Path, manifest_path: &Path) -> Result<LuaFilt
         .exec()
         .map_err(|e| format!("{}: {e}", manifest.name))?;
 
-    let filter: Function = lua
-        .globals()
-        .get("filter_tickets")
-        .map_err(|_| format!("{}: global filter_tickets() not defined", manifest.name))?;
+    let filter = if manifest.capabilities.filter_tickets {
+        Some(
+            lua.globals()
+                .get("filter_tickets")
+                .map_err(|_| format!("{}: global filter_tickets() not defined", manifest.name))?,
+        )
+    } else {
+        None
+    };
 
-    Ok(LuaFilterPlugin {
+    let on_key = if !manifest.capabilities.on_key.is_empty() {
+        Some(
+            lua.globals()
+                .get("on_key")
+                .map_err(|_| format!("{}: global on_key() not defined", manifest.name))?,
+        )
+    } else {
+        None
+    };
+
+    let mut chords = Vec::new();
+    for raw in &manifest.capabilities.on_key {
+        let parsed = chord::parse_chord(raw)?;
+        let label = chord::format_key(&KeyEvent {
+            code: parsed.code,
+            modifiers: parsed.modifiers,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        });
+        chords.push(label);
+    }
+
+    Ok(LuaPlugin {
         name: manifest.name,
         lua,
         filter,
+        on_key,
+        chords,
     })
 }
 
@@ -276,16 +416,50 @@ end
         let lua = Lua::new();
         lua.load(script).exec().unwrap();
         let filter: Function = lua.globals().get("filter_tickets").unwrap();
-        let plugin = LuaFilterPlugin {
+        let plugin = LuaPlugin {
             name: "test".into(),
             lua,
-            filter,
+            filter: Some(filter),
+            on_key: None,
+            chords: Vec::new(),
         };
 
         let tickets = vec![ticket("A-1", "Epic"), ticket("A-2", "Story")];
-        let out = plugin.filter(tickets).unwrap();
+        let out = plugin.filter_tickets(tickets).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].key, "A-2");
+    }
+
+    #[test]
+    fn on_key_handled() {
+        let script = r#"
+function on_key(chord)
+  if chord == "ctrl+shift+h" then
+    return "handled"
+  end
+  return "passthrough"
+end
+"#;
+        let lua = Lua::new();
+        lua.load(script).exec().unwrap();
+        let on_key: Function = lua.globals().get("on_key").unwrap();
+        let plugin = LuaPlugin {
+            name: "test".into(),
+            lua,
+            filter: None,
+            on_key: Some(on_key),
+            chords: vec!["ctrl+shift+h".into()],
+        };
+        let ctx = PluginContext {
+            view_name: "assigned".into(),
+            view_mode: "my_issues".into(),
+            tickets: vec![],
+        };
+        assert_eq!(
+            plugin.call_on_key("ctrl+shift+h", &ctx).unwrap(),
+            (true, None)
+        );
+        assert_eq!(plugin.call_on_key("ctrl+g", &ctx).unwrap(), (false, None));
     }
 
     fn ticket(key: &str, issue_type: &str) -> Ticket {
