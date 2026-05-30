@@ -97,10 +97,57 @@ mod tests {
     }
 
     #[test]
+    fn parses_first_key_from_mixed_text() {
+        assert_eq!(
+            parse_issue_key("please check abc-12, then XYZ-99").as_deref(),
+            Some("ABC-12")
+        );
+    }
+
+    #[test]
+    fn accepts_underscores_and_uses_last_dash() {
+        assert_eq!(
+            normalize_issue_key("team_api-42").as_deref(),
+            Some("TEAM_API-42")
+        );
+        assert_eq!(project_key_from_issue_key("TEAM-API-42"), "TEAM-API");
+    }
+
+    #[test]
+    fn rejects_bad_project_or_number_segments() {
+        assert!(normalize_issue_key("TEAM.API-42").is_none());
+        assert!(normalize_issue_key("TEAM-42A").is_none());
+        assert!(normalize_issue_key("-42").is_none());
+        assert!(normalize_issue_key("TEAM-").is_none());
+    }
+
+    #[test]
+    fn parses_browse_url_key_before_path_query_or_fragment() {
+        assert_eq!(
+            parse_issue_key("https://acme.atlassian.net/browse/demo-7/attachments").as_deref(),
+            Some("DEMO-7")
+        );
+        assert_eq!(
+            parse_issue_key("https://acme.atlassian.net/browse/demo-8#activity").as_deref(),
+            Some("DEMO-8")
+        );
+    }
+
+    #[test]
     fn host_from_jira_url() {
         assert_eq!(
             host_from_url("https://Acme.atlassian.net/browse/X-1").as_deref(),
             Some("acme.atlassian.net")
         );
+    }
+
+    #[test]
+    fn host_from_url_trims_and_rejects_non_urls() {
+        assert_eq!(
+            host_from_url("  http://Example.COM/path  ").as_deref(),
+            Some("example.com")
+        );
+        assert!(host_from_url("example.com/browse/X-1").is_none());
+        assert!(host_from_url("https:///browse/X-1").is_none());
     }
 }

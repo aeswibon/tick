@@ -1132,6 +1132,76 @@ mod fetch_integration {
         assert_eq!(tickets[0].summary, "Hello");
         assert_eq!(tickets[0].labels, vec!["bug", "ui"]);
     }
+
+    #[tokio::test]
+    async fn fetch_all_keeps_successful_sites_when_another_site_fails() {
+        let failing = wiremock::MockServer::start().await;
+        let passing = wiremock::MockServer::start().await;
+
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/rest/api/3/search/jql"))
+            .respond_with(wiremock::ResponseTemplate::new(401).set_body_string("unauthorized"))
+            .mount(&failing)
+            .await;
+
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/rest/api/3/search/jql"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "issues": [{ "id": "20001" }]
+                })),
+            )
+            .mount(&passing)
+            .await;
+
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/bulkfetch"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "issues": [{
+                        "key": "PASS-1",
+                        "fields": {
+                            "issuetype": { "name": "Bug" },
+                            "status": {
+                                "name": "In Progress",
+                                "statusCategory": { "key": "indeterminate", "colorName": "yellow" }
+                            },
+                            "priority": null,
+                            "assignee": null,
+                            "reporter": null,
+                            "duedate": null,
+                            "created": "2026-01-01T00:00:00.000+0000",
+                            "project": { "key": "PASS" },
+                            "summary": "Still fetched",
+                            "labels": null
+                        }
+                    }]
+                })),
+            )
+            .mount(&passing)
+            .await;
+
+        let mut config = test_config(&failing.uri());
+        config.sites[0].name = "broken".into();
+        config.sites.push(Site {
+            name: "healthy".into(),
+            base_url: passing.uri(),
+            ..Default::default()
+        });
+
+        let client = JiraClient::new("user@example.com", "token", false);
+        let jql = config.jql_for(crate::view_mode::ViewMode::MyIssues);
+        let (tickets, errors) = fetch_all(&client, &config, jql, None, &[]).await;
+
+        assert_eq!(tickets.len(), 1);
+        assert_eq!(tickets[0].key, "PASS-1");
+        assert_eq!(tickets[0].site, "healthy");
+        assert_eq!(tickets[0].priority, "");
+        assert_eq!(tickets[0].assignee, "");
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("broken:"));
+        assert!(errors[0].contains("401"));
+    }
 }
 
 #[cfg(test)]

@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.11.2] - 2026-05-30
+
+### Added
+
+- **Tests** — Multi-site `fetch_all` partial failure (wiremock); assignable-user filter/merge; retry `Retry-After` parsing; fetch status formatting; issue-key parsing; view/Closed JQL; input transition/mention routing; issue-relations cache helpers
+
 ## [0.11.1] - 2026-05-30
 
 ### Changed

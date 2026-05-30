@@ -1360,6 +1360,40 @@ mod tests {
     }
 
     #[test]
+    fn invalidate_issue_relations_cache_clears_key_and_selection() {
+        let mut app = App::new(test_config(20), Theme::default(), test_jira(), false);
+        app.issue_relations_key = Some(("acme".into(), "DEMO-1".into()));
+        app.issue_relations = Some(crate::api::issue_relations::IssueRelations::default());
+        app.links_selected = 2;
+        app.invalidate_issue_relations_cache();
+        assert!(app.issue_relations_key.is_none());
+        assert_eq!(app.links_selected, 0);
+    }
+
+    #[test]
+    fn clamp_links_selection_caps_to_last_row() {
+        let mut app = App::new(test_config(20), Theme::default(), test_jira(), false);
+        app.issue_relations = Some(crate::api::issue_relations::IssueRelations {
+            links: vec![],
+            subtasks: vec![
+                crate::api::issue_relations::SubtaskView {
+                    key: "D-1".into(),
+                    summary: "a".into(),
+                    status: "Open".into(),
+                },
+                crate::api::issue_relations::SubtaskView {
+                    key: "D-2".into(),
+                    summary: "b".into(),
+                    status: "Open".into(),
+                },
+            ],
+        });
+        app.links_selected = 99;
+        app.clamp_links_selection();
+        assert_eq!(app.links_selected, 1);
+    }
+
+    #[test]
     fn filter_matches_labels() {
         let mut t1 = sample_ticket("A-1", "one", "Open");
         t1.labels = vec!["backend".into()];

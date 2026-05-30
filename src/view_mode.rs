@@ -155,4 +155,35 @@ mod tests {
     fn escape_jql_quotes() {
         assert_eq!(escape_jql_text(r#"say "hi""#), r#"say \"hi\""#);
     }
+
+    #[test]
+    fn next_and_previous_wrap_around_tab_order() {
+        assert_eq!(ViewMode::ClosedSearch.next(), ViewMode::MyIssues);
+        assert_eq!(ViewMode::MyIssues.prev(), ViewMode::ClosedSearch);
+        assert_eq!(ViewMode::Sprint.next(), ViewMode::ClosedSearch);
+        assert_eq!(ViewMode::Mentions.prev(), ViewMode::MyIssues);
+    }
+
+    #[test]
+    fn background_views_exclude_closed_search() {
+        let background = ViewMode::background();
+        assert_eq!(background.len(), 5);
+        assert!(background.iter().all(|mode| mode.prefetches_on_startup()));
+        assert!(!ViewMode::ClosedSearch.prefetches_on_startup());
+    }
+
+    #[test]
+    fn closed_search_empty_query_omits_text_clause() {
+        let jql = build_closed_search_jql(ViewMode::closed_search_base(false), "   ");
+        assert_eq!(
+            jql,
+            "assignee = currentUser() AND statusCategory = Done ORDER BY updated DESC"
+        );
+    }
+
+    #[test]
+    fn closed_search_escapes_backslashes_and_quotes() {
+        let jql = build_closed_search_jql("statusCategory = Done", r#"C:\tmp "bug""#);
+        assert!(jql.contains(r#"text ~ "C:\\tmp \"bug\"""#));
+    }
 }

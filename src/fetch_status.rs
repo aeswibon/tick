@@ -59,6 +59,9 @@ impl FetchStatus {
 
 #[allow(dead_code)]
 fn truncate(s: &str, max_len: usize) -> String {
+    if max_len == 0 {
+        return String::new();
+    }
     if s.chars().count() <= max_len {
         return s.to_string();
     }
@@ -83,5 +86,33 @@ mod tests {
         let mut s = FetchStatus::default();
         s.set_site_warnings(vec!["a: x".repeat(80)]);
         assert!(s.format_warnings(40).ends_with('…'));
+    }
+
+    #[test]
+    fn action_error_and_notice_replace_each_other() {
+        let mut s = FetchStatus::default();
+        s.set_action_error("failed");
+        assert_eq!(s.action_error.as_deref(), Some("failed"));
+        assert!(s.action_notice.is_none());
+
+        s.set_action_notice("saved");
+        assert!(s.action_error.is_none());
+        assert_eq!(s.action_notice.as_deref(), Some("saved"));
+    }
+
+    #[test]
+    fn formats_multiple_warnings_with_plural_prefix() {
+        let mut s = FetchStatus::default();
+        s.set_site_warnings(vec!["acme: HTTP 401".into(), "beta: timeout".into()]);
+        let line = s.format_warnings(200);
+        assert!(line.starts_with(" 2 sites failed:"));
+        assert!(line.contains("acme: HTTP 401 · beta: timeout"));
+    }
+
+    #[test]
+    fn zero_length_warning_format_is_empty() {
+        let mut s = FetchStatus::default();
+        s.set_site_warnings(vec!["acme: HTTP 401".into()]);
+        assert_eq!(s.format_warnings(0), "");
     }
 }

@@ -80,4 +80,49 @@ mod tests {
         let merged = merge_users(&a, &[]);
         assert_eq!(merged.len(), 1);
     }
+
+    #[test]
+    fn cache_key_normalizes_trailing_slashes() {
+        assert_eq!(
+            cache_key("https://acme.atlassian.net///", "DEMO-1"),
+            "https://acme.atlassian.net|DEMO-1"
+        );
+    }
+
+    #[test]
+    fn filter_matches_account_id_case_insensitively() {
+        let catalog = vec![
+            ("Account-ABC".into(), "Zed".into()),
+            ("account-def".into(), "Amy".into()),
+        ];
+        let out = filter_users(&catalog, "abc");
+        assert_eq!(out, vec![("Account-ABC".into(), "Zed".into())]);
+    }
+
+    #[test]
+    fn filter_limits_to_fifty_sorted_results() {
+        let catalog: Vec<_> = (0..75)
+            .rev()
+            .map(|n| (format!("id-{n:02}"), format!("User {n:02}")))
+            .collect();
+        let out = filter_users(&catalog, "user");
+        assert_eq!(out.len(), 50);
+        assert_eq!(out[0].1, "User 00");
+        assert_eq!(out[49].1, "User 49");
+    }
+
+    #[test]
+    fn merge_refresh_updates_existing_names_and_sorts_case_insensitively() {
+        let existing = vec![("2".into(), "zed".into()), ("1".into(), "Alice Old".into())];
+        let fetched = vec![("1".into(), "Alice New".into()), ("3".into(), "bob".into())];
+        let merged = merge_users(&existing, &fetched);
+        assert_eq!(
+            merged,
+            vec![
+                ("1".into(), "Alice New".into()),
+                ("3".into(), "bob".into()),
+                ("2".into(), "zed".into()),
+            ]
+        );
+    }
 }

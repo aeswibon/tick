@@ -4,75 +4,53 @@
 
 | Version | Highlights |
 |---------|------------|
+| **0.11.2** | Expanded unit/integration tests; roadmap sync |
+| **0.11.1** | Split `src/input/` module (no behavior change) |
 | **0.11.0** | Config reload (`R`); 429 footer UX |
 | **0.10.0** | Saved JQL views; template manager; Closed persist; custom columns |
 | **0.9.1** | Remove link; site `link_types`; create subtask |
 | **0.9.0** | Links tab navigation; relations fetch only on Links tab |
-| **0.8.0** | Issue links tab; add link (`I`); subtasks; multi-select components/versions |
-| **0.7.2** | Watch/unwatch; due date; CLI `tick template export` |
-| **0.7.1** | Closed tab + JQL search; template export (`X`); tab reorder; feature docs |
-| **0.7.0** | Create (`n`), duplicate (`C`), config templates (`N`) |
-| **0.6.9** | Required transition fields; assignable-user cache; ⌘R/Ctrl+R |
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
-Design spec (approved): [docs/specs/2026-05-30-future-roadmap-design.md](docs/specs/2026-05-30-future-roadmap-design.md)
+Design notes (local): `docs/specs/` is gitignored; keep copies there for planning. Tracked user docs: [docs/features/](docs/features/README.md).
 
-## Priority (product)
+## Priority stack (2026-05) — complete
 
-Order for upcoming work (user direction, 2026-05):
+| Track | Status |
+|-------|--------|
+| **A — Triage polish** | Shipped (0.7.2–0.9.1) |
+| **B — Templates & views** | Shipped (0.10.0) |
+| **C — Platform & quality** | Shipped (0.11.0–0.11.2) |
 
-1. **A — Triage polish** — links navigation, remove link, site link types *(core triage shipped in 0.7.2–0.8.0)*  
-2. **B — Templates & views** — template edit/delete, saved JQL views, Closed persist, custom columns  
-3. **C — Platform** — `input.rs` split, config reload, rate-limit UX, tests, docs hygiene  
+## C — platform checklist
 
-## Next releases
-
-| Version | Theme | Highlights |
-|---------|-------|------------|
-| **0.9.0** | A | Shipped |
-| **0.9.1** | A | Shipped |
-| **0.10.0** | B | Shipped |
-| **0.11.0+** | C | Split `input.rs`; config reload; 429 UX; expanded tests; docs cleanup |
-
-## Backlog (by priority)
-
-### A — remaining triage
-
-| Item | Target |
+| Item | Status |
 |------|--------|
-| Links tab navigation | 0.9.0 ✅ |
-| Relations fetch efficiency | 0.9.0 ✅ |
-| Remove issue link | 0.9.1 ✅ |
-| Configurable link types | 0.9.1 ✅ |
-| Create subtask from parent | 0.9.1 ✅ |
-
-### B — templates & views
-
-| Item | Target |
-|------|--------|
-| Template edit/delete in TUI | 0.10.0 ✅ |
-| Saved JQL / extra views | 0.10.0 ✅ |
-| Closed tab: persist query, local filter | 0.10.0 ✅ |
-| Custom field columns | 0.10.0 ✅ |
-
-### C — platform & quality
-
-| Item | Target |
-|------|--------|
-| Split `input.rs` | 0.11.0+ |
 | Config reload (`R`) | 0.11.0 ✅ |
 | Rate-limit UX (429) | 0.11.0 ✅ |
-| Split `input.rs` | 0.11.1+ |
-| Input/key test expansion | 0.11.0+ |
-| CONTRIBUTING release checklist | 0.11.0+ |
-| Consolidate duplicate spec paths | 0.11.0+ |
+| Split `input.rs` → `src/input/` | 0.11.1 ✅ |
+| Test expansion (fetch, retry, keys, views, users) | 0.11.2 ✅ |
+| CONTRIBUTING release checklist | 0.11.0 ✅ |
+| Consolidate spec paths (gitignore vs tracked) | Deferred — local `docs/specs/` only |
+
+## What’s next (v0.12+)
+
+Pick a theme before coding; no approved spec yet.
+
+| Direction | Examples |
+|-----------|----------|
+| **Workflow / site tuning** | Zeta `link_types`, custom views, templates, columns from real keys |
+| **Triage power** | Bulk table actions; editable custom fields; richer template editor |
+| **Quality** | Links-tab wiremock flow; template-export key tests; OAuth polish |
+| **Performance** | Large `max_results`; fewer redundant refreshes after writes |
 
 ## Out of scope (unless demand)
 
-- Jira Server / Data Center  
-- Web UI  
+- Jira Server / Data Center
+- Web UI
+- Full issue-link type discovery API (use `[[sites]].link_types` config)
 
 ---
 
-*Feature guides: [docs/features/](docs/features/README.md)*
+*Feature guides: [docs/features/README.md](docs/features/README.md)*

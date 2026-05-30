@@ -111,4 +111,32 @@ mod tests {
         assert!(!rate_limit_active());
         assert!(rate_limit_secs_remaining().is_none());
     }
+
+    #[test]
+    fn parses_numeric_retry_after_seconds() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(RETRY_AFTER, reqwest::header::HeaderValue::from_static("7"));
+        assert_eq!(parse_retry_after_secs(&headers), Some(7));
+    }
+
+    #[test]
+    fn ignores_missing_or_non_numeric_retry_after() {
+        let headers = reqwest::header::HeaderMap::new();
+        assert_eq!(parse_retry_after_secs(&headers), None);
+
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(
+            RETRY_AFTER,
+            reqwest::header::HeaderValue::from_static("Wed, 21 Oct 2015 07:28:00 GMT"),
+        );
+        assert_eq!(parse_retry_after_secs(&headers), None);
+    }
+
+    #[test]
+    fn retry_status_set_is_exact() {
+        assert!(should_retry_status(StatusCode::BAD_GATEWAY));
+        assert!(should_retry_status(StatusCode::GATEWAY_TIMEOUT));
+        assert!(!should_retry_status(StatusCode::INTERNAL_SERVER_ERROR));
+        assert!(!should_retry_status(StatusCode::UNAUTHORIZED));
+    }
 }
