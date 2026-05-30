@@ -19,8 +19,8 @@ pub mod issue_key;
 pub mod issue_relations_flow;
 pub mod oauth;
 pub mod operations;
-pub mod plugins;
 pub mod platform;
+pub mod plugins;
 pub mod template_export;
 pub mod template_export_flow;
 pub mod template_manage_flow;
@@ -148,12 +148,18 @@ pub async fn run_doctor(config: &Config) {
     for site in &config.sites {
         println!("--- {} ({}) ---", site.name, site.base_url);
 
-        match client.search_jql(&site.base_url, probe_jql, 3, &mut None).await {
+        match client
+            .search_jql(&site.base_url, probe_jql, 3, &mut None)
+            .await
+        {
             Ok(ids) => println!("  JQL search: OK ({} issue ids)", ids.len()),
             Err(e) => println!("  JQL search: FAILED — {e}"),
         }
 
-        match client.search_jql(&site.base_url, probe_jql, 2, &mut None).await {
+        match client
+            .search_jql(&site.base_url, probe_jql, 2, &mut None)
+            .await
+        {
             Ok(ids) => {
                 let sf = site.sprint_field.as_deref();
                 match client.bulk_fetch(&site.base_url, &ids, sf, &[], true).await {

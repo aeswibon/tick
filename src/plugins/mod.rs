@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::api::types::Ticket;
 use crate::config::Config;
 
-pub use manifest::{API_VERSION, PluginManifest};
+pub use manifest::{PluginManifest, API_VERSION};
 
 const FILTER_TIMEOUT: Duration = Duration::from_millis(50);
 
@@ -101,8 +101,7 @@ impl PluginHost {
                         .file_name()
                         .and_then(|s| s.to_str())
                         .unwrap_or("?");
-                    host.load_errors
-                        .push(format!("{label}: {e}"));
+                    host.load_errors.push(format!("{label}: {e}"));
                 }
             }
         }
@@ -217,10 +216,7 @@ impl LuaFilterPlugin {
 
         let mut out = Vec::with_capacity(returned.len());
         for r in &returned {
-            if let Some(t) = tickets
-                .iter()
-                .find(|t| t.key == r.key && t.site == r.site)
-            {
+            if let Some(t) = tickets.iter().find(|t| t.key == r.key && t.site == r.site) {
                 out.push(t.clone());
             }
         }
@@ -231,8 +227,8 @@ impl LuaFilterPlugin {
 fn load_filter_plugin(plugin_dir: &Path, manifest_path: &Path) -> Result<LuaFilterPlugin, String> {
     let manifest = PluginManifest::load(manifest_path)?;
     let entry = manifest.validate(plugin_dir)?;
-    let script = std::fs::read_to_string(&entry)
-        .map_err(|e| format!("read {}: {e}", entry.display()))?;
+    let script =
+        std::fs::read_to_string(&entry).map_err(|e| format!("read {}: {e}", entry.display()))?;
 
     let lua = Lua::new();
     lua.load(&script)
@@ -286,10 +282,7 @@ end
             filter,
         };
 
-        let tickets = vec![
-            ticket("A-1", "Epic"),
-            ticket("A-2", "Story"),
-        ];
+        let tickets = vec![ticket("A-1", "Epic"), ticket("A-2", "Story")];
         let out = plugin.filter(tickets).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].key, "A-2");

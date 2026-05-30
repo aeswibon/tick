@@ -6,8 +6,8 @@ pub mod create;
 pub mod issue_relations;
 pub mod jira_error;
 pub mod markdown;
-pub mod retry;
 pub mod pagination;
+pub mod retry;
 pub mod transition_fields;
 pub mod types;
 
@@ -418,7 +418,10 @@ impl JiraClient {
             }
 
             if self.debug {
-                eprintln!("[DEBUG] POST {} (JQL: {}, page {page}, maxResults {page_size})", url, jql);
+                eprintln!(
+                    "[DEBUG] POST {} (JQL: {}, page {page}, maxResults {page_size})",
+                    url, jql
+                );
             }
 
             let resp = self.send(|| self.post(&url).json(&body).send()).await?;
@@ -443,10 +446,7 @@ impl JiraClient {
                 break;
             }
 
-            let has_more = data
-                .next_page_token
-                .as_ref()
-                .is_some_and(|t| !t.is_empty());
+            let has_more = data.next_page_token.as_ref().is_some_and(|t| !t.is_empty());
             if data.is_last || !has_more {
                 break;
             }
@@ -1363,8 +1363,7 @@ mod fetch_integration {
         let config = test_config(&server.uri());
         let client = JiraClient::new("user@example.com", "token", false);
         let jql = config.jql_for(crate::view_mode::ViewMode::MyIssues);
-        let (tickets, errors) =
-            fetch_all(&client, &config, jql, None, &[], &mut None).await;
+        let (tickets, errors) = fetch_all(&client, &config, jql, None, &[], &mut None).await;
 
         assert!(errors.is_empty(), "{errors:?}");
         assert_eq!(tickets.len(), 1);
@@ -1432,8 +1431,7 @@ mod fetch_integration {
 
         let client = JiraClient::new("user@example.com", "token", false);
         let jql = config.jql_for(crate::view_mode::ViewMode::MyIssues);
-        let (tickets, errors) =
-            fetch_all(&client, &config, jql, None, &[], &mut None).await;
+        let (tickets, errors) = fetch_all(&client, &config, jql, None, &[], &mut None).await;
 
         assert_eq!(tickets.len(), 1);
         assert_eq!(tickets[0].key, "PASS-1");

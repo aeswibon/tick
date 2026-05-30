@@ -34,16 +34,15 @@ pub async fn run(args: SearchArgs) -> Result<(), String> {
     if !args.quiet {
         eprintln!("Searching Jira…");
     }
-    let (tickets, warnings) =
-        api::fetch_all(
-            &jira,
-            &config,
-            &args.jql,
-            args.site.as_deref(),
-            &custom_ids,
-            &mut None,
-        )
-        .await;
+    let (tickets, warnings) = api::fetch_all(
+        &jira,
+        &config,
+        &args.jql,
+        args.site.as_deref(),
+        &custom_ids,
+        &mut None,
+    )
+    .await;
     let issues: Vec<IssueJson> = tickets
         .iter()
         .map(|t| IssueJson::from_ticket(t, &t.site))

@@ -23,8 +23,8 @@ pub struct PluginCapabilities {
 
 impl PluginManifest {
     pub fn load(path: &Path) -> Result<Self, String> {
-        let raw = std::fs::read_to_string(path)
-            .map_err(|e| format!("read {}: {e}", path.display()))?;
+        let raw =
+            std::fs::read_to_string(path).map_err(|e| format!("read {}: {e}", path.display()))?;
         toml::from_str(&raw).map_err(|e| format!("parse {}: {e}", path.display()))
     }
 
@@ -36,7 +36,10 @@ impl PluginManifest {
             ));
         }
         if self.runtime != "lua" {
-            return Err(format!("runtime '{}' not supported (use lua)", self.runtime));
+            return Err(format!(
+                "runtime '{}' not supported (use lua)",
+                self.runtime
+            ));
         }
         if !self.capabilities.filter_tickets {
             return Err("capabilities.filter_tickets must be true for tick v0.21 plugins".into());
