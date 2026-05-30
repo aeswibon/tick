@@ -579,11 +579,13 @@ impl App {
     }
 
     pub async fn refresh_all(&mut self) {
-        self.do_refresh_all(&ViewMode::background(), false, true).await;
+        self.do_refresh_all(&ViewMode::background(), false, true)
+            .await;
     }
 
     pub async fn refresh_all_notify(&mut self) {
-        self.do_refresh_all(&ViewMode::background(), true, false).await;
+        self.do_refresh_all(&ViewMode::background(), true, false)
+            .await;
     }
 
     async fn fetch_views_parallel(

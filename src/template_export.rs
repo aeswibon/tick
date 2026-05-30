@@ -70,7 +70,10 @@ impl TemplateFieldRow {
 }
 
 /// Build picker rows from a loaded create draft.
-pub fn exportable_field_rows(draft: &CreateDraft, sprint_field: Option<&str>) -> Vec<TemplateFieldRow> {
+pub fn exportable_field_rows(
+    draft: &CreateDraft,
+    sprint_field: Option<&str>,
+) -> Vec<TemplateFieldRow> {
     let sprint_label = sprint_field
         .map(|id| format!("Sprint ({id})"))
         .unwrap_or_else(|| "Sprint".to_string());
@@ -201,9 +204,7 @@ pub fn build_issue_template(
     sprint_field: Option<&str>,
 ) -> IssueTemplate {
     let include = |id: TemplateFieldId| -> bool {
-        rows.iter()
-            .find(|r| r.id == id)
-            .is_some_and(|r| r.include)
+        rows.iter().find(|r| r.id == id).is_some_and(|r| r.include)
     };
     let clear = |id: TemplateFieldId| -> bool {
         rows.iter()
@@ -213,18 +214,16 @@ pub fn build_issue_template(
 
     let summary = if include(TemplateFieldId::Summary) && !clear(TemplateFieldId::Summary) {
         summary_for_template(&draft.summary)
-    } else if include(TemplateFieldId::Summary) {
-        "[fill in summary]".to_string()
     } else {
         "[fill in summary]".to_string()
     };
 
-    let description = if include(TemplateFieldId::Description) && !clear(TemplateFieldId::Description)
-    {
-        draft.description.clone()
-    } else {
-        String::new()
-    };
+    let description =
+        if include(TemplateFieldId::Description) && !clear(TemplateFieldId::Description) {
+            draft.description.clone()
+        } else {
+            String::new()
+        };
 
     let labels = if include(TemplateFieldId::Labels) && !clear(TemplateFieldId::Labels) {
         draft.labels.clone()
@@ -296,8 +295,6 @@ pub fn template_name_from_key_and_summary(key: &str, summary: &str) -> String {
         .map(|c| {
             if c.is_ascii_alphanumeric() {
                 c.to_ascii_lowercase()
-            } else if c.is_whitespace() {
-                '-'
             } else {
                 '-'
             }
@@ -353,13 +350,20 @@ pub fn append_issue_template(
     Ok(path)
 }
 
-pub fn format_template_block(template: &IssueTemplate, source_key: &str, external_file: bool) -> String {
+pub fn format_template_block(
+    template: &IssueTemplate,
+    source_key: &str,
+    external_file: bool,
+) -> String {
     let section = if external_file {
         "[[templates]]"
     } else {
         "[[create.templates]]"
     };
-    let mut s = format!("# From {source_key} — {}\n", template_picker_label(template));
+    let mut s = format!(
+        "# From {source_key} — {}\n",
+        template_picker_label(template)
+    );
     s.push_str(section);
     s.push('\n');
     s.push_str(&toml_to_string_pretty(template));
@@ -370,10 +374,7 @@ pub fn format_template_block(template: &IssueTemplate, source_key: &str, externa
 fn toml_to_string_pretty(template: &IssueTemplate) -> String {
     let mut lines = vec![
         format!("name = {}", quote(&template.name)),
-        format!(
-            "site = {}",
-            quote(template.site.as_deref().unwrap_or(""))
-        ),
+        format!("site = {}", quote(template.site.as_deref().unwrap_or(""))),
         format!("project = {}", quote(&template.project)),
         format!("issue_type = {}", quote(&template.issue_type)),
         format!("summary = {}", quote(&template.summary)),
@@ -488,10 +489,12 @@ async fn export_one_issue(
         .unwrap_or(key)
         .to_string();
 
-    let mut draft = CreateDraft::default();
-    draft.project_key = project.clone();
-    draft.issue_type_name = issue_type.clone();
-    draft.summary = summary.clone();
+    let mut draft = CreateDraft {
+        project_key: project.clone(),
+        issue_type_name: issue_type.clone(),
+        summary: summary.clone(),
+        ..Default::default()
+    };
     crate::api::create::enrich_draft_from_clone(jira, &mut draft, &issue, sprint_field).await;
 
     let rows = exportable_field_rows(&draft, sprint_field);

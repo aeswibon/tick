@@ -81,9 +81,7 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         return false;
     }
 
-    if app.template_export.is_some()
-        && app.input_mode != InputMode::TemplateExportName
-    {
+    if app.template_export.is_some() && app.input_mode != InputMode::TemplateExportName {
         crate::template_export_flow::handle_template_export_key(app, code).await;
         return false;
     }
@@ -1002,7 +1000,8 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             } else {
                 "assignee when closed"
             };
-            app.status.set_action_notice(format!("Closed search: {mode}"));
+            app.status
+                .set_action_notice(format!("Closed search: {mode}"));
             if !app.closed_search_query.trim().is_empty() {
                 app.refresh_closed_search().await;
             }

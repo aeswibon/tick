@@ -56,9 +56,11 @@ pub async fn start_template_export_from_selection(app: &mut App) {
     app.loading = true;
     app.loading_message = Some(format!("Loading {} for template export…", ticket.key));
 
-    let mut draft = CreateDraft::default();
-    draft.base_url = site.base_url.clone();
-    draft.site_name = site.name.clone();
+    let mut draft = CreateDraft {
+        base_url: site.base_url.clone(),
+        site_name: site.name.clone(),
+        ..Default::default()
+    };
     seed_draft_from_ticket(&mut draft, &ticket, "");
 
     let sprint_field = site.sprint_field.as_deref();
@@ -121,25 +123,36 @@ pub async fn handle_template_export_key(app: &mut App, code: KeyCode) {
         return;
     }
 
-    let pos_in_nav = nav
-        .iter()
-        .position(|&i| i == session.selected)
-        .unwrap_or(0);
+    let pos_in_nav = nav.iter().position(|&i| i == session.selected).unwrap_or(0);
 
     match session.step {
-        TemplateExportStep::IncludeFields | TemplateExportStep::ClearValues => {
-            match code {
-                KeyCode::Esc => cancel_template_export(app),
-                KeyCode::Up | KeyCode::Char('k') => {
-                    let new_pos = pos_in_nav.saturating_sub(1);
-                    session.selected = nav[new_pos];
+        TemplateExportStep::IncludeFields | TemplateExportStep::ClearValues => match code {
+            KeyCode::Esc => cancel_template_export(app),
+            KeyCode::Up | KeyCode::Char('k') => {
+                let new_pos = pos_in_nav.saturating_sub(1);
+                session.selected = nav[new_pos];
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                if pos_in_nav + 1 < nav.len() {
+                    session.selected = nav[pos_in_nav + 1];
                 }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    if pos_in_nav + 1 < nav.len() {
-                        session.selected = nav[pos_in_nav + 1];
+            }
+            KeyCode::Char(' ') => {
+                let row = &mut session.rows[session.selected];
+                if session.step == TemplateExportStep::IncludeFields {
+                    row.include = !row.include;
+                    if !row.include {
+                        row.clear_value = false;
                     }
+                } else {
+                    row.clear_value = !row.clear_value;
                 }
-                KeyCode::Char(' ') => {
+            }
+            KeyCode::Enter => advance_template_export_step(app),
+            KeyCode::Char(n) if ('1'..='9').contains(&n) => {
+                let idx = (n as u8 - b'1') as usize;
+                if idx < nav.len() {
+                    session.selected = nav[idx];
                     let row = &mut session.rows[session.selected];
                     if session.step == TemplateExportStep::IncludeFields {
                         row.include = !row.include;
@@ -150,25 +163,9 @@ pub async fn handle_template_export_key(app: &mut App, code: KeyCode) {
                         row.clear_value = !row.clear_value;
                     }
                 }
-                KeyCode::Enter => advance_template_export_step(app),
-                KeyCode::Char(n) if ('1'..='9').contains(&n) => {
-                    let idx = (n as u8 - b'1') as usize;
-                    if idx < nav.len() {
-                        session.selected = nav[idx];
-                        let row = &mut session.rows[session.selected];
-                        if session.step == TemplateExportStep::IncludeFields {
-                            row.include = !row.include;
-                            if !row.include {
-                                row.clear_value = false;
-                            }
-                        } else {
-                            row.clear_value = !row.clear_value;
-                        }
-                    }
-                }
-                _ => {}
             }
-        }
+            _ => {}
+        },
         TemplateExportStep::Name => {}
     }
 }

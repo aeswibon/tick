@@ -8,6 +8,6 @@ pub mod help;
 pub mod mentions;
 pub mod priorities;
 pub mod sprints;
-pub mod template_export;
 mod table;
+pub mod template_export;
 pub mod transitions;

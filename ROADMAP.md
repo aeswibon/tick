@@ -1,43 +1,52 @@
 # tick roadmap
 
-## Shipped (v0.6)
+## Shipped (recent)
 
 | Version | Highlights |
 |---------|------------|
-| **0.6.0** | HTTP retry/backoff, refresh UX, markdown descriptions + `@` mentions |
-| **0.6.1** | ADF → markdown on edit, tables/media in detail pane, ratatui 0.30 |
-| **0.6.2** | `tick auth status` for API token + OAuth |
-| **0.6.3** | Sort ascending ↑ / descending ↓ (`S`) |
-| **0.6.4** | `O` — open issue from clipboard/key; multi-site API probe |
-| **0.6.5** | `cargo-deny` in CI; clippy fix for async ticket resolve |
-| **0.6.6** | [FEATURES.md](docs/FEATURES.md); offline header; open-ticket progress; API wiremock tests |
-| **0.6.7** | ADF round-trip (`adf-json` fences, lists, strike); mention restore on `D` |
-| **0.6.8** | Status via workflow transitions; Jira validation errors; `T` alias |
-| **0.6.9** | Required transition fields (typed inputs); assignable-user cache; ⌘R/Ctrl+R load more |
-| **0.7.0** | Create (`n`) and duplicate (`C`) issues; required create fields; clone link |
+| **0.7.1** | Closed tab + JQL search; template export (`X`); tab reorder; feature docs |
+| **0.7.0** | Create (`n`), duplicate (`C`), config templates (`N`) |
+| **0.6.9** | Required transition fields; assignable-user cache; ⌘R/Ctrl+R |
+| **0.6.8** | Workflow transitions (`t`/`T`) |
+| **0.6.6** | [FEATURES.md](docs/FEATURES.md); offline header; wiremock tests |
+
+Full history: [CHANGELOG.md](CHANGELOG.md).
+
+## Priority (product)
+
+Order for upcoming work (user direction, 2026-05):
+
+1. **A — Triage depth** — watch/unwatch, due date, issue links, subtasks, fewer browser detours on transitions  
+2. **B — Create/templates** — CLI `tick template export`, template CRUD, saved JQL views  
+3. **C — Platform** — `input.rs` split, config reload, rate-limit UX, ROADMAP/CI hygiene  
 
 ## Next — product
 
-| Item | Notes |
-|------|------|
-| Richer transition fields | Multi-select, components, rich text (web UI today) |
-| User picker `j`/`k` vs typing | Names like “Jack” when list is open |
-| Jira Server / Data Center | Out of scope unless demand |
+| Item | Priority | Notes |
+|------|----------|-------|
+| Watch / unwatch | A | Complements Watched tab |
+| Edit due date | A | Missing vs other field edits |
+| Issue links (view + add) | A | Beyond duplicate Cloners |
+| Subtasks in detail | A | Parent shown; children not |
+| Richer transition/create fields | A | Multi-select, components (ROADMAP since 0.6.9) |
+| `tick template export` CLI | B | Library exists; TUI `X` only today |
+| Template edit/delete in TUI | B | |
+| Saved JQL / extra views | B | Config-driven tabs |
+| Closed tab: persist query, local filter | B | |
+| Custom field columns | A/B | `columns` + field ids |
 
 ## Next — quality
 
 | Item | Notes |
-|------|------|
-| Input/key handler tests | Expand coverage as new pickers/modals are added |
+|------|-------|
+| Input/key tests | Expand for Closed search, template export |
+| `cargo fmt` in release checklist | CI failed v0.7.1 on fmt — fixed post-tag |
 
-## Done — infrastructure
+## Out of scope (unless demand)
 
-| Item | Status |
-|------|--------|
-| `cargo-deny` in CI | Done (v0.6.5) |
-| Assign / transition wiremock tests | Done (v0.6.6) |
-| Release checklist: `cargo fmt` before tag | Documented |
+- Jira Server / Data Center  
+- Web UI  
 
 ---
 
-*See [CHANGELOG.md](CHANGELOG.md) for version history.*
+*Feature guides: [docs/features/](docs/features/README.md)*

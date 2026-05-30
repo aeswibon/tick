@@ -126,9 +126,7 @@ pub fn build_closed_search_jql(base: &str, query: &str) -> String {
         return format!("{base} ORDER BY updated DESC");
     }
     let escaped = escape_jql_text(q);
-    format!(
-        "{base} AND text ~ \"{escaped}\" ORDER BY updated DESC"
-    )
+    format!("{base} AND text ~ \"{escaped}\" ORDER BY updated DESC")
 }
 
 #[cfg(test)]
@@ -148,10 +146,7 @@ mod tests {
 
     #[test]
     fn closed_jql_includes_text_and_was_assignee() {
-        let jql = build_closed_search_jql(
-            ViewMode::closed_search_base(true),
-            "payment bug",
-        );
+        let jql = build_closed_search_jql(ViewMode::closed_search_base(true), "payment bug");
         assert!(jql.contains("assignee was currentUser()"));
         assert!(jql.contains("text ~ \"payment bug\""));
     }

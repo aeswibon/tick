@@ -1,4 +1,4 @@
-use crate::template_export_flow::{TemplateExportStep, TemplateExportSession};
+use crate::template_export_flow::{TemplateExportSession, TemplateExportStep};
 use ratatui::{
     layout::{Constraint, Rect},
     style::{Modifier, Style},
@@ -7,7 +7,12 @@ use ratatui::{
     Frame,
 };
 
-pub fn draw_template_export(f: &mut Frame, session: &TemplateExportSession, theme: &crate::theme::Theme, area: Rect) {
+pub fn draw_template_export(
+    f: &mut Frame,
+    session: &TemplateExportSession,
+    theme: &crate::theme::Theme,
+    area: Rect,
+) {
     let (title, subtitle, show_clear) = match session.step {
         TemplateExportStep::IncludeFields => (
             "Export template — fields to save",
@@ -26,10 +31,12 @@ pub fn draw_template_export(f: &mut Frame, session: &TemplateExportSession, them
         .rows
         .iter()
         .enumerate()
-        .filter(|(_, r)| show_clear && r.include || !show_clear)
+        .filter(|(_, r)| !show_clear || r.include)
         .collect();
 
-    let height = (visible.len() as u16).saturating_add(9).min(area.height.saturating_sub(2));
+    let height = (visible.len() as u16)
+        .saturating_add(9)
+        .min(area.height.saturating_sub(2));
     let popup = centered_rect(62, height, area);
     f.render_widget(Clear, popup);
 

@@ -209,10 +209,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             "closed assignee"
         };
         (
-            format!(
-                " Closed search ({scope}, Enter): {}_",
-                app.input_buffer
-            ),
+            format!(" Closed search ({scope}, Enter): {}_", app.input_buffer),
             app.theme.accent,
         )
     } else if app.active_view == ViewMode::ClosedSearch

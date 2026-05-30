@@ -5,12 +5,12 @@ use std::collections::HashMap;
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::api::create::{
-    apply_template_to_draft, build_create_fields, enrich_draft_from_clone,
-    seed_draft_from_ticket, template_picker_label, CreateDraft,
+    apply_template_to_draft, build_create_fields, enrich_draft_from_clone, seed_draft_from_ticket,
+    template_picker_label, CreateDraft,
 };
-use crate::config::IssueTemplate;
 use crate::api::transition_fields::{self, TransitionField, TransitionFieldKind};
 use crate::app::{App, InputMode};
+use crate::config::IssueTemplate;
 use crate::config::Site;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

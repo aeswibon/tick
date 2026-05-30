@@ -58,8 +58,12 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
         )),
         Line::from("  ?                      Toggle this help"),
         Line::from("  /                      Filter tickets (/ on Closed tab = JQL search)"),
-        Line::from("  1–6                    Assigned · Mentions · Watched · Updated · Sprint · Closed"),
-        Line::from("  h                      On Closed tab: toggle ever-assigned vs assignee-when-done"),
+        Line::from(
+            "  1–6                    Assigned · Mentions · Watched · Updated · Sprint · Closed",
+        ),
+        Line::from(
+            "  h                      On Closed tab: toggle ever-assigned vs assignee-when-done",
+        ),
         Line::from("  s                      Cycle sort field"),
         Line::from("  S                      Toggle sort asc ↑ / desc ↓ (table)"),
         Line::from("  ← / →                  Cycle view (pane closed)"),
