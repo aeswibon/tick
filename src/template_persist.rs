@@ -84,6 +84,7 @@ pub fn update_template_field(
         TemplateEditField::Project => template.project = value,
         TemplateEditField::IssueType => template.issue_type = value,
         TemplateEditField::Description => template.description = value,
+        TemplateEditField::Labels => template.labels = parse_template_labels(&value),
     }
     template.validate_fields()?;
     save_all_templates(config)?;
@@ -96,6 +97,16 @@ pub enum TemplateEditField {
     Project,
     IssueType,
     Description,
+    Labels,
+}
+
+fn parse_template_labels(input: &str) -> Vec<String> {
+    input
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .collect()
 }
 
 #[cfg(test)]
@@ -120,5 +131,14 @@ assigned = "x"
         assert!(!out.contains("[[create.templates]]"));
         assert!(!out.contains("name = \"old\""));
         assert!(out.contains("[views]"));
+    }
+
+    #[test]
+    fn parse_template_labels_splits_and_trims() {
+        assert_eq!(
+            parse_template_labels("bug, triage , "),
+            vec!["bug", "triage"]
+        );
+        assert!(parse_template_labels("").is_empty());
     }
 }

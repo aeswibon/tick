@@ -74,7 +74,7 @@ pub(crate) async fn apply_sprint_move(app: &mut App, idx: usize) {
     {
         Ok(()) => {
             app.showing_sprints = false;
-            app.refresh_all().await;
+            app.refresh().await;
         }
         Err(e) => {
             app.status.set_action_error(e);
@@ -119,7 +119,7 @@ pub(crate) async fn apply_priority(app: &mut App, idx: usize) {
     match app.jira.update_priority(&base_url, &sel.key, &name).await {
         Ok(()) => {
             app.showing_priorities = false;
-            app.refresh_all().await;
+            app.refresh().await;
         }
         Err(e) => {
             app.status.set_action_error(e);
@@ -462,7 +462,7 @@ pub(crate) async fn execute_transition_with(
     {
         Ok(()) => {
             cancel_transition_collect(app);
-            app.refresh_all().await;
+            app.refresh().await;
         }
         Err(e) if !e.field_errors.is_empty() => {
             let mut pending: Vec<TransitionField> = e

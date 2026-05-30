@@ -288,6 +288,14 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             ),
             app.theme.accent,
         )
+    } else if app.input_mode == crate::app::InputMode::TemplateEditLabels {
+        (
+            format!(
+                " Template labels (comma-separated, Enter save): {}_",
+                app.input_buffer
+            ),
+            app.theme.accent,
+        )
     } else if app.input_mode == crate::app::InputMode::ClosedSearchQuery {
         let scope = if app.closed_search_ever_assigned {
             "ever assigned"

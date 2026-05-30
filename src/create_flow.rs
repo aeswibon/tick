@@ -555,7 +555,7 @@ pub async fn submit_create(app: &mut App) {
             }
             app.loading = false;
             app.loading_message = None;
-            app.refresh_all().await;
+            app.refresh().await;
             app.select_ticket_by_key(&new_key);
             app.detail_open = true;
             app.status.clear_action_error();

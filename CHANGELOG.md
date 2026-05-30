@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.12.2] - 2026-05-30
+
+### Added
+
+- **Template labels** — `Shift+E` → `l` edits comma-separated default labels (saved to `labels = [...]` in template TOML)
+
+### Changed
+
+- **Single-issue writes** — assign, watch/unwatch, transition, comment, links, subtasks, and create refresh the **active view** only (not all background tabs)
+
 ## [0.12.1] - 2026-05-30
 
 ### Added

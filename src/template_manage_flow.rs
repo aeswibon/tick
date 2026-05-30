@@ -12,6 +12,7 @@ pub enum TemplateManageStep {
     EditProject,
     EditIssueType,
     EditDescription,
+    EditLabels,
     ConfirmDelete,
 }
 
@@ -30,6 +31,7 @@ pub fn cancel_template_manage(app: &mut App) {
             | InputMode::TemplateEditProject
             | InputMode::TemplateEditIssueType
             | InputMode::TemplateEditDescription
+            | InputMode::TemplateEditLabels
     ) {
         app.input_mode = InputMode::None;
         app.input_buffer.clear();
@@ -123,6 +125,14 @@ pub async fn handle_template_manage_key(app: &mut App, code: KeyCode) {
                 app.input_mode = InputMode::TemplateEditDescription;
                 session.step = TemplateManageStep::EditDescription;
             }
+            KeyCode::Char('l') => {
+                let name = session.editing_name.clone();
+                if let Some(t) = app.config.create.templates.iter().find(|t| t.name == name) {
+                    app.input_buffer = t.labels.join(", ");
+                }
+                app.input_mode = InputMode::TemplateEditLabels;
+                session.step = TemplateManageStep::EditLabels;
+            }
             KeyCode::Char('d') => session.step = TemplateManageStep::ConfirmDelete,
             _ => {}
         },
@@ -144,7 +154,8 @@ pub async fn handle_template_manage_key(app: &mut App, code: KeyCode) {
         TemplateManageStep::EditSummary
         | TemplateManageStep::EditProject
         | TemplateManageStep::EditIssueType
-        | TemplateManageStep::EditDescription => {}
+        | TemplateManageStep::EditDescription
+        | TemplateManageStep::EditLabels => {}
     }
 }
 
@@ -154,14 +165,23 @@ pub async fn submit_template_edit(app: &mut App) {
         InputMode::TemplateEditProject => TemplateEditField::Project,
         InputMode::TemplateEditIssueType => TemplateEditField::IssueType,
         InputMode::TemplateEditDescription => TemplateEditField::Description,
+        InputMode::TemplateEditLabels => TemplateEditField::Labels,
         _ => return,
     };
-    let value = if app.input_mode == InputMode::TemplateEditDescription {
+    let value = if matches!(
+        app.input_mode,
+        InputMode::TemplateEditDescription | InputMode::TemplateEditLabels
+    ) {
         app.input_buffer.clone()
     } else {
         app.input_buffer.trim().to_string()
     };
-    if value.is_empty() && app.input_mode != InputMode::TemplateEditDescription {
+    if value.is_empty()
+        && !matches!(
+            app.input_mode,
+            InputMode::TemplateEditDescription | InputMode::TemplateEditLabels
+        )
+    {
         app.status.set_action_error("Value cannot be empty");
         return;
     }

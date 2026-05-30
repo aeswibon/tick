@@ -253,14 +253,15 @@ pub(crate) async fn submit_input(app: &mut App) {
         | InputMode::TemplateEditSummary
         | InputMode::TemplateEditProject
         | InputMode::TemplateEditIssueType
-        | InputMode::TemplateEditDescription => {
+        | InputMode::TemplateEditDescription
+        | InputMode::TemplateEditLabels => {
             return;
         }
         InputMode::OpenTicket | InputMode::None => return,
     };
 
     match result {
-        Ok(()) => app.refresh_all().await,
+        Ok(()) => app.refresh().await,
         Err(e) => app.status.set_action_error(e),
     }
 }

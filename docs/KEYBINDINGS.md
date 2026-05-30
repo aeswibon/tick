@@ -45,7 +45,7 @@ For workflows and examples, see the [feature guides](features/README.md).
 | `6` | **Closed** tab | On-demand search |
 | `7`–`9` | **Custom JQL** views | When `[[views.custom]]` configured |
 | `v` / `Shift+V` | Cycle custom views | Wraps through `views.custom` |
-| `Shift+E` | Template manager | Edit summary/project/type/**description**; delete |
+| `Shift+E` | Template manager | Edit summary/project/type/**description**/**labels**; delete |
 | `h` | **Closed tab only:** toggle assignee / ever-assigned | Re-runs search if query set |
 | `f` | **Closed tab only:** local filter | After fetch; does not call Jira |
 | `n` | New issue wizard | |

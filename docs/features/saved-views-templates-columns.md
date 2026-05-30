@@ -78,6 +78,7 @@ Edit or delete templates already in config (including those merged from `create.
    - **`p`** — edit project key
    - **`i`** — edit issue type name
    - **`b`** — edit description (markdown, footer; empty allowed)
+   - **`l`** — edit labels (comma-separated, e.g. `bug, triage`; empty clears)
    - **`d`** — delete (confirm with **`Enter`**)
 4. Changes are written to **`create.templates_file`** if set, otherwise inline blocks in **`config.toml`**.
 

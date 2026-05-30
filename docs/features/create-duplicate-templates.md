@@ -146,7 +146,7 @@ Or paste blocks into `[[create.templates]]` in `config.toml`.
 Edit or remove templates without leaving the TUI. See [saved-views-templates-columns.md](saved-views-templates-columns.md#template-manager-shifte).
 
 ```text
-Shift+E → pick template → e/p/i to edit → d to delete
+Shift+E → pick template → e/p/i/b/l to edit → d to delete
 ```
 
 Writes to `create.templates_file` when set, otherwise updates `[[create.templates]]` in `config.toml`.

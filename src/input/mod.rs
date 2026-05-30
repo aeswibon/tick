@@ -117,6 +117,7 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                 | InputMode::TemplateEditProject
                 | InputMode::TemplateEditIssueType
                 | InputMode::TemplateEditDescription
+                | InputMode::TemplateEditLabels
         )
     {
         crate::template_manage_flow::handle_template_manage_key(app, code).await;
@@ -186,8 +187,12 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     InputMode::CreateField
                         | InputMode::CreateDescription
                         | InputMode::TemplateEditDescription
+                        | InputMode::TemplateEditLabels
                 ) {
-                    if app.input_mode == InputMode::TemplateEditDescription {
+                    if matches!(
+                        app.input_mode,
+                        InputMode::TemplateEditDescription | InputMode::TemplateEditLabels
+                    ) {
                         if let Some(session) = app.template_manage.as_mut() {
                             session.step =
                                 crate::template_manage_flow::TemplateManageStep::Actions;
@@ -253,6 +258,7 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                         | InputMode::TemplateEditProject
                         | InputMode::TemplateEditIssueType
                         | InputMode::TemplateEditDescription
+                        | InputMode::TemplateEditLabels
                 ) {
                     crate::template_manage_flow::submit_template_edit(app).await;
                 } else {

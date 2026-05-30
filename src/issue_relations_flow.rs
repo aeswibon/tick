@@ -64,7 +64,7 @@ pub async fn submit_add_link_target(app: &mut App) {
                 .set_action_notice(format!("Linked {} to {}", sel.key, target));
             app.issue_relations_key = None;
             app.refresh_issue_relations().await;
-            app.refresh_all().await;
+            app.refresh().await;
         }
         Err(e) => app.status.set_action_error(e),
     }
@@ -96,7 +96,7 @@ pub async fn remove_selected_link(app: &mut App) {
             app.status.set_action_notice("Link removed");
             app.issue_relations_key = None;
             app.refresh_issue_relations().await;
-            app.refresh_all().await;
+            app.refresh().await;
         }
         Err(e) => app.status.set_action_error(e),
     }
@@ -180,7 +180,7 @@ pub async fn submit_create_subtask(app: &mut App) {
                 .set_action_notice(format!("Created subtask {key} under {}", parent.key));
             app.issue_relations_key = None;
             app.refresh_issue_relations().await;
-            app.refresh_all().await;
+            app.refresh().await;
         }
         Err(CreateError { message, .. }) => app.status.set_action_error(message),
     }

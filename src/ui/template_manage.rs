@@ -29,7 +29,8 @@ pub fn draw_template_manage(
         TemplateManageStep::EditSummary
         | TemplateManageStep::EditProject
         | TemplateManageStep::EditIssueType
-        | TemplateManageStep::EditDescription => {}
+        | TemplateManageStep::EditDescription
+        | TemplateManageStep::EditLabels => {}
     }
 }
 
@@ -83,6 +84,7 @@ fn draw_actions(f: &mut Frame, session: &TemplateManageSession, theme: &Theme, a
         " p  edit project",
         " i  edit issue type",
         " b  edit description (markdown)",
+        " l  edit labels (comma-separated)",
         " d  delete template",
         "",
         " Esc  back to list",

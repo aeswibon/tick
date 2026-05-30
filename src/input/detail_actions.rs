@@ -14,7 +14,7 @@ pub(crate) async fn assign_to_me(app: &mut App) {
             .assign_to_account(&base_url, &sel.key, &account_id)
             .await
         {
-            Ok(()) => app.refresh_all().await,
+            Ok(()) => app.refresh().await,
             Err(e) => app.status.set_action_error(e),
         },
         Err(e) => app.status.set_action_error(e),
@@ -44,7 +44,7 @@ pub(crate) async fn watch_ticket(app: &mut App) {
         Ok(()) => {
             app.status
                 .set_action_notice(format!("Watching {}", sel.key));
-            app.refresh_all().await;
+            app.refresh().await;
         }
         Err(e) => app.status.set_action_error(e),
     }
@@ -63,7 +63,7 @@ pub(crate) async fn unwatch_ticket(app: &mut App) {
         Ok(()) => {
             app.status
                 .set_action_notice(format!("Unwatched {}", sel.key));
-            app.refresh_all().await;
+            app.refresh().await;
         }
         Err(e) => app.status.set_action_error(e),
     }
@@ -78,7 +78,7 @@ pub(crate) async fn unassign_ticket(app: &mut App) {
         return;
     };
     match app.jira.unassign(&base_url, &sel.key).await {
-        Ok(()) => app.refresh_all().await,
+        Ok(()) => app.refresh().await,
         Err(e) => app.status.set_action_error(e),
     }
 }

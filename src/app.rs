@@ -139,6 +139,7 @@ pub enum InputMode {
     TemplateEditProject,
     TemplateEditIssueType,
     TemplateEditDescription,
+    TemplateEditLabels,
     /// Add issue link: target KEY after picking link type.
     AddIssueLinkTarget,
     /// Create subtask under current issue (summary only).
