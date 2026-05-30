@@ -232,7 +232,7 @@ fn load_filter_plugin(plugin_dir: &Path, manifest_path: &Path) -> Result<LuaFilt
 
     let lua = Lua::new();
     lua.load(&script)
-        .set_name(&format!("@{}", entry.display()))
+        .set_name(format!("@{}", entry.display()))
         .exec()
         .map_err(|e| format!("{}: {e}", manifest.name))?;
 
