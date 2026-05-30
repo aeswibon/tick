@@ -120,6 +120,7 @@ pub enum InputMode {
     EditSummary,
     EditLabels,
     EditDescription,
+    EditDueDate,
     OpenTicket,
     /// Required workflow field (free text) while changing status.
     TransitionField,

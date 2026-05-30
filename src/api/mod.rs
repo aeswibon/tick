@@ -80,6 +80,10 @@ impl JiraClient {
         self.authed(self.http.post(url))
     }
 
+    pub(crate) fn delete(&self, url: &str) -> reqwest::RequestBuilder {
+        self.authed(self.http.delete(url))
+    }
+
     pub(crate) async fn send<F, Fut>(&self, build: F) -> Result<reqwest::Response, String>
     where
         F: Fn() -> Fut,
@@ -170,6 +174,71 @@ impl JiraClient {
         let body = markdown::to_adf(text, mentions);
         self.update_fields(base_url, key, serde_json::json!({ "description": body }))
             .await
+    }
+
+    /// Set or clear due date (`YYYY-MM-DD`). `None` clears the field.
+    pub async fn update_due_date(
+        &self,
+        base_url: &str,
+        key: &str,
+        due_date: Option<chrono::NaiveDate>,
+    ) -> Result<(), String> {
+        let value = match due_date {
+            Some(d) => serde_json::json!(d.format("%Y-%m-%d").to_string()),
+            None => serde_json::Value::Null,
+        };
+        self.update_fields(base_url, key, serde_json::json!({ "duedate": value }))
+            .await
+    }
+
+    /// Add the current user as a watcher on the issue.
+    pub async fn watch_issue(&self, base_url: &str, key: &str) -> Result<(), String> {
+        let account_id = self.current_user_account_id(base_url).await?;
+        let url = format!(
+            "{}/rest/api/3/issue/{}/watchers",
+            base_url.trim_end_matches('/'),
+            key
+        );
+        let resp = self
+            .send(|| {
+                self.post(&url)
+                    .json(&serde_json::json!({ "accountId": account_id }))
+                    .send()
+            })
+            .await?;
+        if resp.status().is_success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "Watch failed: {}",
+                resp.text().await.unwrap_or_default()
+            ))
+        }
+    }
+
+    /// Remove the current user from watchers.
+    pub async fn unwatch_issue(&self, base_url: &str, key: &str) -> Result<(), String> {
+        let account_id = self.current_user_account_id(base_url).await?;
+        let url = format!(
+            "{}/rest/api/3/issue/{}/watchers",
+            base_url.trim_end_matches('/'),
+            key
+        );
+        let resp = self
+            .send(|| {
+                self.delete(&url)
+                    .query(&[("accountId", account_id.as_str())])
+                    .send()
+            })
+            .await?;
+        if resp.status().is_success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "Unwatch failed: {}",
+                resp.text().await.unwrap_or_default()
+            ))
+        }
     }
 
     async fn update_fields(
@@ -1166,6 +1235,52 @@ mod field_updates {
         let client = JiraClient::new("u@example.com", "token", false);
         client
             .add_comment(&server.uri(), "DEMO-1", "hi @Alice", &mentions)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn watch_issue_posts_watcher() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/rest/api/3/myself"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({ "accountId": "me-1" })),
+            )
+            .mount(&server)
+            .await;
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path(
+                "/rest/api/3/issue/DEMO-1/watchers",
+            ))
+            .and(wiremock::matchers::body_json(
+                serde_json::json!({ "accountId": "me-1" }),
+            ))
+            .respond_with(wiremock::ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        client.watch_issue(&server.uri(), "DEMO-1").await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn update_due_date_sends_put() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("PUT"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/DEMO-1"))
+            .and(wiremock::matchers::body_json(serde_json::json!({
+                "fields": { "duedate": "2026-12-31" }
+            })))
+            .respond_with(wiremock::ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        let d = chrono::NaiveDate::from_ymd_opt(2026, 12, 31).unwrap();
+        client
+            .update_due_date(&server.uri(), "DEMO-1", Some(d))
             .await
             .unwrap();
     }

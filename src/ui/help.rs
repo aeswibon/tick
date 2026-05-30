@@ -24,7 +24,7 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
         Line::from("  j/k  or  Up/Down      Move selection"),
         Line::from("  [ / ]                  Scroll up / down by page_size rows"),
         Line::from("  g / G                  Go to first / last row"),
-        Line::from("  1–5                    Jump to view tab"),
+        Line::from("  1–6                    Jump to view tab"),
         Line::from(""),
         Line::from(Span::styled(
             " Actions",
@@ -77,7 +77,10 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
         Line::from("  c                      Add comment (@ tags users)"),
         Line::from("  w                      Log work time"),
         Line::from("  a / u                  Assign to me / unassign (detail open)"),
-        Line::from("  S / P / L / M / D      Edit fields (D: markdown + @mentions)"),
+        Line::from("  W / Shift+W            Watch / unwatch issue (table or detail)"),
+        Line::from(
+            "  S / P / L / M / d / D  Edit summary, priority, labels, sprint, due, description",
+        ),
         Line::from("  !                      Toggle site error overlay"),
         Line::from(""),
         Line::from(Span::styled(

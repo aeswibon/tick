@@ -167,6 +167,14 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             format!(" Labels (comma-separated): {}_", app.input_buffer),
             app.theme.accent,
         )
+    } else if app.input_mode == crate::app::InputMode::EditDueDate {
+        (
+            format!(
+                " Due date (YYYY-MM-DD, empty clears): {}_",
+                app.input_buffer
+            ),
+            app.theme.accent,
+        )
     } else if app.input_mode == crate::app::InputMode::OpenTicket {
         (
             format!(

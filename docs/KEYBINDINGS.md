@@ -43,6 +43,8 @@ For workflows and examples, see the [feature guides](features/README.md).
 | `N` | New from template | |
 | `C` | Duplicate selected | |
 | `X` | Export selection as template | |
+| `W` | Watch issue | Table or detail |
+| `Shift+W` | Unwatch issue | Table or detail |
 | `q` | Quit | |
 
 ### Local filter (`/` on tabs 1–5)
@@ -81,6 +83,7 @@ r        # repeat search
 | `P` | Priority picker | |
 | `L` | Labels (comma-separated) | Replaces all labels |
 | `M` | Sprint / backlog picker | Needs `board_id` |
+| `d` | Edit due date | `YYYY-MM-DD`, empty clears |
 | `D` | Edit description | Markdown + `@` |
 | `t` / `T` | Transitions | Same as table |
 

@@ -78,6 +78,25 @@ boards = { ENG = 12, WEB = 99 }
 | `a` | Assign to **you** (`/myself` account id) |
 | `u` | Unassign |
 
+## Due date (`d`)
+
+Detail pane only.
+
+| Key | Action |
+|-----|--------|
+| `d` | Edit due date — `YYYY-MM-DD` in footer |
+| `Enter` | Save (empty input clears due date) |
+| `Esc` | Cancel |
+
+## Watch / unwatch
+
+Works from the **table** or **detail pane**.
+
+| Key | Action |
+|-----|--------|
+| `W` | Add yourself as watcher |
+| `Shift+W` | Remove yourself as watcher |
+
 ## Related
 
 - [status-transitions.md](status-transitions.md)

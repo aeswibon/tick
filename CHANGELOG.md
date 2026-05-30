@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.7.2] - 2026-05-30
+
+### Added
+
+- **Watch / unwatch** — `W` and `Shift+W` from table or detail (Jira watchers API)
+- **Edit due date** — `d` in detail pane (`YYYY-MM-DD`, empty clears)
+- **CLI** — `tick template export SITE KEY... [-o file] [--append]` for bootstrap templates
+
 ## [0.7.1] - 2026-05-30
 
 ### Added

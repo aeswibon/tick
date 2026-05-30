@@ -83,6 +83,8 @@ base_url = "https://my-team.atlassian.net"
 | `/` | Filter (or JQL search on Closed tab) |
 | `Enter` | Detail pane |
 | `t` / `T`, `c`, `w` | Status transition, comment, worklog |
+| `W` / `Shift+W` | Watch / unwatch issue |
+| `d` (detail) | Edit due date |
 | `n`, `N`, `C`, `X` | New · template · duplicate · export template |
 | `?` | In-app help |
 
@@ -106,6 +108,7 @@ tick --init               # Create ~/.config/tick/config.toml
 tick --doctor             # Test API, sprint fields, agile boards
 tick auth login           # OAuth (optional)
 tick --list-themes        # List themes
+tick template export my-site HIN-1 -o templates/local.toml  # Export issue as template TOML
 ```
 
 ## Contributing

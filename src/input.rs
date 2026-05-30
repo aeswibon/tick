@@ -151,7 +151,10 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     crate::create_flow::cancel_create(app);
                 } else if app.input_mode == InputMode::TemplateExportName {
                     crate::template_export_flow::cancel_template_export(app);
-                } else if app.input_mode == InputMode::ClosedSearchQuery {
+                } else if matches!(
+                    app.input_mode,
+                    InputMode::EditDueDate | InputMode::ClosedSearchQuery
+                ) {
                     app.input_mode = InputMode::None;
                     app.input_buffer.clear();
                 } else {
@@ -201,6 +204,15 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
 
     if app.showing_sprints {
         handle_sprint_key(app, code).await;
+        return false;
+    }
+
+    if code == KeyCode::Char('W') {
+        if key.modifiers.contains(KeyModifiers::SHIFT) {
+            unwatch_ticket(app).await;
+        } else {
+            watch_ticket(app).await;
+        }
         return false;
     }
 
@@ -429,6 +441,15 @@ async fn submit_input(app: &mut App) {
                 .update_description(&base_url, &sel.key, &buffer, &mentions)
                 .await
         }
+        InputMode::EditDueDate => match parse_due_date_input(&buffer) {
+            Ok(due) => app.jira.update_due_date(&base_url, &sel.key, due).await,
+            Err(e) => {
+                app.input_mode = InputMode::EditDueDate;
+                app.input_buffer = buffer;
+                app.status.set_action_error(e);
+                return;
+            }
+        },
         InputMode::TransitionField => {
             let Some(field) = app.transition_field_current.clone() else {
                 return;
@@ -1101,6 +1122,15 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('M') if app.detail_open => {
             start_sprint_picker(app).await;
         }
+        KeyCode::Char('d') if app.detail_open => {
+            if let Some(ticket) = app.selected_ticket_entry() {
+                app.input_mode = InputMode::EditDueDate;
+                app.input_buffer = ticket
+                    .due_date
+                    .map(|d| d.format("%Y-%m-%d").to_string())
+                    .unwrap_or_default();
+            }
+        }
         KeyCode::Char('D') if app.detail_open => {
             if let Some(ticket) = app.selected_ticket_entry() {
                 let text = ticket
@@ -1146,6 +1176,54 @@ async fn assign_to_me(app: &mut App) {
             Ok(()) => app.refresh_all().await,
             Err(e) => app.status.set_action_error(e),
         },
+        Err(e) => app.status.set_action_error(e),
+    }
+}
+
+fn parse_due_date_input(buffer: &str) -> Result<Option<chrono::NaiveDate>, String> {
+    let trimmed = buffer.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    chrono::NaiveDate::parse_from_str(trimmed, "%Y-%m-%d")
+        .map(Some)
+        .map_err(|_| "Due date must be YYYY-MM-DD (empty to clear)".into())
+}
+
+async fn watch_ticket(app: &mut App) {
+    let Some(sel) = app.selected_ticket() else {
+        app.status.set_action_error("Select a ticket first");
+        return;
+    };
+    let Some(base_url) = app.site_base_url(&sel.site) else {
+        app.status.set_action_error("Unknown site for ticket");
+        return;
+    };
+    match app.jira.watch_issue(&base_url, &sel.key).await {
+        Ok(()) => {
+            app.status
+                .set_action_notice(format!("Watching {}", sel.key));
+            app.refresh_all().await;
+        }
+        Err(e) => app.status.set_action_error(e),
+    }
+}
+
+async fn unwatch_ticket(app: &mut App) {
+    let Some(sel) = app.selected_ticket() else {
+        app.status.set_action_error("Select a ticket first");
+        return;
+    };
+    let Some(base_url) = app.site_base_url(&sel.site) else {
+        app.status.set_action_error("Unknown site for ticket");
+        return;
+    };
+    match app.jira.unwatch_issue(&base_url, &sel.key).await {
+        Ok(()) => {
+            app.status
+                .set_action_notice(format!("Unwatched {}", sel.key));
+            app.refresh_all().await;
+        }
         Err(e) => app.status.set_action_error(e),
     }
 }

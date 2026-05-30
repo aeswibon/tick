@@ -119,6 +119,27 @@ hin-payment-template
 Enter
 ```
 
+## CLI template export
+
+Bootstrap templates without the TUI:
+
+```bash
+tick template export zeta HIN-471632 CSJR-25019 HUAT-18652 \
+  -o ~/.config/tick/templates/zeta.toml
+
+# Append to an existing file
+tick template export zeta HIN-100 --output templates/more.toml --append
+```
+
+Then reference the file in config:
+
+```toml
+[create]
+templates_file = "templates/zeta.toml"
+```
+
+Or paste blocks into `[[create.templates]]` in `config.toml`.
+
 ## Related
 
 - [CONFIGURATION.md](../CONFIGURATION.md)

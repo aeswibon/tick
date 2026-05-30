@@ -70,6 +70,31 @@ pub enum TickCommand {
         #[command(subcommand)]
         action: AuthCommand,
     },
+    /// Issue template utilities
+    Template {
+        #[command(subcommand)]
+        action: TemplateCommand,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum TemplateCommand {
+    /// Fetch issues and emit [[templates]] TOML for config
+    Export(TemplateExportArgs),
+}
+
+#[derive(Parser)]
+pub struct TemplateExportArgs {
+    /// Site name from config ([[sites]].name)
+    pub site: String,
+    /// Issue keys to export (e.g. HIN-123)
+    pub keys: Vec<String>,
+    /// Write to file (append with --append)
+    #[arg(short, long)]
+    pub output: Option<std::path::PathBuf>,
+    /// Append to an existing templates file
+    #[arg(long)]
+    pub append: bool,
 }
 
 #[derive(Subcommand)]
@@ -157,6 +182,10 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     if let Some(TickCommand::Auth { action }) = cli.command {
         return run_auth_command(action).await;
+    }
+
+    if let Some(TickCommand::Template { action }) = cli.command {
+        return run_template_command(action).await;
     }
 
     if cli.init {
@@ -260,6 +289,36 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         DisableMouseCapture
     )?;
     terminal.show_cursor()?;
+    Ok(())
+}
+
+async fn run_template_command(action: TemplateCommand) -> Result<(), Box<dyn std::error::Error>> {
+    match action {
+        TemplateCommand::Export(args) => run_template_export(args).await,
+    }
+}
+
+async fn run_template_export(args: TemplateExportArgs) -> Result<(), Box<dyn std::error::Error>> {
+    if args.keys.is_empty() {
+        return Err(
+            "Provide at least one issue key (e.g. tick template export my-site HIN-1)".into(),
+        );
+    }
+
+    let config = Config::load().map_err(|e| format!("Config error: {e}"))?;
+    let jira = api::JiraClient::from_config(&config, false)
+        .await
+        .map_err(|e| format!("Auth error: {e}"))?;
+
+    let content =
+        template_export::export_issues_to_toml(&config, &args.site, &args.keys, &jira).await?;
+
+    if let Some(path) = args.output {
+        template_export::write_templates_file(&path, &content, args.append)?;
+        println!("Wrote {}", path.display());
+    } else {
+        print!("{content}");
+    }
     Ok(())
 }
 
