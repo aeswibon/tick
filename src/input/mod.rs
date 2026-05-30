@@ -216,6 +216,8 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     }
                 } else if app.input_mode == InputMode::TemplateExportName {
                     crate::template_export_flow::cancel_template_export(app);
+                } else if app.input_mode == InputMode::EditCustomField {
+                    crate::editable_fields::cancel_custom_field_edit(app);
                 } else if matches!(
                     app.input_mode,
                     InputMode::EditDueDate
@@ -308,6 +310,16 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
 
     if app.showing_priorities {
         handle_priority_key(app, code).await;
+        return false;
+    }
+
+    if app.showing_editable_field_picker {
+        crate::editable_fields::handle_editable_field_picker_key(app, code);
+        return false;
+    }
+
+    if app.showing_custom_field_select {
+        crate::editable_fields::handle_custom_field_select_key(app, code).await;
         return false;
     }
 

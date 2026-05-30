@@ -95,6 +95,9 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
         Line::from(
             "  S / P / L / M / d / D  Edit summary, priority, labels, sprint, due, description",
         ),
+        Line::from(
+            "  F                      Edit configured custom field ([[detail.editable_fields]])",
+        ),
         Line::from("  !                      Toggle site error overlay"),
         Line::from(""),
         Line::from(Span::styled(

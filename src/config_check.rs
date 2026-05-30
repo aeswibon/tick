@@ -58,6 +58,32 @@ pub fn validate_config(config: &Config) -> Vec<CheckFinding> {
         }
     }
 
+    let mut editable_ids = std::collections::HashSet::new();
+    for (i, field) in config.detail.editable_fields.iter().enumerate() {
+        let id = field.id.trim();
+        if id.is_empty() {
+            out.push(err(format!("detail.editable_fields[{i}] has empty id")));
+            continue;
+        }
+        if !id.starts_with("customfield_") {
+            out.push(warn(format!(
+                "detail.editable_fields[{i}] id '{id}' should be customfield_<digits>"
+            )));
+        }
+        if !editable_ids.insert(id.to_string()) {
+            out.push(err(format!("duplicate detail.editable_fields id '{id}'")));
+        }
+        match field.parsed_kind() {
+            Err(e) => out.push(err(format!("detail.editable_fields[{i}]: {e}"))),
+            Ok(crate::config::EditableFieldKind::Select) if field.options.is_empty() => {
+                out.push(err(format!(
+                    "detail.editable_fields[{i}] (select) needs options"
+                )));
+            }
+            _ => {}
+        }
+    }
+
     for (i, hook) in config.hooks.on_bulk_complete.iter().enumerate() {
         if hook.command.trim().is_empty() {
             out.push(err(format!(
@@ -137,6 +163,7 @@ mod tests {
             oauth: OAuthSettings::default(),
             create: CreateSettings::default(),
             hooks: Default::default(),
+            detail: Default::default(),
             view_jql: Config::build_view_jql(&ViewQueries::default()),
         }
     }

@@ -10,6 +10,7 @@ pub mod columns;
 pub mod config;
 pub mod config_check;
 pub mod create_flow;
+pub mod editable_fields;
 pub mod fetch_status;
 pub mod global_search;
 pub mod hooks;

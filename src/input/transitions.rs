@@ -178,6 +178,10 @@ pub(crate) async fn refresh_transition_user_search(app: &mut App, force_refresh:
 }
 
 pub(crate) fn cancel_transition_collect(app: &mut App) {
+    if app.custom_field_editing.is_some() && app.transition_collect.is_none() {
+        crate::editable_fields::cancel_custom_field_edit(app);
+        return;
+    }
     app.transition_collect = None;
     app.showing_transition_field = false;
     app.transition_field_text_mode = false;
@@ -341,6 +345,11 @@ pub(crate) async fn prompt_next_transition_field(app: &mut App) {
 
 pub(crate) async fn apply_transition_field_pick(app: &mut App, idx: usize) {
     if idx >= app.transition_field_options.len() {
+        return;
+    }
+    if app.custom_field_editing.is_some() {
+        let (account_id, _) = app.transition_field_options[idx].clone();
+        crate::editable_fields::apply_custom_field_user_pick(app, account_id).await;
         return;
     }
     let Some(field) = app.transition_field_current.clone() else {

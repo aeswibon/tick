@@ -105,6 +105,7 @@ Search text and `h` mode persist across restarts (`cache/closed_prefs.json`).
 | `M` | Sprint / backlog picker | Needs `board_id` |
 | `d` | Edit due date | `YYYY-MM-DD`, empty clears |
 | `D` | Edit description | Markdown + `@` |
+| `F` | Edit configured custom field | `[[detail.editable_fields]]` in config |
 | `t` / `T` | Transitions | Same as table |
 
 ---

@@ -148,6 +148,8 @@ pub enum InputMode {
     CreateSubtaskSummary,
     /// Search all cached views (`Ctrl+g`).
     GlobalSearchQuery,
+    /// Configured custom field (`[[detail.editable_fields]]`, type text).
+    EditCustomField,
 }
 
 /// Collecting values for a workflow transition before POST.
@@ -262,13 +264,21 @@ pub struct App {
     pub showing_global_search: bool,
     pub global_search_hits: Vec<crate::global_search::GlobalSearchHit>,
     pub global_search_selected: usize,
+    /// Pick which `[[detail.editable_fields]]` entry to edit (`F`).
+    pub showing_editable_field_picker: bool,
+    pub editable_field_picker_selected: usize,
+    /// Select-list overlay for configured option fields.
+    pub showing_custom_field_select: bool,
+    pub custom_field_select_options: Vec<String>,
+    pub custom_field_select_selected: usize,
+    pub custom_field_editing: Option<crate::config::EditableFieldConfig>,
 }
 
 impl App {
     pub fn new(config: Config, theme: Theme, jira: Arc<JiraClient>, debug: bool) -> Self {
         let cache = ViewCache::open();
         let columns = Column::resolve(config.columns.as_deref());
-        let custom_field_ids = Column::custom_field_ids(&columns);
+        let custom_field_ids = config.custom_field_ids_for_fetch();
         let page_size = config.page_size as usize;
         let closed_prefs = cache.load_closed_prefs();
 
@@ -348,6 +358,12 @@ impl App {
             showing_global_search: false,
             global_search_hits: Vec::new(),
             global_search_selected: 0,
+            showing_editable_field_picker: false,
+            editable_field_picker_selected: 0,
+            showing_custom_field_select: false,
+            custom_field_select_options: Vec::new(),
+            custom_field_select_selected: 0,
+            custom_field_editing: None,
         };
         app.load_cache();
         app
@@ -541,7 +557,7 @@ impl App {
 
         self.config = config;
         self.columns = Column::resolve(self.config.columns.as_deref());
-        self.custom_field_ids = Column::custom_field_ids(&self.columns);
+        self.custom_field_ids = self.config.custom_field_ids_for_fetch();
         self.page_size = self.config.page_size as usize;
         self.invalidate_filter_cache();
         self.status
@@ -1405,6 +1421,7 @@ mod tests {
             oauth: Default::default(),
             create: Default::default(),
             hooks: Default::default(),
+            detail: Default::default(),
             view_jql: Config::build_view_jql(&Default::default()),
         }
     }

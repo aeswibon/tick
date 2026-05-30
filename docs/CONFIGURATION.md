@@ -212,6 +212,28 @@ timeout_secs = 30
 
 Fires after TUI bulk table actions and `tick bulk` (including partial failures). See [features/automation.md](features/automation.md#bulk-complete-hooks).
 
+### Editable custom fields
+
+```toml
+[[detail.editable_fields]]
+id = "customfield_10042"
+label = "Story points"
+type = "text"          # text | select | user
+
+[[detail.editable_fields]]
+id = "customfield_10001"
+label = "Environment"
+type = "select"
+options = ["Dev", "Staging", "Prod"]
+
+[[detail.editable_fields]]
+id = "customfield_10002"
+label = "Reviewer"
+type = "user"
+```
+
+Press **`F`** in the detail pane to edit. See [features/custom-fields.md](features/custom-fields.md).
+
 ## Example full config
 
 ```toml

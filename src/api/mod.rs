@@ -242,6 +242,18 @@ impl JiraClient {
         }
     }
 
+    /// Update a single issue field (standard or `customfield_*`).
+    pub async fn update_issue_field(
+        &self,
+        base_url: &str,
+        key: &str,
+        field_id: &str,
+        value: serde_json::Value,
+    ) -> Result<(), String> {
+        let fields = serde_json::json!({ field_id: value });
+        self.update_fields(base_url, key, fields).await
+    }
+
     async fn update_fields(
         &self,
         base_url: &str,
@@ -1077,6 +1089,7 @@ mod fetch_integration {
             oauth: Default::default(),
             create: Default::default(),
             hooks: Default::default(),
+            detail: Default::default(),
             view_jql: Config::build_view_jql(&Default::default()),
         }
     }

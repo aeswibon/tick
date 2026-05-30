@@ -167,6 +167,27 @@ pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
                 ]));
             }
 
+            for field in &app.config.detail.editable_fields {
+                let value = ticket
+                    .custom_fields
+                    .get(&field.id)
+                    .map(|s| s.as_str())
+                    .unwrap_or("—");
+                let label = field.display_label();
+                let label_col = if label.len() > 11 {
+                    format!("{}:", &label[..11])
+                } else {
+                    format!("{label:<12}")
+                };
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        label_col,
+                        Style::default().fg(dl).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(value, Style::default().fg(dv)),
+                ]));
+            }
+
             let mut mentioned = Vec::new();
             if let Some(ref adf) = ticket.description_adf {
                 mentioned.extend(crate::api::types::collect_mention_labels(adf));

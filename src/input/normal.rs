@@ -242,6 +242,9 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
                     .unwrap_or_default();
             }
         }
+        KeyCode::Char('F') if app.detail_open && !app.config.detail.editable_fields.is_empty() => {
+            crate::editable_fields::start_editable_field_flow(app);
+        }
         KeyCode::Char('D') if app.detail_open => {
             if let Some(ticket) = app.selected_ticket_entry() {
                 let text = ticket

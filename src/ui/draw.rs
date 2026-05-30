@@ -56,6 +56,12 @@ pub fn render(f: &mut Frame, app: &mut App) {
     if app.showing_priorities {
         super::priorities::draw_priorities(f, app, f.area());
     }
+    if app.showing_editable_field_picker {
+        super::editable_fields::draw_editable_field_picker(f, app, f.area());
+    }
+    if app.showing_custom_field_select {
+        super::editable_fields::draw_custom_field_select(f, app, f.area());
+    }
     if app.showing_sprints {
         super::sprints::draw_sprints(f, app, f.area());
     }
@@ -235,6 +241,16 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
                 " Due date (YYYY-MM-DD, empty clears): {}_",
                 app.input_buffer
             ),
+            app.theme.accent,
+        )
+    } else if app.input_mode == crate::app::InputMode::EditCustomField {
+        let label = app
+            .custom_field_editing
+            .as_ref()
+            .map(|f| f.display_label())
+            .unwrap_or_else(|| "Custom field".into());
+        (
+            format!(" {label} (empty clears): {}_", app.input_buffer),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::AddIssueLinkTarget {

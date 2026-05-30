@@ -267,6 +267,71 @@ pub struct BulkCompleteHook {
     pub timeout_secs: u64,
 }
 
+/// Detail pane settings (`[detail]` and `[[detail.editable_fields]]`).
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct DetailSettings {
+    #[serde(default, rename = "editable_fields")]
+    pub editable_fields: Vec<EditableFieldConfig>,
+}
+
+/// Configured custom field editable from the issue detail pane (phase 1: text, select, user).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EditableFieldConfig {
+    /// Jira field id, e.g. `customfield_10042`.
+    pub id: String,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(rename = "type", default = "default_editable_field_type")]
+    pub field_type: String,
+    /// Required when `type = "select"`: allowed option labels/values.
+    #[serde(default)]
+    pub options: Vec<String>,
+}
+
+fn default_editable_field_type() -> String {
+    "text".into()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditableFieldKind {
+    Text,
+    Select,
+    User,
+}
+
+impl EditableFieldConfig {
+    pub fn display_label(&self) -> String {
+        self.label
+            .as_ref()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| self.id.clone())
+    }
+
+    pub fn parsed_kind(&self) -> Result<EditableFieldKind, String> {
+        match self.field_type.trim().to_ascii_lowercase().as_str() {
+            "text" | "string" => Ok(EditableFieldKind::Text),
+            "select" | "option" => Ok(EditableFieldKind::Select),
+            "user" => Ok(EditableFieldKind::User),
+            other => Err(format!("unknown editable field type '{other}'")),
+        }
+    }
+}
+
+impl DetailSettings {
+    /// Union of table column custom fields and configured editable fields (for Jira fetch).
+    pub fn merge_custom_field_ids(&self, column_ids: Vec<String>) -> Vec<String> {
+        let mut ids = column_ids;
+        for field in &self.editable_fields {
+            if !ids.iter().any(|id| id == &field.id) {
+                ids.push(field.id.clone());
+            }
+        }
+        ids
+    }
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct HooksSettings {
     #[serde(default, rename = "on_refresh")]
@@ -339,6 +404,8 @@ pub struct Config {
     pub create: CreateSettings,
     #[serde(default)]
     pub hooks: HooksSettings,
+    #[serde(default)]
+    pub detail: DetailSettings,
     #[serde(skip)]
     pub view_jql: HashMap<ViewMode, String>,
 }
@@ -356,6 +423,12 @@ fn default_page_size() -> u32 {
 }
 
 impl Config {
+    pub fn custom_field_ids_for_fetch(&self) -> Vec<String> {
+        let columns = crate::columns::Column::resolve(self.columns.as_deref());
+        let base = crate::columns::Column::custom_field_ids(&columns);
+        self.detail.merge_custom_field_ids(base)
+    }
+
     pub fn config_dir() -> Result<PathBuf, String> {
         let base =
             dirs::config_dir().ok_or_else(|| "Cannot determine config directory".to_string())?;
@@ -610,6 +683,32 @@ impl Config {
                 ));
             }
         }
+        let mut editable_ids = std::collections::HashSet::new();
+        for field in &self.detail.editable_fields {
+            let id = field.id.trim();
+            if id.is_empty() {
+                return Err("config: detail.editable_fields id must not be empty".into());
+            }
+            if !id.starts_with("customfield_") {
+                return Err(format!(
+                    "config: editable field '{id}' id must be customfield_<digits>"
+                ));
+            }
+            let suffix = id.strip_prefix("customfield_").unwrap_or("");
+            if suffix.is_empty() || !suffix.chars().all(|c| c.is_ascii_digit()) {
+                return Err(format!("config: editable field '{id}' has invalid id"));
+            }
+            if !editable_ids.insert(id.to_string()) {
+                return Err(format!("config: duplicate editable field '{id}'"));
+            }
+            let kind = field.parsed_kind().map_err(|e| format!("config: {e}"))?;
+            if kind == EditableFieldKind::Select && field.options.is_empty() {
+                return Err(format!(
+                    "config: editable field '{}' (select) needs options = [...]",
+                    field.display_label()
+                ));
+            }
+        }
         Ok(())
     }
 
@@ -787,6 +886,31 @@ base_url = "https://one.atlassian.net"
         let mut cfg: Config = toml::from_str(raw).unwrap();
         cfg.view_jql = Config::build_view_jql(&cfg.views);
         assert!(cfg.notify_on_refresh);
+    }
+
+    #[test]
+    fn parses_detail_editable_fields() {
+        let raw = r#"
+email = "a@b.com"
+token = "secret"
+
+[[sites]]
+name = "one"
+base_url = "https://one.atlassian.net"
+
+[[detail.editable_fields]]
+id = "customfield_10042"
+label = "Team"
+type = "select"
+options = ["Alpha", "Beta"]
+"#;
+        let mut cfg: Config = toml::from_str(raw).unwrap();
+        cfg.view_jql = Config::build_view_jql(&cfg.views);
+        assert_eq!(cfg.detail.editable_fields.len(), 1);
+        assert_eq!(cfg.detail.editable_fields[0].id, "customfield_10042");
+        assert_eq!(cfg.detail.editable_fields[0].options.len(), 2);
+        let ids = cfg.custom_field_ids_for_fetch();
+        assert!(ids.contains(&"customfield_10042".to_string()));
     }
 
     #[test]

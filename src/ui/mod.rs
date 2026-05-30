@@ -2,6 +2,7 @@ pub mod adf;
 pub mod create;
 pub mod detail;
 pub mod draw;
+pub mod editable_fields;
 pub mod errors;
 pub mod field_picker;
 pub mod global_search;

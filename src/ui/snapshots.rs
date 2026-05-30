@@ -28,6 +28,7 @@ mod tests {
             oauth: Default::default(),
             create: Default::default(),
             hooks: Default::default(),
+            detail: Default::default(),
             view_jql: Config::build_view_jql(&Default::default()),
         }
     }

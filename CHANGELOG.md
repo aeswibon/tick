@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.17.0] - 2026-05-30
+
+### Added
+
+- **Editable custom fields** — `[[detail.editable_fields]]` for text, select, and user fields; edit from detail with **`F`**
+- Values for configured fields are fetched on refresh even when omitted from `columns`
+
+### Documentation
+
+- [docs/features/custom-fields.md](docs/features/custom-fields.md), [CONFIGURATION.md](docs/CONFIGURATION.md#editable-custom-fields)
+
 ## [0.16.0] - 2026-05-30
 
 ### Added

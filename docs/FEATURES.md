@@ -34,6 +34,12 @@ Single-page map of everything tick can do. For **step-by-step guides with exampl
 
 Custom JQL: `[views]` and `[[views.custom]]` in config. Cache: `~/.config/tick/cache/`.
 
+### v0.17 highlights
+
+| Feature | Guide |
+|---------|--------|
+| Editable custom fields | [custom-fields.md](features/custom-fields.md) — `[[detail.editable_fields]]`, **`F`** in detail |
+
 ### v0.16 highlights
 
 | Feature | Guide |

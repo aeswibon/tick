@@ -214,6 +214,10 @@ pub(crate) async fn submit_input(app: &mut App) {
                 .update_description(&base_url, &sel.key, &buffer, &mentions)
                 .await
         }
+        InputMode::EditCustomField => {
+            crate::editable_fields::submit_custom_field_text(app, buffer).await;
+            return;
+        }
         InputMode::EditDueDate => match parse_due_date_input(&buffer) {
             Ok(due) => app.jira.update_due_date(&base_url, &sel.key, due).await,
             Err(e) => {
