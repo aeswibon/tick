@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.20.0] - 2026-05-30
+
+### Fixed
+
+- **JQL pagination** — `max_results` is enforced as a total per-site cap; search pages use up to 100 ids per request and bulk-fetch chunks of 100. Footer shows progress during multi-page fetches.
+
+### Documentation
+
+- [platform.md](docs/features/platform.md#jql-pagination-max_results)
+- [plugin-rfc.md](docs/architecture/plugin-rfc.md) — draft RFC for track C (no runtime yet)
+
 ## [0.19.0] - 2026-05-30
 
 ### Changed

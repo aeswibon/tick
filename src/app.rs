@@ -815,6 +815,7 @@ impl App {
             return;
         }
         self.loading = true;
+        self.loading_message = Some("Fetching…".into());
         let (jql, site_filter) = self.jql_for_current_fetch();
         let (tickets, errors) = api::fetch_all(
             &self.jira,
@@ -822,6 +823,7 @@ impl App {
             &jql,
             site_filter.as_deref(),
             &self.custom_field_ids,
+            &mut self.loading_message,
         )
         .await;
         self.view_cache.insert(self.active_view, tickets.clone());
@@ -829,6 +831,7 @@ impl App {
         let hooks_ok = errors.is_empty();
         self.apply_fetch_result(tickets, errors, true);
         self.loading = false;
+        self.loading_message = None;
         self.last_refresh = Instant::now();
         self.view_fetched_at = Some(Utc::now());
         if hooks_ok {
@@ -844,12 +847,14 @@ impl App {
             return;
         };
         self.loading = true;
+        self.loading_message = Some("Fetching…".into());
         let (tickets, errors) = api::fetch_all(
             &self.jira,
             &self.config,
             &view.jql,
             view.site.as_deref(),
             &self.custom_field_ids,
+            &mut self.loading_message,
         )
         .await;
         let slug = view.cache_slug();
@@ -858,6 +863,7 @@ impl App {
         let hooks_ok = errors.is_empty();
         self.apply_fetch_result(tickets, errors, true);
         self.loading = false;
+        self.loading_message = None;
         self.last_refresh = Instant::now();
         self.view_fetched_at = Some(Utc::now());
         if hooks_ok {
@@ -957,7 +963,9 @@ impl App {
             let cf = cf.clone();
             set.spawn(async move {
                 let jql = config.jql_for(mode);
-                let (tickets, errors) = api::fetch_all(&jira, &config, jql, None, &cf).await;
+                let mut loading = None;
+                let (tickets, errors) =
+                    api::fetch_all(&jira, &config, jql, None, &cf, &mut loading).await;
                 (mode, tickets, errors)
             });
         }
@@ -1024,8 +1032,16 @@ impl App {
                 let config = config.clone();
                 let cf = custom_field_ids.clone();
                 set.spawn(async move {
-                    let (tickets, errors) =
-                        api::fetch_all(&jira, &config, config.jql_for(mode), None, &cf).await;
+                    let mut loading = None;
+                    let (tickets, errors) = api::fetch_all(
+                        &jira,
+                        &config,
+                        config.jql_for(mode),
+                        None,
+                        &cf,
+                        &mut loading,
+                    )
+                    .await;
                     (mode, tickets, errors)
                 });
             }

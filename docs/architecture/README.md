@@ -83,6 +83,7 @@ Async handlers await Jira without blocking the executor (tokio multi-thread runt
 
 - `JiraClient` wraps `reqwest` with `api::retry` for 429/5xx backoff.
 - `api::fetch_all` — parallel per-site JQL + `bulkfetch` for fields.
+- `api::pagination` — JQL page size (100) and bulk-fetch chunk size; `max_results` is a total cap per site.
 - `api::types::Ticket` — denormalized row for the table; ADF kept for description/comments.
 - Transition required fields: `transition_fields` + modal reuse from create flow.
 
@@ -97,6 +98,7 @@ See [testing.md](testing.md) for how to test without a live Jira site.
 
 ## Related docs
 
+- [plugin-rfc.md](plugin-rfc.md) — draft plugin runtime (track C; not implemented)
 - [testing.md](testing.md) — unit, wiremock, insta, proptest, benches
 - [CONTRIBUTING.md](../../CONTRIBUTING.md) — first PR and CI checks
 - [CHANGELOG.md](../../CHANGELOG.md) — shipped versions

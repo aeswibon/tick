@@ -35,6 +35,18 @@ Jira rate limit — wait ~Ns, then r to retry
 
 Wait for the countdown, then press **`r`**. Avoid hammering **`r`** while the message is visible.
 
+## JQL pagination (`max_results`)
+
+`max_results` in `config.toml` is the **total cap per site** for each view fetch (not “one page of 100”).
+
+When a view matches more issues than one JQL page allows, tick:
+
+1. Pages `POST /rest/api/3/search/jql` with `maxResults = min(remaining, 100)` until the cap or Jira reports `isLast`
+2. Chunks `bulkfetch` in batches of 100 issue ids
+3. Updates the **footer** during multi-page search (`JQL search page 2 (100/500)…`) so the TUI stays responsive
+
+Raise `max_results` (default 500, max 5000) if you need larger views; Jira rate limits still apply.
+
 ## Lazy detail load
 
 View refresh (`r`, tab switch, background refresh) fetches **table fields only** — not description or comments for every row.

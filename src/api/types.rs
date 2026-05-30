@@ -78,7 +78,10 @@ pub struct CommentEntry {
 #[derive(Debug, Deserialize)]
 pub struct JqlSearchResponse {
     pub issues: Vec<JqlIssue>,
+    #[serde(rename = "nextPageToken", default)]
     pub next_page_token: Option<String>,
+    #[serde(rename = "isLast", default)]
+    pub is_last: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -506,6 +509,14 @@ mod tests {
         let data: JqlSearchResponse = serde_json::from_str(raw).unwrap();
         assert_eq!(data.issues.len(), 2);
         assert_eq!(data.issues[0].id, "10001");
+    }
+
+    #[test]
+    fn jql_search_response_parses_next_page_token() {
+        let raw = r#"{"issues":[],"nextPageToken":"tok","isLast":false}"#;
+        let data: JqlSearchResponse = serde_json::from_str(raw).unwrap();
+        assert_eq!(data.next_page_token.as_deref(), Some("tok"));
+        assert!(!data.is_last);
     }
 
     #[test]

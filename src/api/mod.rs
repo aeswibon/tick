@@ -7,6 +7,7 @@ pub mod issue_relations;
 pub mod jira_error;
 pub mod markdown;
 pub mod retry;
+pub mod pagination;
 pub mod transition_fields;
 pub mod types;
 
@@ -382,22 +383,42 @@ impl JiraClient {
         base_url: &str,
         jql: &str,
         max_results: u32,
+        progress: &mut Option<String>,
     ) -> Result<Vec<String>, String> {
+        if max_results == 0 {
+            return Ok(Vec::new());
+        }
+
         let mut all_ids = Vec::new();
         let mut next_token: Option<String> = None;
+        let mut page = 0u32;
 
         loop {
+            page += 1;
+            let remaining = max_results.saturating_sub(all_ids.len() as u32);
+            if remaining == 0 {
+                break;
+            }
+            let page_size = pagination::jql_page_size(remaining);
+
+            *progress = Some(if page == 1 {
+                format!("JQL search (up to {max_results})…")
+            } else {
+                format!("JQL search page {page} ({}/{max_results})…", all_ids.len())
+            });
+            tokio::task::yield_now().await;
+
             let url = format!("{}/rest/api/3/search/jql", base_url.trim_end_matches('/'));
             let mut body = serde_json::json!({
                 "jql": jql,
-                "maxResults": max_results,
+                "maxResults": page_size,
             });
             if let Some(ref token) = next_token {
                 body["nextPageToken"] = serde_json::Value::String(token.clone());
             }
 
             if self.debug {
-                eprintln!("[DEBUG] POST {} (JQL: {})", url, jql);
+                eprintln!("[DEBUG] POST {} (JQL: {}, page {page}, maxResults {page_size})", url, jql);
             }
 
             let resp = self.send(|| self.post(&url).json(&body).send()).await?;
@@ -417,11 +438,19 @@ impl JiraClient {
             })?;
 
             all_ids.extend(data.issues.into_iter().map(|i| i.id));
-
-            match data.next_page_token {
-                Some(token) if !token.is_empty() => next_token = Some(token),
-                _ => break,
+            if all_ids.len() as u32 >= max_results {
+                all_ids.truncate(max_results as usize);
+                break;
             }
+
+            let has_more = data
+                .next_page_token
+                .as_ref()
+                .is_some_and(|t| !t.is_empty());
+            if data.is_last || !has_more {
+                break;
+            }
+            next_token = data.next_page_token;
         }
 
         Ok(all_ids)
@@ -464,6 +493,34 @@ impl JiraClient {
     }
 
     pub async fn bulk_fetch(
+        &self,
+        base_url: &str,
+        ids: &[String],
+        sprint_field: Option<&str>,
+        custom_field_ids: &[String],
+        include_detail: bool,
+    ) -> Result<Vec<BulkFetchIssue>, String> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut all_issues = Vec::new();
+        for chunk in ids.chunks(pagination::BULK_FETCH_CHUNK) {
+            let batch = self
+                .bulk_fetch_one_batch(
+                    base_url,
+                    chunk,
+                    sprint_field,
+                    custom_field_ids,
+                    include_detail,
+                )
+                .await?;
+            all_issues.extend(batch);
+        }
+        Ok(all_issues)
+    }
+
+    async fn bulk_fetch_one_batch(
         &self,
         base_url: &str,
         ids: &[String],
@@ -1047,6 +1104,7 @@ pub async fn fetch_all(
     jql: &str,
     site_filter: Option<&str>,
     custom_field_ids: &[String],
+    progress: &mut Option<String>,
 ) -> (Vec<Ticket>, Vec<String>) {
     let mut all = Vec::new();
     let mut errors = Vec::new();
@@ -1057,8 +1115,11 @@ pub async fn fetch_all(
             eprintln!("[DEBUG] Processing site: {} ({})", site.name, site.base_url);
         }
 
+        *progress = Some(format!("{}: searching…", site.name));
+        tokio::task::yield_now().await;
+
         let ids = match client
-            .search_jql(&site.base_url, jql, config.max_results)
+            .search_jql(&site.base_url, jql, config.max_results, progress)
             .await
         {
             Ok(k) => k,
@@ -1067,6 +1128,9 @@ pub async fn fetch_all(
                 continue;
             }
         };
+
+        *progress = Some(format!("{}: loading {} issues…", site.name, ids.len()));
+        tokio::task::yield_now().await;
 
         let sprint_field = site.sprint_field.as_deref();
         match client
@@ -1198,6 +1262,65 @@ mod fetch_integration {
     }
 
     #[tokio::test]
+    async fn search_jql_paginates_and_respects_max_results() {
+        let server = wiremock::MockServer::start().await;
+
+        let page1_issues: Vec<_> = (1..=100)
+            .map(|n| serde_json::json!({ "id": format!("id{n:03}") }))
+            .collect();
+
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/rest/api/3/search/jql"))
+            .and(wiremock::matchers::body_json(serde_json::json!({
+                "jql": "project = DEMO",
+                "maxResults": 100
+            })))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "issues": page1_issues,
+                    "nextPageToken": "page-2",
+                    "isLast": false
+                })),
+            )
+            .up_to_n_times(1)
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let page2_issues: Vec<_> = (101..=150)
+            .map(|n| serde_json::json!({ "id": format!("id{n:03}") }))
+            .collect();
+
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/rest/api/3/search/jql"))
+            .and(wiremock::matchers::body_json(serde_json::json!({
+                "jql": "project = DEMO",
+                "maxResults": 20,
+                "nextPageToken": "page-2"
+            })))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "issues": page2_issues,
+                    "isLast": true
+                })),
+            )
+            .up_to_n_times(1)
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("user@example.com", "token", false);
+        let ids = client
+            .search_jql(&server.uri(), "project = DEMO", 120, &mut None)
+            .await
+            .expect("search");
+
+        assert_eq!(ids.len(), 120);
+        assert_eq!(ids[0], "id001");
+        assert_eq!(ids[119], "id120");
+    }
+
+    #[tokio::test]
     async fn fetch_all_maps_jql_and_bulk_fetch() {
         let server = wiremock::MockServer::start().await;
 
@@ -1240,7 +1363,8 @@ mod fetch_integration {
         let config = test_config(&server.uri());
         let client = JiraClient::new("user@example.com", "token", false);
         let jql = config.jql_for(crate::view_mode::ViewMode::MyIssues);
-        let (tickets, errors) = fetch_all(&client, &config, jql, None, &[]).await;
+        let (tickets, errors) =
+            fetch_all(&client, &config, jql, None, &[], &mut None).await;
 
         assert!(errors.is_empty(), "{errors:?}");
         assert_eq!(tickets.len(), 1);
@@ -1308,7 +1432,8 @@ mod fetch_integration {
 
         let client = JiraClient::new("user@example.com", "token", false);
         let jql = config.jql_for(crate::view_mode::ViewMode::MyIssues);
-        let (tickets, errors) = fetch_all(&client, &config, jql, None, &[]).await;
+        let (tickets, errors) =
+            fetch_all(&client, &config, jql, None, &[], &mut None).await;
 
         assert_eq!(tickets.len(), 1);
         assert_eq!(tickets[0].key, "PASS-1");
