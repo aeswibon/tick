@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.23.0] - 2026-05-30
+
+### Added
+
+- **Plugin `run_transition`** — `tick.list_transitions(key)` and `tick.run_transition(key, transition_id)` for plugins with `run_transition = true` (simple transitions only; refreshes view on success)
+- Example: `examples/plugins/list-transitions/` (**Ctrl+Shift+T**)
+
+### Documentation
+
+- [plugins.md](docs/features/plugins.md#run_transition-capability)
+- **Automation cookbook (D)** — [automation.md](docs/features/automation.md): layer guide (CLI vs hooks vs plugins), jq recipes, cron/CI; expanded [examples/automation/](examples/automation/)
+
 ## [0.22.0] - 2026-05-30
 
 ### Added

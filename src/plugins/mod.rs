@@ -3,11 +3,37 @@
 mod chord;
 mod manifest;
 
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+thread_local! {
+    static PLUGIN_BRIDGE: Cell<Option<*mut ()>> = const { Cell::new(None) };
+}
+
+fn set_plugin_bridge(bridge: Option<&mut PluginBridge<'_>>) {
+    PLUGIN_BRIDGE.with(|slot| {
+        slot.set(bridge.map(|b| (b as *mut PluginBridge).cast()));
+    });
+}
+
+struct PluginBridgeGuard;
+
+impl Drop for PluginBridgeGuard {
+    fn drop(&mut self) {
+        set_plugin_bridge(None);
+    }
+}
+
+fn with_plugin_bridge<R>(f: impl FnOnce(&mut PluginBridge<'_>) -> R) -> R {
+    let ptr = PLUGIN_BRIDGE
+        .with(|slot| slot.get())
+        .expect("plugin bridge not set");
+    unsafe { f(&mut *ptr.cast::<PluginBridge>()) }
+}
 
 use crossterm::event::{KeyEvent, KeyEventKind, KeyEventState};
 use mlua::{Function, HookTriggers, Lua, LuaSerdeExt, Value, VmState};
@@ -56,11 +82,73 @@ pub enum PluginKeyResult {
     HandledWithNotice(String),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PluginSelection {
+    pub key: String,
+    pub site: String,
+}
+
 /// Read-only context for `on_key` handlers.
 pub struct PluginContext {
     pub view_name: String,
     pub view_mode: String,
     pub tickets: Vec<PluginTicket>,
+    pub selected: Option<PluginSelection>,
+}
+
+/// Mutable app bridge for plugin APIs that perform Jira writes.
+pub struct PluginBridge<'a> {
+    pub app: &'a mut crate::app::App,
+    pub run_transition: bool,
+}
+
+impl PluginBridge<'_> {
+    pub fn run_transition(&mut self, key: &str, transition_id: &str) -> PluginTransitionResult {
+        if !self.run_transition {
+            return PluginTransitionResult {
+                ok: false,
+                error: Some("plugin lacks run_transition capability".into()),
+            };
+        }
+        let handle = match tokio::runtime::Handle::try_current() {
+            Ok(h) => h,
+            Err(_) => {
+                return PluginTransitionResult {
+                    ok: false,
+                    error: Some("no async runtime".into()),
+                };
+            }
+        };
+        match handle.block_on(self.app.plugin_run_transition(key, transition_id)) {
+            Ok(()) => PluginTransitionResult {
+                ok: true,
+                error: None,
+            },
+            Err(e) => PluginTransitionResult {
+                ok: false,
+                error: Some(e),
+            },
+        }
+    }
+
+    pub fn list_transitions(
+        &mut self,
+        key: &str,
+    ) -> Result<Vec<crate::operations::transition::TransitionSummary>, String> {
+        if !self.run_transition {
+            return Err("plugin lacks run_transition capability".into());
+        }
+        let handle =
+            tokio::runtime::Handle::try_current().map_err(|_| "no async runtime".to_string())?;
+        handle.block_on(self.app.plugin_list_transitions(key))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PluginTransitionResult {
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 struct LuaPlugin {
@@ -68,6 +156,7 @@ struct LuaPlugin {
     lua: Lua,
     filter: Option<Function>,
     on_key: Option<Function>,
+    run_transition: bool,
     /// Canonical chord labels (see `chord::format_key`).
     chords: Vec<String>,
 }
@@ -158,14 +247,20 @@ impl PluginHost {
     pub fn try_handle_key(
         &self,
         ctx: &PluginContext,
+        app: &mut crate::app::App,
         key: &KeyEvent,
     ) -> Result<PluginKeyResult, String> {
         let chord_str = chord::format_key(key);
         let Some(indices) = self.key_index.get(&chord_str) else {
             return Ok(PluginKeyResult::Passthrough);
         };
+        let mut bridge = PluginBridge {
+            app,
+            run_transition: false,
+        };
         for &idx in indices {
-            let (handled, notice) = self.plugins[idx].call_on_key(&chord_str, ctx)?;
+            bridge.run_transition = self.plugins[idx].run_transition;
+            let (handled, notice) = self.plugins[idx].call_on_key(&chord_str, ctx, &mut bridge)?;
             if handled {
                 if let Some(msg) = notice {
                     return Ok(PluginKeyResult::HandledWithNotice(msg));
@@ -196,6 +291,9 @@ impl PluginHost {
                 }
                 if p.on_key.is_some() {
                     caps.push(format!("on_key [{}]", p.chords.join(", ")));
+                }
+                if p.run_transition {
+                    caps.push("run_transition".into());
                 }
                 lines.push(format!("  Loaded: {} ({})", p.name, caps.join(", ")));
             }
@@ -255,12 +353,15 @@ impl LuaPlugin {
         &self,
         chord: &str,
         ctx: &PluginContext,
+        bridge: &mut PluginBridge<'_>,
     ) -> Result<(bool, Option<String>), String> {
         let Some(on_key) = &self.on_key else {
             return Ok((false, None));
         };
         self.run_with_timeout("on_key", || {
-            register_tick_api(&self.lua, ctx)?;
+            set_plugin_bridge(Some(bridge));
+            let _guard = PluginBridgeGuard;
+            register_tick_api(&self.lua, ctx, bridge.run_transition)?;
             let result: String = on_key.call(chord).map_err(|e| lua_err(&self.name, e))?;
             let handled = result.eq_ignore_ascii_case("handled");
             let notice = self
@@ -313,7 +414,7 @@ impl LuaPlugin {
     }
 }
 
-fn register_tick_api(lua: &Lua, ctx: &PluginContext) -> Result<(), String> {
+fn register_tick_api(lua: &Lua, ctx: &PluginContext, run_transition: bool) -> Result<(), String> {
     let tick = lua.create_table().map_err(|e| lua_err("tick", e))?;
     tick.set("version", API_VERSION)
         .map_err(|e| lua_err("tick", e))?;
@@ -328,6 +429,38 @@ fn register_tick_api(lua: &Lua, ctx: &PluginContext) -> Result<(), String> {
     let tickets: Value = lua.to_value(&ctx.tickets).map_err(|e| lua_err("tick", e))?;
     tick.set("tickets", tickets)
         .map_err(|e| lua_err("tick", e))?;
+
+    if let Some(sel) = &ctx.selected {
+        let selected: Value = lua.to_value(sel).map_err(|e| lua_err("tick", e))?;
+        tick.set("selected", selected)
+            .map_err(|e| lua_err("tick", e))?;
+    } else {
+        tick.set("selected", mlua::Value::Nil)
+            .map_err(|e| lua_err("tick", e))?;
+    }
+
+    if run_transition {
+        tick.set(
+            "run_transition",
+            lua.create_function(|lua, (key, transition_id): (String, String)| {
+                let result = with_plugin_bridge(|b| b.run_transition(&key, &transition_id));
+                lua.to_value(&result).map_err(mlua::Error::external)
+            })
+            .map_err(|e| lua_err("tick", e))?,
+        )
+        .map_err(|e| lua_err("tick", e))?;
+
+        tick.set(
+            "list_transitions",
+            lua.create_function(|lua, key: String| {
+                let list = with_plugin_bridge(|b| b.list_transitions(&key))
+                    .map_err(mlua::Error::external)?;
+                lua.to_value(&list).map_err(mlua::Error::external)
+            })
+            .map_err(|e| lua_err("tick", e))?,
+        )
+        .map_err(|e| lua_err("tick", e))?;
+    }
 
     lua.globals()
         .set("tick", tick)
@@ -384,6 +517,7 @@ fn load_plugin(plugin_dir: &Path, manifest_path: &Path) -> Result<LuaPlugin, Str
         lua,
         filter,
         on_key,
+        run_transition: manifest.capabilities.run_transition,
         chords,
     })
 }
@@ -421,6 +555,7 @@ end
             lua,
             filter: Some(filter),
             on_key: None,
+            run_transition: false,
             chords: Vec::new(),
         };
 
@@ -448,18 +583,65 @@ end
             lua,
             filter: None,
             on_key: Some(on_key),
+            run_transition: false,
             chords: vec!["ctrl+shift+h".into()],
         };
         let ctx = PluginContext {
             view_name: "assigned".into(),
             view_mode: "my_issues".into(),
             tickets: vec![],
+            selected: None,
+        };
+        let mut app = plugin_test_app();
+        let mut bridge = PluginBridge {
+            app: &mut app,
+            run_transition: false,
         };
         assert_eq!(
-            plugin.call_on_key("ctrl+shift+h", &ctx).unwrap(),
+            plugin
+                .call_on_key("ctrl+shift+h", &ctx, &mut bridge)
+                .unwrap(),
             (true, None)
         );
-        assert_eq!(plugin.call_on_key("ctrl+g", &ctx).unwrap(), (false, None));
+        assert_eq!(
+            plugin.call_on_key("ctrl+g", &ctx, &mut bridge).unwrap(),
+            (false, None)
+        );
+    }
+
+    fn plugin_test_app() -> crate::app::App {
+        use crate::api::JiraClient;
+        use crate::app::App;
+        use crate::config::{Config, Site};
+        use crate::theme::Theme;
+        use std::sync::Arc;
+
+        App::new(
+            Config {
+                email: "a@b.com".into(),
+                token: "t".into(),
+                sites: vec![Site {
+                    name: "acme".into(),
+                    base_url: "https://acme.atlassian.net".into(),
+                    ..Default::default()
+                }],
+                columns: None,
+                max_results: 50,
+                page_size: 20,
+                theme: "default".into(),
+                views: Default::default(),
+                notify_on_refresh: false,
+                auth: Default::default(),
+                oauth: Default::default(),
+                create: Default::default(),
+                hooks: Default::default(),
+                detail: Default::default(),
+                view_jql: Config::build_view_jql(&Default::default()),
+            },
+            Theme::default(),
+            Arc::new(JiraClient::new("a@b.com", "t", false)),
+            false,
+        )
     }
 
     fn ticket(key: &str, issue_type: &str) -> Ticket {

@@ -1,0 +1,9 @@
+name = "list-transitions"
+version = "0.1.0"
+api = "1"
+runtime = "lua"
+entry = "main.lua"
+
+[capabilities]
+run_transition = true
+on_key = ["ctrl+shift+t"]

@@ -1,8 +1,17 @@
 # Automation
 
-For in-process Lua filters (hide epics, etc.), see [plugins.md](plugins.md). (CLI)
+Headless commands, config hooks, and Lua plugins share the same `config.toml`, auth, and Jira client as the TUI. Pick the layer that matches where your logic runs.
 
-Headless commands use the same `config.toml` and auth as the TUI.
+## Choose a layer
+
+| Need | Use | Why |
+|------|-----|-----|
+| Cron, CI, Slack bot, one-off shell | **`tick` CLI** | Separate process; easy to test; no TUI required |
+| React when a view refreshes or bulk finishes in the TUI | **Hooks** (`[[hooks.on_refresh]]`, `[[hooks.on_bulk_complete]]`) | tick passes JSON on disk + env vars; no plugin runtime |
+| Filter table rows or bind keys inside tick | **Lua plugins** | In-process; read `tick.tickets` / `tick.selected`; optional `run_transition` |
+| Custom fields, complex transitions, admin | **Jira REST** (or Automation app) | tick does not expose every Jira API |
+
+**Parity:** Bulk transition/assign/labels in the TUI follow the same rules as `tick bulk` and `tick issue transition` (simple transitions only; required-field modals stay in the TUI).
 
 ## `tick issue show`
 
@@ -28,6 +37,42 @@ tick search --jql 'project = HIN AND assignee = currentUser() ORDER BY updated D
 
 Prints JSON: `{ "issues": [...], "warnings": [...] }`. Respects `max_results` in config.
 
+### jq recipes
+
+Issue list (keys only):
+
+```bash
+tick search --jql 'assignee = currentUser() AND resolution = Unresolved' --site zeta \
+  | jq -r '.issues[].key'
+```
+
+Summaries for a standup paste:
+
+```bash
+tick search --jql 'project = HIN AND status = Blocked' --site zeta \
+  | jq -r '.issues[] | "\(.key): \(.summary) [\(.status)]"'
+```
+
+Count + warnings:
+
+```bash
+tick search --jql 'updated >= -1d' --site zeta \
+  | jq '{ count: (.issues | length), warnings: .warnings }'
+```
+
+Single issue from `issue show`:
+
+```bash
+tick issue show HIN-42 --site zeta | jq '{ key, status, assignee, labels }'
+```
+
+Bulk result (after `tick bulk`):
+
+```bash
+tick bulk transition --site zeta --keys HIN-1,HIN-2 --to Done \
+  | jq '{ ok: [.ok[].key], failed: .failed }'
+```
+
 ## `tick bulk`
 
 All bulk commands require `--site` and `--keys` (comma-separated or repeated).
@@ -39,6 +84,37 @@ tick bulk labels --site zeta --keys HIN-1 --set "bug,triage"
 ```
 
 Output is JSON with `ok` and `failed` arrays. Exit code `1` if any issue fails. Use `--quiet` for compact JSON on stdout only.
+
+## Cron
+
+Run from the same user account that owns `~/.config/tick/config.toml` (or set `TICK_CONFIG`).
+
+Daily assignee report (keys + summary to a file):
+
+```bash
+0 8 * * 1-5  /path/to/examples/automation/cron-assignee-report.sh >> ~/tick-standup.txt 2>&1
+```
+
+Transition stale “In Review” tickets (dry-run first by echoing the command):
+
+```bash
+0 18 * * 5   tick bulk transition --site zeta --keys "$(tick search --jql '...' --site zeta | jq -r '.issues[].key' | paste -sd,)" --to Done
+```
+
+Prefer a small wrapper script (see `examples/automation/`) so cron logs failures and you can add `--quiet` + alerting.
+
+## CI (GitHub Actions)
+
+Transition when a PR merges (issue key in branch name or env):
+
+```yaml
+# See examples/automation/github-actions-transition.yml
+- run: tick issue transition "$JIRA_KEY" --to "Done" --site zeta
+  env:
+    TICK_CONFIG: ${{ github.workspace }}/.tick/config.toml
+```
+
+Store API token or OAuth refresh material in GitHub **secrets**; never commit credentials. Use `tick --doctor` in a workflow job to verify auth before writes.
 
 ## Config validation
 
@@ -91,4 +167,4 @@ Example scripts: [examples/automation/](../../examples/automation/).
 
 ## Plugins (Lua)
 
-For in-process table filters (e.g. hide epics), see [plugins.md](plugins.md).
+For in-process table filters, key chords, and simple transitions from Lua, see [plugins.md](plugins.md).

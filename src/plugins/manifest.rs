@@ -24,6 +24,9 @@ pub struct PluginCapabilities {
     /// Chords this plugin handles, e.g. `["ctrl+shift+h"]`.
     #[serde(default)]
     pub on_key: Vec<String>,
+    /// Allow `tick.run_transition` / `tick.list_transitions` (delegates to core transition API).
+    #[serde(default)]
+    pub run_transition: bool,
 }
 
 impl PluginManifest {
@@ -49,10 +52,11 @@ impl PluginManifest {
         if self.name.trim().is_empty() {
             return Err("name is required".into());
         }
-        if !self.capabilities.filter_tickets && self.capabilities.on_key.is_empty() {
-            return Err(
-                "enable capabilities.filter_tickets and/or capabilities.on_key chords".into(),
-            );
+        if !self.capabilities.filter_tickets
+            && self.capabilities.on_key.is_empty()
+            && !self.capabilities.run_transition
+        {
+            return Err("enable filter_tickets, on_key chords, and/or run_transition".into());
         }
         for raw in &self.capabilities.on_key {
             chord::parse_chord(raw).map_err(|e| format!("on_key chord '{raw}': {e}"))?;

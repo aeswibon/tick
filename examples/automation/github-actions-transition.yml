@@ -1,0 +1,33 @@
+# Sample GitHub Actions workflow — copy into .github/workflows/ and customize.
+# Secrets: TICK_API_TOKEN (or your OAuth refresh env vars per CONFIGURATION.md).
+
+name: Jira transition on merge
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  transition:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tick
+        run: |
+          curl -fsSL https://github.com/your-org/tick/releases/latest/download/tick-x86_64-unknown-linux-gnu.tar.gz | tar xz
+          sudo mv tick /usr/local/bin/
+
+      - name: Verify auth
+        env:
+          TICK_CONFIG: ${{ github.workspace }}/.tick/config.toml
+          # TICK_API_TOKEN: ${{ secrets.TICK_API_TOKEN }}
+        run: tick --doctor
+
+      - name: Transition issue
+        env:
+          TICK_CONFIG: ${{ github.workspace }}/.tick/config.toml
+          JIRA_KEY: HIN-123
+        run: |
+          tick issue transition "$JIRA_KEY" --to "Done" --site zeta

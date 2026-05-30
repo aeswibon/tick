@@ -6,6 +6,7 @@ Optional **Lua** extensions in `~/.config/tick/plugins/`.
 |--------------|---------|-------------|
 | `filter_tickets` | v0.21 | Filter rows after each fetch |
 | `on_key` | v0.22 | Custom chords while the table is idle |
+| `run_transition` | v0.23 | `tick.run_transition` / `tick.list_transitions` (no required-field modals) |
 
 ## Install
 
@@ -62,6 +63,18 @@ end
 
 Called only for chords listed in the manifest, when the table is idle (no modal, footer input, or local `/` filter). Plugins run in directory order until one returns `"handled"`.
 
+## `run_transition` (capability)
+
+Requires `run_transition = true` in the manifest. Exposes:
+
+- **`tick.selected`** — `{ key, site }` or absent
+- **`tick.list_transitions(key)`** — `{ { id, name, to_status }, ... }`
+- **`tick.run_transition(key, transition_id)`** — `{ ok = true }` or `{ ok = false, error = "..." }`
+
+Uses the same transition rules as the CLI: transitions that need extra fields fail with an error (use **`t`** in the TUI for those). On success, tick refreshes the active view.
+
+Example: `examples/plugins/list-transitions/` (**Ctrl+Shift+T** shows transition ids in the footer).
+
 ## Limits
 
 - **Timeout:** 50 ms per plugin call
@@ -76,5 +89,5 @@ tick --doctor
 
 ## Related
 
-- [plugin-rfc.md](../architecture/plugin-rfc.md) — `run_transition` (planned)
+- [plugin-rfc.md](../architecture/plugin-rfc.md) — capability matrix and RFC
 - [automation.md](automation.md) — shell hooks vs plugins

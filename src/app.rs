@@ -1146,6 +1146,12 @@ impl App {
             .filter_map(|&i| tickets.get(i))
             .map(crate::plugins::PluginTicket::from)
             .collect();
+        let selected = self
+            .selected_ticket_entry()
+            .map(|t| crate::plugins::PluginSelection {
+                key: t.key,
+                site: t.site,
+            });
         crate::plugins::PluginContext {
             view_name: self.current_view_hook_id(),
             view_mode: if self.is_custom_view_active() {
@@ -1154,13 +1160,67 @@ impl App {
                 self.active_view.cache_key().to_string()
             },
             tickets: filtered,
+            selected,
         }
+    }
+
+    pub(crate) fn base_url_for_issue_key(&self, key: &str) -> Result<String, String> {
+        if let Some(t) = self.selected_ticket_entry() {
+            if t.key == key {
+                return self
+                    .site_base_url(&t.site)
+                    .ok_or_else(|| format!("unknown site {:?}", t.site));
+            }
+        }
+        let tickets = read_tickets(&self.tickets);
+        if let Some(t) = tickets.iter().find(|t| t.key == key) {
+            return self
+                .site_base_url(&t.site)
+                .ok_or_else(|| format!("unknown site {:?}", t.site));
+        }
+        if self.config.sites.len() == 1 {
+            return Ok(self.config.sites[0]
+                .base_url
+                .trim_end_matches('/')
+                .to_string());
+        }
+        Err(format!(
+            "issue {key} not in current view; select it in the table first"
+        ))
+    }
+
+    pub async fn plugin_list_transitions(
+        &self,
+        key: &str,
+    ) -> Result<Vec<crate::operations::transition::TransitionSummary>, String> {
+        let base_url = self.base_url_for_issue_key(key)?;
+        crate::operations::transition::list_transitions(&self.jira, &base_url, key).await
+    }
+
+    pub async fn plugin_run_transition(
+        &mut self,
+        key: &str,
+        transition_id: &str,
+    ) -> Result<(), String> {
+        let base_url = self.base_url_for_issue_key(key)?;
+        crate::operations::transition::apply_transition_by_id(
+            &self.jira,
+            &base_url,
+            key,
+            transition_id,
+        )
+        .await?;
+        self.refresh().await;
+        Ok(())
     }
 
     /// Returns `true` when a plugin consumed the key (skip default handling).
     pub fn try_plugin_key(&mut self, key: &KeyEvent) -> bool {
         let ctx = self.plugin_context();
-        match self.plugins.try_handle_key(&ctx, key) {
+        let plugins = &self.plugins as *const crate::plugins::PluginHost;
+        let app = self as *mut App;
+        // SAFETY: `plugins` and the rest of `App` are distinct fields.
+        match unsafe { (*plugins).try_handle_key(&ctx, &mut *app, key) } {
             Ok(crate::plugins::PluginKeyResult::Handled) => true,
             Ok(crate::plugins::PluginKeyResult::HandledWithNotice(msg)) => {
                 self.status.set_action_notice(msg);

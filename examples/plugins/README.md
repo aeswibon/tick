@@ -10,6 +10,10 @@ Removes issues whose `issue_type` is `Epic` from the table after each view refre
 
 **Ctrl+Shift+C** — footer notice with the active view name and filtered row count (demonstrates `on_key` + `tick.tickets`).
 
+## list-transitions
+
+**Ctrl+Shift+T** — footer lists Jira transition ids/names for the selected issue (`tick.list_transitions`). Pair with `tick.run_transition(key, id)` in your own plugin when you know the id.
+
 ```bash
 mkdir -p ~/.config/tick/plugins
 cp -R examples/plugins/hide-epics ~/.config/tick/plugins/
