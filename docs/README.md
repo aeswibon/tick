@@ -45,4 +45,3 @@ Each guide covers one area: what it does, keys, config, examples, and pitfalls.
 - [tick on Product Hunt](https://www.producthunt.com/products/tick-4?launch=tick-4)
 - [Installation](../README.md#install) — build, GitHub releases, Homebrew
 - [CHANGELOG](../CHANGELOG.md) — version history
-- [ROADMAP](../ROADMAP.md) — plans

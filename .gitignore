@@ -2,6 +2,10 @@ target
 .superpowers
 docs/specs/
 docs/superpowers/
+# Internal planning (not published)
+ROADMAP.md
+docs/OSS_ROADMAP.md
+docs/architecture/
 releases/
 .DS_Store
 **/.DS_Store

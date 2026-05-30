@@ -117,7 +117,7 @@ tick template export my-site HIN-1 -o templates/local.toml  # Export issue as te
 
 ## Contributing
 
-[CONTRIBUTING.md](CONTRIBUTING.md) · [GitHub Issues](https://github.com/aeswibon/tick/issues) · [ROADMAP.md](ROADMAP.md)
+[CONTRIBUTING.md](CONTRIBUTING.md) · [GitHub Issues](https://github.com/aeswibon/tick/issues) · [CHANGELOG.md](CHANGELOG.md)
 
 ## License
 
