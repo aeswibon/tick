@@ -585,6 +585,7 @@ pub async fn submit_create(app: &mut App) {
             app.refresh().await;
             app.select_ticket_by_key(&new_key);
             app.detail_open = true;
+            app.ensure_selected_issue_detail().await;
             app.status.clear_action_error();
         }
         Err(e) if !e.field_errors.is_empty() => {

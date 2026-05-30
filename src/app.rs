@@ -272,6 +272,8 @@ pub struct App {
     pub custom_field_select_options: Vec<String>,
     pub custom_field_select_selected: usize,
     pub custom_field_editing: Option<crate::config::EditableFieldConfig>,
+    /// Loading description/comments for the open detail pane.
+    pub detail_loading: bool,
 }
 
 impl App {
@@ -364,6 +366,7 @@ impl App {
             custom_field_select_options: Vec::new(),
             custom_field_select_selected: 0,
             custom_field_editing: None,
+            detail_loading: false,
         };
         app.load_cache();
         app
@@ -831,6 +834,9 @@ impl App {
         if hooks_ok {
             self.fire_refresh_hooks();
         }
+        if self.detail_open {
+            self.ensure_selected_issue_detail().await;
+        }
     }
 
     pub async fn refresh_custom_view(&mut self) {
@@ -857,6 +863,9 @@ impl App {
         if hooks_ok {
             self.fire_refresh_hooks();
         }
+        if self.detail_open {
+            self.ensure_selected_issue_detail().await;
+        }
     }
 
     pub async fn refresh_all(&mut self) {
@@ -867,6 +876,41 @@ impl App {
     pub async fn refresh_all_notify(&mut self) {
         self.do_refresh_all(&ViewMode::background(), true, false)
             .await;
+    }
+
+    /// Fetch description and comments when the detail pane is open (lazy detail).
+    pub async fn ensure_selected_issue_detail(&mut self) {
+        if !self.detail_open {
+            return;
+        }
+        let Some(idx) = self.selected_ticket_index() else {
+            return;
+        };
+        let (site, key, already_loaded) = {
+            let tickets = crate::ticket_lock::read_tickets(&self.tickets);
+            let t = &tickets[idx];
+            (t.site.clone(), t.key.clone(), t.detail_loaded)
+        };
+        if already_loaded {
+            return;
+        }
+        let Some(base_url) = self.site_base_url(&site) else {
+            self.status.set_action_error("Unknown site for ticket");
+            return;
+        };
+        self.detail_loading = true;
+        match self.jira.fetch_issue_detail(&base_url, &key).await {
+            Ok(fields) => {
+                let mut tickets = crate::ticket_lock::write_tickets(&self.tickets);
+                if let Some(t) = tickets.get_mut(idx) {
+                    if t.key == key && t.site == site {
+                        t.apply_detail_fields(&fields);
+                    }
+                }
+            }
+            Err(e) => self.status.set_action_error(e),
+        }
+        self.detail_loading = false;
     }
 
     /// Load issue links and subtasks for the current selection (Links tab).
@@ -1450,6 +1494,7 @@ mod tests {
             sprint_name: None,
             project_key: String::new(),
             custom_fields: std::collections::HashMap::new(),
+            detail_loaded: false,
         }
     }
 

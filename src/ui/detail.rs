@@ -189,24 +189,26 @@ pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
             }
 
             let mut mentioned = Vec::new();
-            if let Some(ref adf) = ticket.description_adf {
-                mentioned.extend(crate::api::types::collect_mention_labels(adf));
-            }
-            for comment in &ticket.all_comments {
-                if let Some(ref body) = comment.body {
-                    mentioned.extend(crate::api::types::collect_mention_labels(body));
+            if ticket.detail_loaded {
+                if let Some(ref adf) = ticket.description_adf {
+                    mentioned.extend(crate::api::types::collect_mention_labels(adf));
                 }
-            }
-            mentioned.sort();
-            mentioned.dedup();
-            if !mentioned.is_empty() {
-                lines.push(Line::from(vec![
-                    Span::styled(
-                        format!("{:<12}", "Mentioned:"),
-                        Style::default().fg(dl).add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(mentioned.join(", "), Style::default().fg(dv)),
-                ]));
+                for comment in &ticket.all_comments {
+                    if let Some(ref body) = comment.body {
+                        mentioned.extend(crate::api::types::collect_mention_labels(body));
+                    }
+                }
+                mentioned.sort();
+                mentioned.dedup();
+                if !mentioned.is_empty() {
+                    lines.push(Line::from(vec![
+                        Span::styled(
+                            format!("{:<12}", "Mentioned:"),
+                            Style::default().fg(dl).add_modifier(Modifier::BOLD),
+                        ),
+                        Span::styled(mentioned.join(", "), Style::default().fg(dv)),
+                    ]));
+                }
             }
 
             lines.push(Line::from(""));
@@ -249,7 +251,12 @@ pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
             }
         }
         DetailTab::Description => {
-            if let Some(ref adf) = ticket.description_adf {
+            if app.detail_loading || !ticket.detail_loaded {
+                lines.push(Line::from(Span::styled(
+                    "  Loading description…",
+                    Style::default().fg(app.theme.border),
+                )));
+            } else if let Some(ref adf) = ticket.description_adf {
                 let rendered = crate::ui::adf::render_doc(adf);
                 if rendered.is_empty() || (rendered.len() == 1 && rendered[0].spans.is_empty()) {
                     lines.push(Line::from(Span::styled(
@@ -271,7 +278,12 @@ pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
             }
         }
         DetailTab::Comments => {
-            if ticket.all_comments.is_empty() {
+            if app.detail_loading || !ticket.detail_loaded {
+                lines.push(Line::from(Span::styled(
+                    "  Loading comments…",
+                    Style::default().fg(app.theme.border),
+                )));
+            } else if ticket.all_comments.is_empty() {
                 lines.push(Line::from(Span::styled(
                     "  No comments",
                     Style::default().fg(app.theme.border),

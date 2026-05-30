@@ -25,6 +25,10 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
                 app.links_selected = app.links_selected.saturating_sub(1);
             } else {
                 app.move_selection_up();
+                if app.detail_open && app.detail_tab != crate::app::DetailTab::Links {
+                    app.ensure_selected_issue_detail().await;
+                    app.refresh_issue_relations().await;
+                }
             }
         }
         KeyCode::Down | KeyCode::Char('j') => {
@@ -34,6 +38,10 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
                 }
             } else {
                 app.move_selection_down();
+                if app.detail_open && app.detail_tab != crate::app::DetailTab::Links {
+                    app.ensure_selected_issue_detail().await;
+                    app.refresh_issue_relations().await;
+                }
             }
         }
         KeyCode::Char('[') => app.scroll_page_up(),
@@ -67,6 +75,7 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
                 crate::issue_relations_flow::jump_to_selected_link(app).await;
             } else if !app.detail_open {
                 app.detail_open = true;
+                app.ensure_selected_issue_detail().await;
                 app.refresh_issue_relations().await;
             }
         }

@@ -34,6 +34,12 @@ Single-page map of everything tick can do. For **step-by-step guides with exampl
 
 Custom JQL: `[views]` and `[[views.custom]]` in config. Cache: `~/.config/tick/cache/`.
 
+### v0.19 highlights
+
+| Feature | Guide |
+|---------|--------|
+| Lazy detail load | [platform.md](features/platform.md#lazy-detail-load) — description/comments on detail open |
+
 ### v0.18 highlights
 
 | Feature | Guide |

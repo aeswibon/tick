@@ -35,6 +35,14 @@ Jira rate limit — wait ~Ns, then r to retry
 
 Wait for the countdown, then press **`r`**. Avoid hammering **`r`** while the message is visible.
 
+## Lazy detail load
+
+View refresh (`r`, tab switch, background refresh) fetches **table fields only** — not description or comments for every row.
+
+When you **open the detail pane** (`Enter`) or move to another issue with detail open, tick loads description and comments for that issue only. Description and Comments tabs show “Loading…” until the fetch completes.
+
+Headless **`tick issue show`** still includes full issue body in JSON.
+
 ## Related
 
 - [CONFIGURATION.md](../CONFIGURATION.md)

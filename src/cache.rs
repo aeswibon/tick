@@ -142,6 +142,7 @@ mod tests {
             sprint_name: None,
             project_key: String::new(),
             custom_fields: std::collections::HashMap::new(),
+            detail_loaded: false,
         }
     }
 

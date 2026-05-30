@@ -59,6 +59,9 @@ pub struct Ticket {
     /// Read-only custom field values keyed by field id (e.g. `customfield_10042`).
     #[serde(default)]
     pub custom_fields: HashMap<String, String>,
+    /// Description and comments were fetched (lazy detail load).
+    #[serde(default)]
+    pub detail_loaded: bool,
 }
 
 pub(crate) fn project_key_from_issue_key(key: &str) -> &str {
@@ -92,6 +95,18 @@ pub struct BulkFetchResponse {
 pub struct BulkFetchIssue {
     pub key: String,
     pub fields: JiraFields,
+}
+
+/// Subset of issue fields loaded on demand when the detail pane opens.
+#[derive(Debug, Deserialize)]
+pub struct IssueDetailFields {
+    pub description: Option<serde_json::Value>,
+    pub comment: Option<JiraComments>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct IssueDetailResponse {
+    pub fields: IssueDetailFields,
 }
 
 #[derive(Debug, Deserialize)]
@@ -130,12 +145,12 @@ pub struct JiraStatusCategory {
     pub color_name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct JiraComments {
     pub comments: Vec<JiraComment>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct JiraComment {
     pub body: Option<serde_json::Value>,
     #[allow(dead_code)]
@@ -149,7 +164,7 @@ pub struct JiraNamed {
     pub name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct JiraUser {
     #[serde(rename = "displayName")]
     pub display_name: String,
@@ -270,6 +285,25 @@ pub(crate) fn extract_sprint_name(value: &serde_json::Value) -> Option<String> {
     }
 }
 
+fn comments_from_jira(comment: Option<&JiraComments>) -> Vec<CommentEntry> {
+    comment
+        .map(|c| {
+            c.comments
+                .iter()
+                .map(|cmt| CommentEntry {
+                    author: cmt
+                        .author
+                        .as_ref()
+                        .map(|a| a.display_name.clone())
+                        .unwrap_or_default(),
+                    created: cmt.created.clone(),
+                    body: cmt.body.clone(),
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 impl Ticket {
     pub fn project_key_for_api(&self) -> &str {
         if !self.project_key.is_empty() {
@@ -279,46 +313,39 @@ impl Ticket {
         }
     }
 
+    pub fn clear_detail_fields(&mut self) {
+        self.description = None;
+        self.description_adf = None;
+        self.latest_comment = None;
+        self.all_comments.clear();
+        self.detail_loaded = false;
+    }
+
+    pub fn apply_detail_fields(&mut self, fields: &IssueDetailFields) {
+        self.description_adf = fields.description.clone();
+        self.description = self.description_adf.as_ref().and_then(extract_text);
+        self.all_comments = comments_from_jira(fields.comment.as_ref());
+        self.latest_comment = self
+            .all_comments
+            .last()
+            .and_then(|c| c.body.as_ref())
+            .and_then(extract_text);
+        self.detail_loaded = true;
+    }
+
     pub fn from_bulk_fetch(
         issue: BulkFetchIssue,
         site_name: &str,
         base_url: &str,
         sprint_field: Option<&str>,
         custom_field_ids: &[&str],
+        include_detail: bool,
     ) -> Self {
         let ageing_days = NaiveDate::parse_from_str(&issue.fields.created[..10], "%Y-%m-%d")
             .map(|d| (chrono::Utc::now().date_naive() - d).num_days())
             .unwrap_or(0);
 
-        let description_adf = issue.fields.description.clone();
-        let description = description_adf.as_ref().and_then(extract_text);
-
-        let all_comments: Vec<CommentEntry> = issue
-            .fields
-            .comment
-            .as_ref()
-            .map(|c| {
-                c.comments
-                    .iter()
-                    .map(|cmt| CommentEntry {
-                        author: cmt
-                            .author
-                            .as_ref()
-                            .map(|a| a.display_name.clone())
-                            .unwrap_or_default(),
-                        created: cmt.created.clone(),
-                        body: cmt.body.clone(),
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        let latest_comment = all_comments
-            .last()
-            .and_then(|c| c.body.as_ref())
-            .and_then(extract_text);
-
-        Self {
+        let mut ticket = Self {
             key: issue.key.clone(),
             site: site_name.to_string(),
             issue_type: issue.fields.issue_type.name,
@@ -346,10 +373,10 @@ impl Ticket {
                 .unwrap_or_default(),
             summary: issue.fields.summary,
             link: format!("{}/browse/{}", base_url.trim_end_matches('/'), issue.key),
-            description,
-            description_adf,
-            latest_comment,
-            all_comments,
+            description: None,
+            description_adf: None,
+            latest_comment: None,
+            all_comments: Vec::new(),
             parent_key: issue.fields.parent.as_ref().map(|p| p.key.clone()),
             parent_summary: issue
                 .fields
@@ -370,7 +397,17 @@ impl Ticket {
                         .map(|v| (id.to_string(), format_custom_field_value(v)))
                 })
                 .collect(),
+            detail_loaded: false,
+        };
+
+        if include_detail {
+            ticket.apply_detail_fields(&IssueDetailFields {
+                description: issue.fields.description.clone(),
+                comment: issue.fields.comment.clone(),
+            });
         }
+
+        ticket
     }
 }
 
@@ -505,12 +542,13 @@ mod tests {
             },
         };
         let ticket =
-            Ticket::from_bulk_fetch(issue, "acme", "https://acme.atlassian.net", None, &[]);
+            Ticket::from_bulk_fetch(issue, "acme", "https://acme.atlassian.net", None, &[], true);
         assert_eq!(ticket.key, "PROJ-1");
         assert_eq!(ticket.site, "acme");
         assert_eq!(ticket.status, "In Progress");
         assert_eq!(ticket.assignee, "Alice");
         assert_eq!(ticket.description.as_deref(), Some("Plain description"));
+        assert!(ticket.detail_loaded);
         assert!(ticket.link.contains("PROJ-1"));
         assert_eq!(ticket.labels, vec!["backend", "urgent"]);
     }
@@ -563,7 +601,50 @@ mod tests {
             "https://acme.atlassian.net",
             Some("customfield_10020"),
             &["customfield_10020"],
+            false,
         );
         assert_eq!(ticket.sprint_name.as_deref(), Some("Board Sprint"));
+        assert!(!ticket.detail_loaded);
+    }
+
+    #[test]
+    fn from_bulk_fetch_without_detail_omits_description() {
+        let issue = BulkFetchIssue {
+            key: "PROJ-2".into(),
+            fields: JiraFields {
+                issue_type: JiraNamed {
+                    name: "Task".into(),
+                },
+                status: JiraStatus {
+                    name: "Open".into(),
+                    status_category: JiraStatusCategory {
+                        key: "new".into(),
+                        color_name: "blue".into(),
+                    },
+                },
+                priority: None,
+                assignee: None,
+                reporter: None,
+                duedate: None,
+                created: "2026-01-01T00:00:00.000+0000".into(),
+                project: JiraProject { key: "PROJ".into() },
+                summary: "S".into(),
+                description: Some(serde_json::json!("hidden until detail open")),
+                comment: None,
+                parent: None,
+                labels: None,
+                custom: HashMap::new(),
+            },
+        };
+        let ticket = Ticket::from_bulk_fetch(
+            issue,
+            "acme",
+            "https://acme.atlassian.net",
+            None,
+            &[],
+            false,
+        );
+        assert!(ticket.description.is_none());
+        assert!(!ticket.detail_loaded);
     }
 }

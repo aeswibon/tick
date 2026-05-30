@@ -520,6 +520,7 @@ mod tests {
             sprint_name: None,
             project_key: "DEMO".into(),
             custom_fields: std::collections::HashMap::new(),
+            detail_loaded: false,
         };
         let mut draft = CreateDraft::default();
         seed_draft_from_ticket(&mut draft, &ticket, "Copy of: ");

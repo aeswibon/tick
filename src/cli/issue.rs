@@ -88,6 +88,7 @@ async fn fetch_ticket(jira: &JiraClient, site: &Site, key: &str) -> Result<Ticke
             &[key.to_string()],
             site.sprint_field.as_deref(),
             &[],
+            true,
         )
         .await?;
     let issue = issues
@@ -100,5 +101,6 @@ async fn fetch_ticket(jira: &JiraClient, site: &Site, key: &str) -> Result<Ticke
         base_url,
         site.sprint_field.as_deref(),
         &[],
+        true,
     ))
 }

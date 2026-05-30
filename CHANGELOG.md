@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.19.0] - 2026-05-30
+
+### Changed
+
+- **Lazy detail load** — View refreshes no longer fetch description/comments for every issue; they load when you open the detail pane (or change selection with detail open). `tick issue show` still returns full JSON.
+
+### Documentation
+
+- [platform.md](docs/features/platform.md#lazy-detail-load)
+
 ## [0.18.0] - 2026-05-30
 
 ### Added

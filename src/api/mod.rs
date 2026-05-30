@@ -469,6 +469,7 @@ impl JiraClient {
         ids: &[String],
         sprint_field: Option<&str>,
         custom_field_ids: &[String],
+        include_detail: bool,
     ) -> Result<Vec<BulkFetchIssue>, String> {
         if ids.is_empty() {
             return Ok(Vec::new());
@@ -488,11 +489,13 @@ impl JiraClient {
             "created",
             "project",
             "summary",
-            "description",
-            "comment",
             "parent",
             "labels",
         ];
+        if include_detail {
+            fields.push("description");
+            fields.push("comment");
+        }
         if let Some(sf) = sprint_field {
             if !fields.contains(&sf) {
                 fields.push(sf);
@@ -524,6 +527,29 @@ impl JiraClient {
             .map_err(|e| format!("Parse error: {} | raw: {}", e, &text[..text.len().min(200)]))?;
 
         Ok(data.issues)
+    }
+
+    /// Fetch description and comments for one issue (lazy detail pane).
+    pub async fn fetch_issue_detail(
+        &self,
+        base_url: &str,
+        key: &str,
+    ) -> Result<crate::api::types::IssueDetailFields, String> {
+        let url = format!(
+            "{}/rest/api/3/issue/{key}?fields=description,comment",
+            base_url.trim_end_matches('/')
+        );
+        let resp = self.send(|| self.get(&url).send()).await?;
+        if !resp.status().is_success() {
+            return Err(format!(
+                "Issue detail {}: {}",
+                resp.status(),
+                resp.text().await.unwrap_or_default()
+            ));
+        }
+        let data: crate::api::types::IssueDetailResponse =
+            resp.json().await.map_err(|e| format!("Parse error: {e}"))?;
+        Ok(data.fields)
     }
 
     /// List workflow transitions available for the issue (status changes go through these).
@@ -1044,7 +1070,7 @@ pub async fn fetch_all(
 
         let sprint_field = site.sprint_field.as_deref();
         match client
-            .bulk_fetch(&site.base_url, &ids, sprint_field, custom_field_ids)
+            .bulk_fetch(&site.base_url, &ids, sprint_field, custom_field_ids, false)
             .await
         {
             Ok(issues) => {
@@ -1055,6 +1081,7 @@ pub async fn fetch_all(
                         &site.base_url,
                         sprint_field,
                         &cf_refs,
+                        false,
                     ));
                 }
             }
@@ -1068,7 +1095,11 @@ pub async fn fetch_all(
 #[cfg(test)]
 mod fetch_integration {
     use super::*;
+    use crate::api::types::{
+        BulkFetchIssue, JiraFields, JiraNamed, JiraProject, JiraStatus, JiraStatusCategory, Ticket,
+    };
     use crate::config::{Config, Site};
+    use std::collections::HashMap;
 
     fn test_config(base_url: &str) -> Config {
         Config {
@@ -1092,6 +1123,78 @@ mod fetch_integration {
             detail: Default::default(),
             view_jql: Config::build_view_jql(&Default::default()),
         }
+    }
+
+    #[tokio::test]
+    async fn fetch_issue_detail_loads_description_and_comments() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/DEMO-1"))
+            .and(wiremock::matchers::query_param(
+                "fields",
+                "description,comment",
+            ))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "fields": {
+                        "description": { "type": "doc", "version": 1, "content": [
+                            { "type": "paragraph", "content": [
+                                { "type": "text", "text": "Hello" }
+                            ]}
+                        ]},
+                        "comment": { "comments": [] }
+                    }
+                })),
+            )
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("user@example.com", "token", false);
+        let fields = client
+            .fetch_issue_detail(&server.uri(), "DEMO-1")
+            .await
+            .expect("detail fetch");
+        let mut ticket = Ticket::from_bulk_fetch(
+            BulkFetchIssue {
+                key: "DEMO-1".into(),
+                fields: JiraFields {
+                    issue_type: JiraNamed {
+                        name: "Task".into(),
+                    },
+                    status: JiraStatus {
+                        name: "Open".into(),
+                        status_category: JiraStatusCategory {
+                            key: "new".into(),
+                            color_name: "blue".into(),
+                        },
+                    },
+                    priority: None,
+                    assignee: None,
+                    reporter: None,
+                    duedate: None,
+                    created: "2026-01-01T00:00:00.000+0000".into(),
+                    project: JiraProject { key: "DEMO".into() },
+                    summary: "S".into(),
+                    description: None,
+                    comment: None,
+                    parent: None,
+                    labels: None,
+                    custom: HashMap::new(),
+                },
+            },
+            "test",
+            &server.uri(),
+            None,
+            &[],
+            false,
+        );
+        assert!(!ticket.detail_loaded);
+        ticket.apply_detail_fields(&fields);
+        assert!(ticket.detail_loaded);
+        assert!(ticket
+            .description
+            .as_ref()
+            .is_some_and(|d| d.contains("Hello")));
     }
 
     #[tokio::test]

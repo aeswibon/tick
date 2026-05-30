@@ -30,6 +30,7 @@ fn sample_tickets(n: usize) -> Vec<Ticket> {
             sprint_name: Some("Sprint 1".into()),
             project_key: "DEMO".into(),
             custom_fields: Default::default(),
+            detail_loaded: false,
         })
         .collect()
 }
