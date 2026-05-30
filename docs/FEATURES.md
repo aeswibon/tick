@@ -34,6 +34,13 @@ Single-page map of everything tick can do. For **step-by-step guides with exampl
 
 Custom JQL: `[views]` and `[[views.custom]]` in config. Cache: `~/.config/tick/cache/`.
 
+### v0.12 highlights
+
+| Feature | Guide |
+|---------|--------|
+| Bulk table actions | [bulk-actions.md](features/bulk-actions.md) — `Space`, bulk `t` / `a` |
+| Template description edit | [saved-views-templates-columns.md](features/saved-views-templates-columns.md#template-manager-shifte) — `Shift+E` → `b` |
+
 ### v0.10 highlights
 
 | Feature | Guide |

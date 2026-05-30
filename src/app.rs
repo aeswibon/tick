@@ -10,7 +10,7 @@ use crate::theme::Theme;
 use crate::ticket_lock::{read_tickets, write_tickets};
 use crate::view_mode::ViewMode;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 
@@ -138,6 +138,7 @@ pub enum InputMode {
     TemplateEditSummary,
     TemplateEditProject,
     TemplateEditIssueType,
+    TemplateEditDescription,
     /// Add issue link: target KEY after picking link type.
     AddIssueLinkTarget,
     /// Create subtask under current issue (summary only).
@@ -249,6 +250,9 @@ pub struct App {
     cache: ViewCache,
     pub pending_bg_update: Arc<Mutex<Option<BgResult>>>,
     filter_cache: RefCell<Option<FilterCache>>,
+    /// Bulk table selection: `(site, key)`.
+    pub bulk_marked: HashSet<(String, String)>,
+    pub bulk_action: Option<crate::bulk::BulkAction>,
 }
 
 impl App {
@@ -330,9 +334,68 @@ impl App {
             cache,
             pending_bg_update: Arc::new(Mutex::new(None)),
             filter_cache: RefCell::new(None),
+            bulk_marked: HashSet::new(),
+            bulk_action: None,
         };
         app.load_cache();
         app
+    }
+
+    pub fn bulk_mark_count(&self) -> usize {
+        self.bulk_marked.len()
+    }
+
+    pub fn clear_bulk_marks(&mut self) {
+        self.bulk_marked.clear();
+        self.bulk_action = None;
+    }
+
+    pub fn bulk_same_site(&self) -> Option<String> {
+        let mut sites = self.bulk_marked.iter().map(|(s, _)| s.as_str());
+        let first = sites.next()?;
+        if sites.all(|s| s == first) {
+            Some(first.to_string())
+        } else {
+            None
+        }
+    }
+
+    pub fn toggle_bulk_mark(&mut self, site: &str, key: &str) -> Result<(), String> {
+        let id = (site.to_string(), key.to_string());
+        if self.bulk_marked.contains(&id) {
+            self.bulk_marked.remove(&id);
+            return Ok(());
+        }
+        if self.bulk_marked.len() >= crate::bulk::BULK_MAX_SELECTED {
+            return Err(format!(
+                "Bulk selection limited to {} issues",
+                crate::bulk::BULK_MAX_SELECTED
+            ));
+        }
+        self.bulk_marked.insert(id);
+        Ok(())
+    }
+
+    pub fn bulk_marked_refs_in_filter_order(&self) -> Vec<TicketRef> {
+        let tickets = read_tickets(&self.tickets);
+        self.filtered_indices()
+            .iter()
+            .filter_map(|&idx| {
+                let t = &tickets[idx];
+                let id = (t.site.clone(), t.key.clone());
+                self.bulk_marked.contains(&id).then(|| TicketRef {
+                    site: t.site.clone(),
+                    key: t.key.clone(),
+                    link: t.link.clone(),
+                })
+            })
+            .collect()
+    }
+
+    pub fn prune_bulk_marks(&mut self) {
+        let tickets = read_tickets(&self.tickets);
+        self.bulk_marked
+            .retain(|(site, key)| tickets.iter().any(|t| &t.site == site && &t.key == key));
     }
 
     pub fn invalidate_filter_cache(&self) {
@@ -699,6 +762,7 @@ impl App {
             self.status.clear_action_error();
         }
         write_tickets(&self.tickets).clone_from(&tickets);
+        self.prune_bulk_marks();
         self.invalidate_filter_cache();
         self.live_data = !tickets.is_empty() || no_errors;
         if reset_cursor {

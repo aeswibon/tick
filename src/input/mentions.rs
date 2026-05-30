@@ -252,7 +252,8 @@ pub(crate) async fn submit_input(app: &mut App) {
         | InputMode::CreateSubtaskSummary
         | InputMode::TemplateEditSummary
         | InputMode::TemplateEditProject
-        | InputMode::TemplateEditIssueType => {
+        | InputMode::TemplateEditIssueType
+        | InputMode::TemplateEditDescription => {
             return;
         }
         InputMode::OpenTicket | InputMode::None => return,

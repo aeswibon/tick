@@ -10,6 +10,7 @@ Use these when you want **depth** on one capability. For a single scrollable ove
 ## Table and reading
 
 - **[table-and-navigation.md](table-and-navigation.md)** — Row selection, filter, sort, `page_size`, column ids
+- **[bulk-actions.md](bulk-actions.md)** — Multi-select (`Space`), bulk transition and assign (v0.12)
 - **[detail-pane.md](detail-pane.md)** — Detail layout, ADF rendering, markdown round-trip
 
 ## Jira write-back

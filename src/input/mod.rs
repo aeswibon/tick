@@ -116,6 +116,7 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
             InputMode::TemplateEditSummary
                 | InputMode::TemplateEditProject
                 | InputMode::TemplateEditIssueType
+                | InputMode::TemplateEditDescription
         )
     {
         crate::template_manage_flow::handle_template_manage_key(app, code).await;
@@ -182,9 +183,20 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     cancel_transition_collect(app);
                 } else if matches!(
                     app.input_mode,
-                    InputMode::CreateField | InputMode::CreateDescription
+                    InputMode::CreateField
+                        | InputMode::CreateDescription
+                        | InputMode::TemplateEditDescription
                 ) {
-                    crate::create_flow::cancel_create(app);
+                    if app.input_mode == InputMode::TemplateEditDescription {
+                        if let Some(session) = app.template_manage.as_mut() {
+                            session.step =
+                                crate::template_manage_flow::TemplateManageStep::Actions;
+                        }
+                        app.input_mode = InputMode::None;
+                        app.input_buffer.clear();
+                    } else {
+                        crate::create_flow::cancel_create(app);
+                    }
                 } else if app.input_mode == InputMode::TemplateExportName {
                     crate::template_export_flow::cancel_template_export(app);
                 } else if matches!(
@@ -240,6 +252,7 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     InputMode::TemplateEditSummary
                         | InputMode::TemplateEditProject
                         | InputMode::TemplateEditIssueType
+                        | InputMode::TemplateEditDescription
                 ) {
                     crate::template_manage_flow::submit_template_edit(app).await;
                 } else {
@@ -314,6 +327,18 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         && !app.detail_open
     {
         crate::template_manage_flow::start_template_manage(app);
+        return false;
+    }
+
+    if matches!(code, KeyCode::Char(' ')) && crate::bulk::bulk_table_active(app) {
+        if key.modifiers.contains(KeyModifiers::SHIFT) {
+            crate::bulk::mark_all_filtered(app);
+        } else if let Some(t) = app.selected_ticket_entry() {
+            match app.toggle_bulk_mark(&t.site, &t.key) {
+                Ok(()) => {}
+                Err(e) => app.status.set_action_error(e),
+            }
+        }
         return false;
     }
 

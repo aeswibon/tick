@@ -28,7 +28,8 @@ pub fn draw_template_manage(
         TemplateManageStep::ConfirmDelete => draw_confirm_delete(f, session, theme, inner),
         TemplateManageStep::EditSummary
         | TemplateManageStep::EditProject
-        | TemplateManageStep::EditIssueType => {}
+        | TemplateManageStep::EditIssueType
+        | TemplateManageStep::EditDescription => {}
     }
 }
 
@@ -81,6 +82,7 @@ fn draw_actions(f: &mut Frame, session: &TemplateManageSession, theme: &Theme, a
         " e  edit summary",
         " p  edit project",
         " i  edit issue type",
+        " b  edit description (markdown)",
         " d  delete template",
         "",
         " Esc  back to list",

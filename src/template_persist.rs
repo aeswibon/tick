@@ -83,6 +83,7 @@ pub fn update_template_field(
         TemplateEditField::Summary => template.summary = value,
         TemplateEditField::Project => template.project = value,
         TemplateEditField::IssueType => template.issue_type = value,
+        TemplateEditField::Description => template.description = value,
     }
     template.validate_fields()?;
     save_all_templates(config)?;
@@ -94,6 +95,7 @@ pub enum TemplateEditField {
     Summary,
     Project,
     IssueType,
+    Description,
 }
 
 #[cfg(test)]

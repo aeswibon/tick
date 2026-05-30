@@ -28,6 +28,7 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
         Line::from("  7–9                    Custom JQL views (if configured)"),
         Line::from("  v / Shift+V            Cycle custom views"),
         Line::from("  Shift+E                Manage templates (edit/delete)"),
+        Line::from("  Space / Shift+Space    Bulk mark row / all filtered (max 50)"),
         Line::from(""),
         Line::from(Span::styled(
             " Actions",
@@ -83,7 +84,8 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
             " Jira Actions",
             Style::default().add_modifier(Modifier::UNDERLINED),
         )),
-        Line::from("  t / T                  Change status (workflow transition picker)"),
+        Line::from("  t / T                  Change status (bulk if rows marked)"),
+        Line::from("  a                      Assign to me (bulk on table when marked)"),
         Line::from("  c                      Add comment (@ tags users)"),
         Line::from("  w                      Log work time"),
         Line::from("  a / u                  Assign to me / unassign (detail open)"),

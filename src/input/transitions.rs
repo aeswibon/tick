@@ -26,7 +26,10 @@ pub(crate) async fn handle_transition_key(app: &mut App, code: KeyCode) {
             let idx = (n as u8 - b'1') as usize;
             apply_transition(app, idx).await;
         }
-        KeyCode::Esc => app.showing_transitions = false,
+        KeyCode::Esc => {
+            app.showing_transitions = false;
+            app.bulk_action = None;
+        }
         _ => {}
     }
 }
@@ -495,6 +498,12 @@ pub(crate) async fn execute_transition_with(
 
 pub(crate) async fn apply_transition(app: &mut App, idx: usize) {
     if idx >= app.transition_options.len() {
+        return;
+    }
+    if let Some(crate::bulk::BulkAction::Transition { site, keys }) = app.bulk_action.take() {
+        let transition = app.transition_options[idx].clone();
+        app.showing_transitions = false;
+        crate::bulk::apply_bulk_transition_by_name(app, &site, &keys, &transition).await;
         return;
     }
     let mut transition = app.transition_options[idx].clone();

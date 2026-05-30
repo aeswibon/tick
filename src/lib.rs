@@ -1,5 +1,6 @@
 pub mod api;
 pub mod app;
+pub mod bulk;
 pub mod auth;
 pub mod auth_status;
 pub mod cache;

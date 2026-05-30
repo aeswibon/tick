@@ -4,6 +4,7 @@
 
 | Version | Highlights |
 |---------|------------|
+| **0.12.0** | Bulk table marks/transition/assign; template description in manager |
 | **0.11.2** | Expanded unit/integration tests; roadmap sync |
 | **0.11.1** | Split `src/input/` module (no behavior change) |
 | **0.11.0** | Config reload (`R`); 429 footer UX |
@@ -34,14 +35,12 @@ Design notes (local): `docs/specs/` is gitignored; keep copies there for plannin
 | CONTRIBUTING release checklist | 0.11.0 ✅ |
 | Consolidate spec paths (gitignore vs tracked) | Deferred — local `docs/specs/` only |
 
-## What’s next (v0.12+)
-
-Pick a theme before coding; no approved spec yet.
+## What's next (v0.12.1+)
 
 | Direction | Examples |
 |-----------|----------|
 | **Workflow / site tuning** | Zeta `link_types`, custom views, templates, columns from real keys |
-| **Triage power** | Bulk table actions; editable custom fields; richer template editor |
+| **Triage power** | Bulk labels/watch; editable custom fields; template labels |
 | **Quality** | Links-tab wiremock flow; template-export key tests; OAuth polish |
 | **Performance** | Large `max_results`; fewer redundant refreshes after writes |
 

@@ -29,7 +29,10 @@ For workflows and examples, see the [feature guides](features/README.md).
 | `O` | Open from clipboard or key | Multi-site: probes API |
 | `e` | Open config file | `$EDITOR` / system default |
 | `R` | Reload `config.toml` | After editing; then `r` to refresh views |
-| `t` / `T` | Workflow transition picker | Not status field directly |
+| `Space` | Toggle bulk mark on row | Detail closed; max 50 |
+| `Shift+Space` | Mark all filtered rows | Up to cap |
+| `t` / `T` | Workflow transition picker | Bulk: when rows marked |
+| `a` | Assign to me (bulk) | Table + marks; detail uses `a` too |
 | `!` | Site errors overlay | When warnings exist |
 | `←` / `→` | Previous / next tab | |
 | `Tab` / `Shift+Tab` | Next / previous tab | |
@@ -41,7 +44,7 @@ For workflows and examples, see the [feature guides](features/README.md).
 | `6` | **Closed** tab | On-demand search |
 | `7`–`9` | **Custom JQL** views | When `[[views.custom]]` configured |
 | `v` / `Shift+V` | Cycle custom views | Wraps through `views.custom` |
-| `Shift+E` | Template manager | Edit/delete config templates |
+| `Shift+E` | Template manager | Edit summary/project/type/**description**; delete |
 | `h` | **Closed tab only:** toggle assignee / ever-assigned | Re-runs search if query set |
 | `f` | **Closed tab only:** local filter | After fetch; does not call Jira |
 | `n` | New issue wizard | |

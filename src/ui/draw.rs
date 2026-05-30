@@ -280,6 +280,14 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             format!(" Template issue type (Enter): {}_", app.input_buffer),
             app.theme.accent,
         )
+    } else if app.input_mode == crate::app::InputMode::TemplateEditDescription {
+        (
+            format!(
+                " Template description (markdown, Enter save): {}_",
+                app.input_buffer
+            ),
+            app.theme.accent,
+        )
     } else if app.input_mode == crate::app::InputMode::ClosedSearchQuery {
         let scope = if app.closed_search_ever_assigned {
             "ever assigned"
@@ -354,8 +362,16 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             ),
             app.theme.loading_fg,
         )
+    } else if app.bulk_mark_count() > 0 {
+        (
+            format!(
+                " {} selected · t transition · a assign me · Esc clear",
+                app.bulk_mark_count()
+            ),
+            app.theme.accent,
+        )
     } else {
-        let mut left = " ? help  / filter  ! errors  j/k  s/S sort  y copy  o/O open  t/T status  [ ] scroll  ←/→ view  1-6 tabs  R reload  q quit".to_string();
+        let mut left = " ? help  / filter  ! errors  j/k  s/S sort  y copy  o/O open  t/T status  Space mark  [ ] scroll  ←/→ view  1-6 tabs  R reload  q quit".to_string();
         if app.detail_open {
             left.push_str("  S/P/L/M/D fields  h/l tabs");
             if app.detail_tab == crate::app::DetailTab::Links {

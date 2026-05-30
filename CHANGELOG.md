@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.12.0] - 2026-05-30
+
+### Added
+
+- **Bulk table selection** — `Space` toggle mark, `Shift+Space` mark filtered rows (max 50), `Esc` clear; `✓` in Key column
+- **Bulk transition** — with marks, `t` applies chosen transition by name to each issue (same site); per-issue failures reported in footer
+- **Bulk assign** — with marks, `a` assigns current user to all marked issues (same site)
+- **Template description** — `Shift+E` → `b` edits template `description` (markdown footer, empty allowed)
+
+### Documentation
+
+- [docs/features/bulk-actions.md](docs/features/bulk-actions.md), KEYBINDINGS, FEATURES, help overlay
+
 ## [0.11.2] - 2026-05-30
 
 ### Added

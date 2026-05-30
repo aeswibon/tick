@@ -71,6 +71,10 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             }
         }
         KeyCode::Esc => {
+            if app.bulk_mark_count() > 0 && !app.detail_open {
+                app.clear_bulk_marks();
+                return false;
+            }
             app.show_help = false;
             app.detail_open = false;
             crate::issue_relations_flow::cancel_add_link(app);
@@ -178,6 +182,8 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('t') | KeyCode::Char('T') => {
             if crate::create_flow::handle_create_normal_keys(app, code).await {
                 // create wizard: change issue type
+            } else if app.bulk_mark_count() > 0 {
+                crate::bulk::start_bulk_status_picker(app).await;
             } else {
                 start_status_picker(app).await;
             }
@@ -196,6 +202,9 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('w') if app.detail_open => {
             app.input_mode = InputMode::Worklog;
             app.input_buffer.clear();
+        }
+        KeyCode::Char('a') if app.bulk_mark_count() > 0 && !app.detail_open => {
+            crate::bulk::bulk_assign_to_me(app).await;
         }
         KeyCode::Char('a') if app.detail_open => {
             assign_to_me(app).await;
