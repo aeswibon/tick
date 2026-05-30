@@ -1,4 +1,3 @@
-use crate::api::issue_relations::ADD_LINK_TYPES;
 use ratatui::{
     layout::{Constraint, Rect},
     style::{Modifier, Style},
@@ -9,11 +8,12 @@ use ratatui::{
 
 pub fn draw_add_link_picker(
     f: &mut Frame,
+    options: &[(String, String)],
     selected: usize,
     theme: &crate::theme::Theme,
     area: Rect,
 ) {
-    let height = (ADD_LINK_TYPES.len() as u16).saturating_add(8);
+    let height = (options.len() as u16).saturating_add(8);
     let popup = centered_rect(50, height.min(area.height.saturating_sub(2)), area);
     f.render_widget(Clear, popup);
 
@@ -31,7 +31,7 @@ pub fn draw_add_link_picker(
         Line::from(""),
     ];
 
-    for (i, (_, label)) in ADD_LINK_TYPES.iter().enumerate() {
+    for (i, (_, label)) in options.iter().enumerate() {
         let is_sel = i == selected;
         let marker = if is_sel { "›" } else { " " };
         let style = if is_sel {
@@ -43,7 +43,7 @@ pub fn draw_add_link_picker(
         };
         lines.push(Line::from(vec![
             Span::styled(format!(" {marker} "), style),
-            Span::styled(*label, style),
+            Span::styled(label.as_str(), style),
         ]));
     }
 

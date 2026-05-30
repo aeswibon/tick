@@ -52,6 +52,9 @@ pub struct Site {
     /// Issue link type name for duplicate.
     #[serde(default = "default_clone_link_type")]
     pub clone_link_type: String,
+    /// Issue link type names for add-link (`I`); see `SiteLinkTypes`.
+    #[serde(default)]
+    pub link_types: SiteLinkTypes,
 }
 
 fn default_true() -> bool {
@@ -60,6 +63,67 @@ fn default_true() -> bool {
 
 fn default_clone_link_type() -> String {
     "Cloners".into()
+}
+
+fn default_link_relates() -> String {
+    crate::api::issue_relations::DEFAULT_LINK_RELATES.into()
+}
+
+fn default_link_blocks() -> String {
+    crate::api::issue_relations::DEFAULT_LINK_BLOCKS.into()
+}
+
+fn default_link_epic() -> String {
+    crate::api::issue_relations::DEFAULT_LINK_EPIC.into()
+}
+
+/// Jira issue link type names for the add-link picker (`I`).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SiteLinkTypes {
+    #[serde(default = "default_link_relates")]
+    pub relates: String,
+    #[serde(default = "default_link_blocks")]
+    pub blocks: String,
+    /// Often the same Jira type as `blocks`; picker uses inverted inward/outward.
+    #[serde(default = "default_link_blocks")]
+    pub blocked_by: String,
+    #[serde(default = "default_link_epic")]
+    pub epic: String,
+}
+
+impl Default for SiteLinkTypes {
+    fn default() -> Self {
+        Self {
+            relates: default_link_relates(),
+            blocks: default_link_blocks(),
+            blocked_by: default_link_blocks(),
+            epic: default_link_epic(),
+        }
+    }
+}
+
+impl SiteLinkTypes {
+    /// `(Jira type name, picker label)` — four entries, fixed order.
+    pub fn picker_options(&self) -> Vec<(String, String)> {
+        vec![
+            (
+                self.relates.clone(),
+                crate::api::issue_relations::ADD_LINK_LABELS[0].into(),
+            ),
+            (
+                self.blocks.clone(),
+                crate::api::issue_relations::ADD_LINK_LABELS[1].into(),
+            ),
+            (
+                self.blocked_by.clone(),
+                crate::api::issue_relations::ADD_LINK_LABELS[2].into(),
+            ),
+            (
+                self.epic.clone(),
+                crate::api::issue_relations::ADD_LINK_LABELS[3].into(),
+            ),
+        ]
+    }
 }
 
 impl Site {

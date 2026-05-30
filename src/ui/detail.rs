@@ -298,7 +298,7 @@ pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
         }
         DetailTab::Links => {
             lines.push(Line::from(Span::styled(
-                "  j/k select · Enter jump · o open · I add link",
+                "  j/k · Enter jump · o open · I link · Shift+I remove · Shift+N subtask",
                 Style::default().fg(app.theme.border),
             )));
             lines.push(Line::from(""));

@@ -4,6 +4,7 @@
 
 | Version | Highlights |
 |---------|------------|
+| **0.9.1** | Remove link; site `link_types`; create subtask |
 | **0.9.0** | Links tab navigation; relations fetch only on Links tab |
 | **0.8.0** | Issue links tab; add link (`I`); subtasks; multi-select components/versions |
 | **0.7.2** | Watch/unwatch; due date; CLI `tick template export` |
@@ -28,7 +29,7 @@ Order for upcoming work (user direction, 2026-05):
 | Version | Theme | Highlights |
 |---------|-------|------------|
 | **0.9.0** | A | Shipped |
-| **0.9.1** | A | Remove link (`Shift+I`); per-site link type config; optional create subtask |
+| **0.9.1** | A | Shipped |
 | **0.10.0** | B | Template edit/delete; saved JQL views; Closed tab persist; custom field columns |
 | **0.11.0+** | C | Split `input.rs`; config reload; 429 UX; expanded tests; docs cleanup |
 
@@ -40,9 +41,9 @@ Order for upcoming work (user direction, 2026-05):
 |------|--------|
 | Links tab navigation | 0.9.0 ✅ |
 | Relations fetch efficiency | 0.9.0 ✅ |
-| Remove issue link | 0.9.1 |
-| Configurable link types | 0.9.1 |
-| Create subtask from parent | 0.9.1 (optional) |
+| Remove issue link | 0.9.1 ✅ |
+| Configurable link types | 0.9.1 ✅ |
+| Create subtask from parent | 0.9.1 ✅ |
 
 ### B — templates & views
 

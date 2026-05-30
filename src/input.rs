@@ -166,6 +166,7 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     InputMode::EditDueDate
                         | InputMode::ClosedSearchQuery
                         | InputMode::AddIssueLinkTarget
+                        | InputMode::CreateSubtaskSummary
                 ) {
                     app.input_mode = InputMode::None;
                     app.input_buffer.clear();
@@ -187,6 +188,8 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     crate::template_export_flow::submit_template_export_name(app).await;
                 } else if app.input_mode == InputMode::AddIssueLinkTarget {
                     crate::issue_relations_flow::submit_add_link_target(app).await;
+                } else if app.input_mode == InputMode::CreateSubtaskSummary {
+                    crate::issue_relations_flow::submit_create_subtask(app).await;
                 } else if app.input_mode == InputMode::ClosedSearchQuery {
                     app.closed_search_query = app.input_buffer.trim().to_string();
                     app.input_mode = InputMode::None;
@@ -227,6 +230,26 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         } else {
             watch_ticket(app).await;
         }
+        return false;
+    }
+
+    if matches!(code, KeyCode::Char('I') | KeyCode::Char('i')) {
+        if key.modifiers.contains(KeyModifiers::SHIFT) {
+            if app.detail_open && app.detail_tab == crate::app::DetailTab::Links {
+                crate::issue_relations_flow::remove_selected_link(app).await;
+            }
+        } else if app.detail_open {
+            crate::issue_relations_flow::start_add_link(app);
+        }
+        return false;
+    }
+
+    if matches!(code, KeyCode::Char('N') | KeyCode::Char('n'))
+        && key.modifiers.contains(KeyModifiers::SHIFT)
+        && app.detail_open
+        && app.detail_tab == crate::app::DetailTab::Links
+    {
+        crate::issue_relations_flow::start_create_subtask(app);
         return false;
     }
 
@@ -489,7 +512,8 @@ async fn submit_input(app: &mut App) {
         | InputMode::CreateDescription
         | InputMode::TemplateExportName
         | InputMode::ClosedSearchQuery
-        | InputMode::AddIssueLinkTarget => {
+        | InputMode::AddIssueLinkTarget
+        | InputMode::CreateSubtaskSummary => {
             return;
         }
         InputMode::OpenTicket | InputMode::None => return,
@@ -1143,9 +1167,6 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             if app.detail_tab == crate::app::DetailTab::Links {
                 app.refresh_issue_relations().await;
             }
-        }
-        KeyCode::Char('I') if app.detail_open => {
-            crate::issue_relations_flow::start_add_link(app);
         }
         KeyCode::Right => app.switch_to(app.active_view.next()).await,
         KeyCode::Left => app.switch_to(app.active_view.prev()).await,

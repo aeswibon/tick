@@ -7,6 +7,7 @@ use serde_json::json;
 /// A linked issue shown relative to the current issue.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IssueLinkView {
+    pub link_id: String,
     pub link_type: String,
     pub direction: String,
     pub other_key: String,
@@ -41,6 +42,14 @@ impl IssueRelations {
                 .map(|s| s.key.as_str())
         }
     }
+
+    pub fn link_id_at(&self, index: usize) -> Option<&str> {
+        if index < self.links.len() {
+            Some(self.links[index].link_id.as_str())
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -58,6 +67,7 @@ struct IssueRelationsFields {
 
 #[derive(Debug, Deserialize)]
 struct JiraIssueLink {
+    id: String,
     #[serde(rename = "type")]
     link_type: JiraLinkType,
     #[serde(rename = "inwardIssue")]
@@ -102,15 +112,14 @@ struct JiraSubtaskFields {
     status: JiraLinkedStatus,
 }
 
-/// Preset link types for the add-link picker: `(Jira type name, label)`.
-pub const ADD_LINK_TYPES: &[(&str, &str)] = &[
-    ("Relates", "Relates to"),
-    ("Blocks", "Blocks"),
-    ("Blocks", "Is blocked by"),
-    ("Epic-Story Link", "Epic"),
-];
+/// Default Cloud link type names (overridden per site via `Site::link_types`).
+pub const DEFAULT_LINK_RELATES: &str = "Relates";
+pub const DEFAULT_LINK_BLOCKS: &str = "Blocks";
+pub const DEFAULT_LINK_EPIC: &str = "Epic-Story Link";
 
-/// Which picker index uses “blocked by” semantics (same Jira type as Blocks).
+pub const ADD_LINK_LABELS: [&str; 4] = ["Relates to", "Blocks", "Is blocked by", "Epic"];
+
+/// Which picker index uses “blocked by” semantics (same Jira type name as Blocks).
 pub fn add_link_blocked_by(index: usize) -> bool {
     index == 2
 }
@@ -167,6 +176,24 @@ impl JiraClient {
         } else {
             Err(format!(
                 "Issue link {}: {}",
+                resp.status(),
+                resp.text().await.unwrap_or_default()
+            ))
+        }
+    }
+
+    pub async fn delete_issue_link(&self, base_url: &str, link_id: &str) -> Result<(), String> {
+        let url = format!(
+            "{}/rest/api/3/issueLink/{}",
+            base_url.trim_end_matches('/'),
+            link_id
+        );
+        let resp = self.send(|| self.delete(&url).send()).await?;
+        if resp.status().is_success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "Delete link {}: {}",
                 resp.status(),
                 resp.text().await.unwrap_or_default()
             ))
@@ -251,6 +278,7 @@ fn parse_relations(issue_key: &str, fields: IssueRelationsFields) -> IssueRelati
         if let Some(inward) = link.inward_issue {
             if inward.key != issue_key {
                 links.push(IssueLinkView {
+                    link_id: link.id.clone(),
                     link_type: type_name.clone(),
                     direction: link.link_type.inward.clone(),
                     other_key: inward.key,
@@ -263,6 +291,7 @@ fn parse_relations(issue_key: &str, fields: IssueRelationsFields) -> IssueRelati
         if let Some(outward) = link.outward_issue {
             if outward.key != issue_key {
                 links.push(IssueLinkView {
+                    link_id: link.id.clone(),
                     link_type: type_name,
                     direction: link.link_type.outward,
                     other_key: outward.key,
@@ -287,16 +316,14 @@ fn parse_relations(issue_key: &str, fields: IssueRelationsFields) -> IssueRelati
 /// Map picker selection to inward/outward keys for `link_issues`.
 pub fn link_keys_for_picker(
     picker_index: usize,
-    api_type: &str,
+    _api_type: &str,
     source_key: &str,
     target_key: &str,
 ) -> (String, String) {
-    if api_type == "Blocks" {
-        if add_link_blocked_by(picker_index) {
-            (source_key.to_string(), target_key.to_string())
-        } else {
-            (target_key.to_string(), source_key.to_string())
-        }
+    if add_link_blocked_by(picker_index) {
+        (source_key.to_string(), target_key.to_string())
+    } else if picker_index == 1 {
+        (target_key.to_string(), source_key.to_string())
     } else {
         (source_key.to_string(), target_key.to_string())
     }
@@ -311,6 +338,7 @@ mod tests {
         let json = serde_json::json!({
             "fields": {
                 "issuelinks": [{
+                    "id": "10001",
                     "type": { "name": "Relates", "inward": "relates to", "outward": "relates to" },
                     "inwardIssue": {
                         "key": "B-2",
@@ -338,6 +366,7 @@ mod tests {
     fn combined_list_keys_links_then_subtasks() {
         let rel = IssueRelations {
             links: vec![IssueLinkView {
+                link_id: "1".into(),
                 link_type: "Relates".into(),
                 direction: "relates to".into(),
                 other_key: "A-2".into(),
@@ -377,6 +406,22 @@ mod tests {
             .unwrap();
         assert_eq!(rel.subtasks.len(), 1);
         assert_eq!(rel.subtasks[0].key, "DEMO-2");
+    }
+
+    #[tokio::test]
+    async fn delete_issue_link_calls_api() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("DELETE"))
+            .and(wiremock::matchers::path("/rest/api/3/issueLink/10001"))
+            .respond_with(wiremock::ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        client
+            .delete_issue_link(&server.uri(), "10001")
+            .await
+            .unwrap();
     }
 
     #[tokio::test]

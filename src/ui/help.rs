@@ -53,7 +53,8 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
         Line::from("  h / l                  Prev / next detail tab (Details · Description · Comments · Links)"),
         Line::from("  j / k                  On Links tab: select link/subtask row"),
         Line::from("  Enter                  Links tab: jump to row; else toggle detail"),
-        Line::from("  I (Links tab)          Add issue link (Relates / Blocks / Epic)"),
+        Line::from("  I / Shift+I            Links tab: add / remove issue link"),
+        Line::from("  Shift+N                Links tab: create subtask (summary)"),
         Line::from("  o                      Links tab: open selected row in browser"),
         Line::from(""),
         Line::from(Span::styled(

@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.9.1] - 2026-05-30
+
+### Added
+
+- **Remove issue link** — `Shift+I` on Links tab (link rows only)
+- **Per-site link types** — `link_types` on `[[sites]]` for Jira name overrides
+- **Create subtask** — `Shift+N` on Links tab (summary → POST with parent)
+
 ## [0.9.0] - 2026-05-30
 
 ### Added

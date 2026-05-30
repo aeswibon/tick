@@ -77,6 +77,8 @@ r        # repeat search
 | `j` / `k` | On **Links** tab: move link/subtask selection | Does not move table row |
 | `Enter` | On **Links** tab: jump to selected link/subtask | Else toggle detail pane |
 | `I` | Add issue link | Pick type → target key |
+| `Shift+I` | Remove selected link | Links tab; not subtasks |
+| `Shift+N` | Create subtask | Links tab; summary prompt |
 | `o` | On **Links** tab: open selected in browser | Table: open current row |
 | `Enter` / `Esc` | Close detail | |
 | `c` | Add comment | `@` mention picker |

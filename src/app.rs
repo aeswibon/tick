@@ -2,7 +2,7 @@ use crate::api::types::Ticket;
 use crate::api::{self, JiraClient};
 use crate::cache::ViewCache;
 use crate::columns::Column;
-use crate::config::Config;
+use crate::config::{Config, SiteLinkTypes};
 use crate::fetch_status::FetchStatus;
 use crate::issue_key::{host_from_url, parse_issue_key};
 use crate::platform;
@@ -137,6 +137,8 @@ pub enum InputMode {
     ClosedSearchQuery,
     /// Add issue link: target KEY after picking link type.
     AddIssueLinkTarget,
+    /// Create subtask under current issue (summary only).
+    CreateSubtaskSummary,
 }
 
 /// Collecting values for a workflow transition before POST.
@@ -487,6 +489,29 @@ impl App {
     pub fn selected_link_key(&self) -> Option<String> {
         let rel = self.issue_relations.as_ref()?;
         rel.key_at(self.links_selected).map(str::to_string)
+    }
+
+    pub fn selected_link_id(&self) -> Option<String> {
+        let rel = self.issue_relations.as_ref()?;
+        rel.link_id_at(self.links_selected).map(str::to_string)
+    }
+
+    pub fn links_selection_is_link_row(&self) -> bool {
+        self.issue_relations
+            .as_ref()
+            .is_some_and(|r| self.links_selected < r.links.len())
+    }
+
+    pub fn add_link_options(&self) -> Vec<(String, String)> {
+        let Some(sel) = self.selected_ticket() else {
+            return SiteLinkTypes::default().picker_options();
+        };
+        self.config
+            .sites
+            .iter()
+            .find(|s| s.name == sel.site)
+            .map(|s| s.link_types.picker_options())
+            .unwrap_or_else(|| SiteLinkTypes::default().picker_options())
     }
 
     /// Select a row in the filtered table by issue key. Returns whether a match was found.

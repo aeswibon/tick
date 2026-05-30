@@ -60,7 +60,14 @@ pub fn render(f: &mut Frame, app: &mut App) {
         super::errors::draw_site_errors(f, app, f.area());
     }
     if app.showing_add_link {
-        super::issue_links::draw_add_link_picker(f, app.add_link_selected, &app.theme, f.area());
+        let options = app.add_link_options();
+        super::issue_links::draw_add_link_picker(
+            f,
+            &options,
+            app.add_link_selected,
+            &app.theme,
+            f.area(),
+        );
     }
     if app.showing_transition_field {
         if app.transition_multi_mode {
@@ -195,6 +202,11 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             format!(" Link target issue key: {}_", app.input_buffer),
             app.theme.accent,
         )
+    } else if app.input_mode == crate::app::InputMode::CreateSubtaskSummary {
+        (
+            format!(" Subtask summary: {}_", app.input_buffer),
+            app.theme.accent,
+        )
     } else if app.input_mode == crate::app::InputMode::OpenTicket {
         (
             format!(
@@ -303,7 +315,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         if app.detail_open {
             left.push_str("  S/P/L/M/D fields  h/l tabs");
             if app.detail_tab == crate::app::DetailTab::Links {
-                left.push_str("  Enter jump  o open");
+                left.push_str("  Enter jump  o open  Shift+I remove  Shift+N subtask");
             }
         }
         let total = app.filtered_count();

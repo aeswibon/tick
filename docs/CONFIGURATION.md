@@ -54,6 +54,7 @@ Plus `TICK_OAUTH_CLIENT_SECRET` in the environment.
 | `sprint_field` | no | Jira field id for sprint **column** (`tick --doctor`) |
 | `board_id` | no | Default agile **board** for sprint **moves** (`M`) |
 | `boards` | no | Per-project board map, e.g. `{ DEMO = 7, WEB = 12 }` |
+| `link_types` | no | Jira link type names for add-link (`I`); defaults to Cloud standard names |
 
 Example:
 
@@ -64,6 +65,12 @@ base_url = "https://acme.atlassian.net"
 sprint_field = "customfield_10020"
 board_id = 4
 boards = { MOBILE = 12 }
+
+# Per-site link type names (optional)
+[[sites]]
+name = "zeta"
+base_url = "https://zeta-tm.atlassian.net"
+link_types = { relates = "Relates", blocks = "Blocks", blocked_by = "Blocks", epic = "Epic-Story Link" }
 ```
 
 ## Custom JQL (`[views]`)
