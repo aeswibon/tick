@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.7.1] - 2026-05-30
+
+### Added
+
+- **Closed** tab (`6`) — JQL search in done issues (`/` + `Enter`); `h` toggles assignee-when-done vs **ever assigned** (`assignee was currentUser()`)
+- **Export template** (`X`) — interactive field picker, save to `[[create.templates]]` or `create.templates_file`
+- `create.templates_file` — merge external template TOML at config load
+- **Documentation** — [docs/features/](docs/features/README.md) per-feature guides with examples; expanded [KEYBINDINGS.md](docs/KEYBINDINGS.md)
+
+### Changed
+
+- Tab order: **Assigned · Mentions · Watched · Updated · Sprint · Closed** (keys `1`–`6`)
+- [docs/FEATURES.md](docs/FEATURES.md) slimmed to overview; depth moved to feature guides
+- Footer success messages use `action_notice` (not red error styling)
+
 ## [0.7.0] - 2026-05-29
 
 ### Added

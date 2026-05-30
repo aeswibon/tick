@@ -127,6 +127,10 @@ pub enum InputMode {
     CreateField,
     /// Create issue: optional description (markdown).
     CreateDescription,
+    /// Save issue as template: template name in footer.
+    TemplateExportName,
+    /// Closed tab: JQL text search in footer.
+    ClosedSearchQuery,
 }
 
 /// Collecting values for a workflow transition before POST.
@@ -167,6 +171,7 @@ pub struct App {
     pub transition_options: Vec<crate::api::types::WorkflowTransition>,
     pub transition_collect: Option<TransitionCollect>,
     pub create_session: Option<crate::create_flow::CreateSession>,
+    pub template_export: Option<crate::template_export_flow::TemplateExportSession>,
     pub showing_create_picker: bool,
     pub showing_transition_field: bool,
     /// True when the modal is showing a footer text prompt (no option list).
@@ -188,6 +193,10 @@ pub struct App {
     pub live_data: bool,
     pub filter: String,
     pub filtering: bool,
+    /// Closed tab: last JQL search words (server-side `text ~`).
+    pub closed_search_query: String,
+    /// Closed tab: `true` → `assignee was currentUser()` (ever assigned).
+    pub closed_search_ever_assigned: bool,
     pub sort_mode: SortMode,
     pub sort_order: SortOrder,
     pub input_mode: InputMode,
@@ -242,6 +251,7 @@ impl App {
             transition_options: Vec::new(),
             transition_collect: None,
             create_session: None,
+            template_export: None,
             showing_create_picker: false,
             showing_transition_field: false,
             transition_field_text_mode: false,
@@ -261,6 +271,8 @@ impl App {
             live_data: false,
             filter: String::new(),
             filtering: false,
+            closed_search_query: String::new(),
+            closed_search_ever_assigned: false,
             sort_mode: SortMode::Default,
             sort_order: SortOrder::default(),
             input_mode: InputMode::None,
@@ -536,10 +548,28 @@ impl App {
         }
     }
 
+    pub fn jql_for_fetch(&self, mode: ViewMode) -> String {
+        if mode == ViewMode::ClosedSearch {
+            self.config.build_closed_search_jql(
+                &self.closed_search_query,
+                self.closed_search_ever_assigned,
+            )
+        } else {
+            self.config.jql_for(mode).to_string()
+        }
+    }
+
     pub async fn refresh(&mut self) {
+        if self.active_view == ViewMode::ClosedSearch && self.closed_search_query.trim().is_empty()
+        {
+            self.status.set_action_error(
+                "Closed tab: press / to search done tickets (h = ever-assigned history)",
+            );
+            return;
+        }
         self.loading = true;
-        let jql = self.config.jql_for(self.active_view);
-        let (tickets, errors) = api::fetch_all(&self.jira, &self.config, jql).await;
+        let jql = self.jql_for_fetch(self.active_view);
+        let (tickets, errors) = api::fetch_all(&self.jira, &self.config, &jql).await;
         self.view_cache.insert(self.active_view, tickets.clone());
         self.save_cache(self.active_view);
         self.apply_fetch_result(tickets, errors, true);
@@ -549,11 +579,11 @@ impl App {
     }
 
     pub async fn refresh_all(&mut self) {
-        self.do_refresh_all(&ViewMode::all(), false, true).await;
+        self.do_refresh_all(&ViewMode::background(), false, true).await;
     }
 
     pub async fn refresh_all_notify(&mut self) {
-        self.do_refresh_all(&ViewMode::all(), true, false).await;
+        self.do_refresh_all(&ViewMode::background(), true, false).await;
     }
 
     async fn fetch_views_parallel(
@@ -565,7 +595,8 @@ impl App {
             let jira = Arc::clone(&self.jira);
             let config = self.config.clone();
             set.spawn(async move {
-                let (tickets, errors) = api::fetch_all(&jira, &config, config.jql_for(mode)).await;
+                let jql = config.jql_for(mode);
+                let (tickets, errors) = api::fetch_all(&jira, &config, jql).await;
                 (mode, tickets, errors)
             });
         }
@@ -621,7 +652,7 @@ impl App {
         let jira = self.jira.clone();
         let config = self.config.clone();
         let pending = self.pending_bg_update.clone();
-        let views: Vec<ViewMode> = ViewMode::all().to_vec();
+        let views: Vec<ViewMode> = ViewMode::background().to_vec();
         tokio::spawn(async move {
             let mut set = tokio::task::JoinSet::new();
             for mode in views.iter().copied() {
@@ -704,10 +735,31 @@ impl App {
             self.sync_view_fetched_at(mode);
             self.detail_open = false;
             return;
+        } else if mode == ViewMode::ClosedSearch && self.closed_search_query.trim().is_empty() {
+            write_tickets(&self.tickets).clear();
+            self.loading = false;
+            self.live_data = false;
+            self.invalidate_filter_cache();
+            self.scroll_offset = 0;
+            self.selected = 0;
+            self.sync_view_fetched_at(mode);
         } else {
             self.refresh().await;
         }
         self.detail_open = false;
+    }
+
+    pub async fn refresh_closed_search(&mut self) {
+        if self.closed_search_query.trim().is_empty() {
+            self.status.set_action_error("Enter search words first (/)");
+            return;
+        }
+        self.active_view = ViewMode::ClosedSearch;
+        self.refresh().await;
+    }
+
+    pub fn toggle_closed_search_history(&mut self) {
+        self.closed_search_ever_assigned = !self.closed_search_ever_assigned;
     }
 
     pub fn sites_str(&self) -> String {

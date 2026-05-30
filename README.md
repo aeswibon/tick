@@ -1,6 +1,6 @@
 # tick
 
-A k9s-inspired Jira Cloud TUI for the terminal. Multi-site ticket dashboard with filtering, sorting, transitions, comments, worklogs, field edits, and sprint moves — without leaving the keyboard.
+A k9s-inspired Jira Cloud TUI for the terminal. Multi-site ticket dashboard with filtering, sorting, transitions, comments, worklogs, field edits, sprint moves, create/duplicate, and templates — without leaving the keyboard.
 
 ```
 ████████╗██╗ ██████╗██╗  ██╗
@@ -14,10 +14,11 @@ A k9s-inspired Jira Cloud TUI for the terminal. Multi-site ticket dashboard with
 ## Features
 
 - **Multi-site** — Several Atlassian Cloud instances in one table
-- **Five views** — Assigned, Updated, Mentions, Watched, Sprint (custom JQL each)
+- **Six views** — Assigned, Mentions, Watched, Updated, Sprint, Closed (JQL search)
 - **Virtualized table** — Scroll hundreds of issues at terminal height
 - **Detail pane** — Summary, description, comments; edit fields in place
 - **Jira write-back** — Transitions, comments, worklogs, summary, priority, labels, description, sprint/backlog
+- **Create & templates** — `n` / `N` / `C` / `X` (export template from ticket)
 - **Auth** — API token by default; optional [OAuth 2.0](docs/OAUTH.md)
 - **Offline-friendly** — Per-view disk cache with staleness indicators
 - **Optional notify** — Desktop alert when refresh finds new issues
@@ -27,12 +28,14 @@ A k9s-inspired Jira Cloud TUI for the terminal. Multi-site ticket dashboard with
 
 | Guide | Description |
 |-------|-------------|
-| **[docs/FEATURES.md](docs/FEATURES.md)** | Complete feature reference (all capabilities) |
 | **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** | Start here — setup, workflow, tips |
-| **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** | Full `config.toml` reference |
-| **[docs/OAUTH.md](docs/OAUTH.md)** | OAuth app setup and `tick auth` |
+| **[docs/features/](docs/features/README.md)** | **Per-feature guides** with examples |
 | **[docs/KEYBINDINGS.md](docs/KEYBINDINGS.md)** | Complete keyboard reference |
-| [ROADMAP.md](ROADMAP.md) | Release history and plans |
+| **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** | Full `config.toml` reference |
+| **[docs/FEATURES.md](docs/FEATURES.md)** | One-page feature map |
+| **[docs/OAUTH.md](docs/OAUTH.md)** | OAuth app setup and `tick auth` |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [ROADMAP.md](ROADMAP.md) | Plans |
 
 ## Quick start
 
@@ -66,7 +69,7 @@ tick                      # Launch TUI
 tick --init               # Create ~/.config/tick/config.toml
 tick --doctor             # Test API, sprint fields, agile boards
 tick auth login           # OAuth browser login
-tick auth status          # OAuth session info
+tick auth status          # Auth summary
 tick --list-themes        # List themes
 ```
 
@@ -77,11 +80,11 @@ tick --list-themes        # List themes
 | `j`/`k`, `g`/`G`, `[`/`]` | Navigate / scroll |
 | `/`, `s`, `S` | Filter / sort field / sort direction |
 | `o`, `O` | Open selected / open from clipboard or key |
-| `n`, `N`, `C` | New issue / from template / duplicate selected |
+| `n`, `N`, `C`, `X` | New / template / duplicate / export template |
 | `Enter`, `h`/`l` | Detail pane / tabs |
 | `t`/`T`, `c`, `w` | Status (workflow), comment, worklog |
 | `S`, `P`, `L`, `M`, `D` | Edit summary, priority, labels, sprint, description |
-| `1`–`5` | View tabs |
+| `1`–`6` | View tabs (see docs) |
 | `?` | Help |
 
 Full list: [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md)
@@ -97,7 +100,7 @@ name = "my-team"
 base_url = "https://my-team.atlassian.net"
 ```
 
-See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for columns, JQL, sprint fields, boards, OAuth, and notifications.
+See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for columns, JQL, sprint fields, boards, OAuth, templates, and notifications.
 
 ## Contributing
 

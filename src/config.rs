@@ -100,6 +100,10 @@ pub struct ViewQueries {
     pub mentions: Option<String>,
     pub watched: Option<String>,
     pub sprint: Option<String>,
+    /// Closed search: assignee when done (base JQL without `text ~` or ORDER BY).
+    pub closed: Option<String>,
+    /// Closed search: ever assigned to you (`assignee was`).
+    pub closed_history: Option<String>,
 }
 
 /// Pre-filled issue for `N` (create from template). Minimal edits: summary, then Enter.
@@ -126,10 +130,31 @@ pub struct IssueTemplate {
     pub extra_fields: HashMap<String, toml::Value>,
 }
 
+impl IssueTemplate {
+    pub fn validate_fields(&self) -> Result<(), String> {
+        if self.name.trim().is_empty() {
+            return Err("Template name cannot be empty".into());
+        }
+        if self.project.trim().is_empty() {
+            return Err("Template needs a project".into());
+        }
+        if self.issue_type.trim().is_empty() {
+            return Err("Template needs an issue type".into());
+        }
+        if self.summary.trim().is_empty() {
+            return Err("Template needs a summary".into());
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct CreateSettings {
     #[serde(default = "default_clone_summary_prefix")]
     pub clone_summary_prefix: String,
+    /// Optional file under the config dir (e.g. `templates/local.toml`) merged at load.
+    #[serde(default)]
+    pub templates_file: Option<String>,
     #[serde(default)]
     pub templates: Vec<IssueTemplate>,
 }
@@ -226,6 +251,7 @@ impl Config {
             config.token = Self::resolve_token(&config.token)?;
         }
         config.view_jql = Self::build_view_jql(&config.views);
+        crate::template_export::merge_templates_file(&mut config)?;
         config.validate()?;
         Ok(config)
     }
@@ -273,10 +299,11 @@ impl Config {
             .map(|mode| {
                 let jql = match mode {
                     ViewMode::MyIssues => views.assigned.as_deref(),
-                    ViewMode::Updated => views.updated.as_deref(),
                     ViewMode::Mentions => views.mentions.as_deref(),
                     ViewMode::Watching => views.watched.as_deref(),
+                    ViewMode::Updated => views.updated.as_deref(),
                     ViewMode::Sprint => views.sprint.as_deref(),
+                    ViewMode::ClosedSearch => views.closed.as_deref(),
                 };
                 let s = jql
                     .map(String::from)
@@ -291,6 +318,26 @@ impl Config {
             .get(&mode)
             .map(String::as_str)
             .unwrap_or(mode.default_jql())
+    }
+
+    /// Base JQL for the Closed tab (without search text).
+    pub fn closed_search_base(&self, ever_assigned: bool) -> &str {
+        if ever_assigned {
+            self.views
+                .closed_history
+                .as_deref()
+                .unwrap_or(ViewMode::closed_search_base(true))
+        } else {
+            self.views
+                .closed
+                .as_deref()
+                .unwrap_or(ViewMode::closed_search_base(false))
+        }
+    }
+
+    pub fn build_closed_search_jql(&self, query: &str, ever_assigned: bool) -> String {
+        let base = self.closed_search_base(ever_assigned);
+        crate::view_mode::build_closed_search_jql(base, query)
     }
 
     /// Apply CLI overrides and re-validate (call after `load()`).
@@ -406,10 +453,12 @@ theme = "default"
 # Optional custom JQL per view (defaults shown commented)
 # [views]
 # assigned = "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
-# updated = "assignee = currentUser() AND statusCategory != Done AND updated >= -7d ORDER BY updated DESC"
 # mentions = "comment ~ currentUser() AND statusCategory != Done ORDER BY updated DESC"
 # watched = "watcher = currentUser() AND statusCategory != Done ORDER BY updated DESC"
-# sprint = "sprint in openSprints() AND assignee = currentUser() ORDER BY updated DESC"   # 5th tab
+# updated = "assignee = currentUser() AND statusCategory != Done AND updated >= -7d ORDER BY updated DESC"
+# sprint = "sprint in openSprints() AND assignee = currentUser() ORDER BY updated DESC"
+# closed = "assignee = currentUser() AND statusCategory = Done"   # 6th tab — add text via /
+# closed_history = "assignee was currentUser() AND statusCategory = Done"   # h toggles on Closed tab
 
 # Optional table columns (ids: site, key, type, status, priority, age, due, assignee, reporter, parent, labels, sprint, summary)
 # columns = ["site", "key", "labels", "sprint", "summary", "status", "assignee"]
@@ -423,7 +472,8 @@ base_url = "https://my-team.atlassian.net"
 # create_project = "ENG"
 # create_issue_type = "Task"
 
-# Issue templates — press N in tick to create with fields pre-filled
+# Issue templates — press N to create; X on a ticket exports it as a template
+# Optional: templates_file = "templates/local.toml"  # merged at load
 # [[create.templates]]
 # name = "bug"
 # site = "my-team"                    # required if you have multiple [[sites]]

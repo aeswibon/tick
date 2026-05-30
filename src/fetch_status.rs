@@ -3,6 +3,7 @@
 pub struct FetchStatus {
     pub site_warnings: Vec<String>,
     pub action_error: Option<String>,
+    pub action_notice: Option<String>,
 }
 
 impl FetchStatus {
@@ -10,8 +11,18 @@ impl FetchStatus {
         self.action_error = None;
     }
 
+    pub fn clear_action_notice(&mut self) {
+        self.action_notice = None;
+    }
+
     pub fn set_action_error(&mut self, message: impl Into<String>) {
+        self.action_notice = None;
         self.action_error = Some(message.into());
+    }
+
+    pub fn set_action_notice(&mut self, message: impl Into<String>) {
+        self.action_error = None;
+        self.action_notice = Some(message.into());
     }
 
     pub fn set_site_warnings(&mut self, warnings: Vec<String>) {

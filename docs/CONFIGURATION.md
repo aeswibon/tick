@@ -4,6 +4,8 @@ Config file: `~/.config/tick/config.toml`
 
 Generate a template: `tick --init`
 
+**Examples by feature:** [features/](features/README.md) · **Keys:** [KEYBINDINGS.md](KEYBINDINGS.md)
+
 ## Top-level options
 
 | Key | Type | Default | Description |
@@ -69,10 +71,12 @@ boards = { MOBILE = 12 }
 | Key | Default tab |
 |-----|-------------|
 | `assigned` | Assigned (`1`) |
-| `updated` | Updated (`2`) |
-| `mentions` | Mentions (`3`) |
-| `watched` | Watched (`4`) |
+| `mentions` | Mentions (`2`) |
+| `watched` | Watched (`3`) |
+| `updated` | Updated (`4`) |
 | `sprint` | Sprint (`5`) |
+| `closed` | Closed (`6`) — base JQL without search text |
+| `closed_history` | Closed tab when `h` toggles to ever-assigned (`assignee was`) |
 
 Example:
 

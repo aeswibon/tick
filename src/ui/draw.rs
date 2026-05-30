@@ -39,6 +39,11 @@ pub fn render(f: &mut Frame, app: &mut App) {
     if app.showing_create_picker {
         super::create::draw_create_picker(f, app, f.area());
     }
+    if let Some(ref session) = app.template_export {
+        if session.step != crate::template_export_flow::TemplateExportStep::Name {
+            super::template_export::draw_template_export(f, session, &app.theme, f.area());
+        }
+    }
     if app.showing_transitions {
         super::transitions::draw_transitions(f, app, f.area());
     }
@@ -189,6 +194,50 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             ),
             app.theme.accent,
         )
+    } else if app.input_mode == crate::app::InputMode::TemplateExportName {
+        (
+            format!(
+                " Template name (saved to config, Enter): {}_",
+                app.input_buffer
+            ),
+            app.theme.accent,
+        )
+    } else if app.input_mode == crate::app::InputMode::ClosedSearchQuery {
+        let scope = if app.closed_search_ever_assigned {
+            "ever assigned"
+        } else {
+            "closed assignee"
+        };
+        (
+            format!(
+                " Closed search ({scope}, Enter): {}_",
+                app.input_buffer
+            ),
+            app.theme.accent,
+        )
+    } else if app.active_view == ViewMode::ClosedSearch
+        && app.input_mode == crate::app::InputMode::None
+        && app.closed_search_query.is_empty()
+    {
+        (
+            " Closed: / search done tickets · h toggle ever-assigned · 6 tab".to_string(),
+            app.theme.border,
+        )
+    } else if app.active_view == ViewMode::ClosedSearch
+        && app.input_mode == crate::app::InputMode::None
+    {
+        let scope = if app.closed_search_ever_assigned {
+            "ever assigned"
+        } else {
+            "assignee"
+        };
+        (
+            format!(
+                " Closed [{scope}]: \"{}\" — / refine · h scope · r refresh",
+                app.closed_search_query
+            ),
+            app.theme.border,
+        )
     } else if app.input_mode == crate::app::InputMode::TransitionField {
         let (label, hint) = app
             .transition_field_current
@@ -212,6 +261,8 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     } else if app.loading && !app.showing_transition_field {
         let msg = app.loading_message.as_deref().unwrap_or(" Loading...");
         (format!(" {msg}"), app.theme.loading_fg)
+    } else if let Some(ref msg) = app.status.action_notice {
+        (format!(" {msg}"), app.theme.accent)
     } else if let Some(ref err) = app.status.action_error {
         (format!(" Error: {err}"), app.theme.error_fg)
     } else if app.status.has_warnings() {
@@ -223,7 +274,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             app.theme.loading_fg,
         )
     } else {
-        let mut left = " ? help  / filter  ! errors  j/k  s/S sort  y copy  o/O open  t/T status  [ ] scroll  ←/→ view  1-5 tabs  q quit".to_string();
+        let mut left = " ? help  / filter  ! errors  j/k  s/S sort  y copy  o/O open  t/T status  [ ] scroll  ←/→ view  1-6 tabs  q quit".to_string();
         if app.detail_open {
             left.push_str("  S/P/L/M/D fields  h/l tabs");
         }

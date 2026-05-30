@@ -81,6 +81,13 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         return false;
     }
 
+    if app.template_export.is_some()
+        && app.input_mode != InputMode::TemplateExportName
+    {
+        crate::template_export_flow::handle_template_export_key(app, code).await;
+        return false;
+    }
+
     if app.filtering {
         match code {
             KeyCode::Char(c) => app.filter.push(c),
@@ -144,6 +151,11 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     InputMode::CreateField | InputMode::CreateDescription
                 ) {
                     crate::create_flow::cancel_create(app);
+                } else if app.input_mode == InputMode::TemplateExportName {
+                    crate::template_export_flow::cancel_template_export(app);
+                } else if app.input_mode == InputMode::ClosedSearchQuery {
+                    app.input_mode = InputMode::None;
+                    app.input_buffer.clear();
                 } else {
                     app.input_mode = InputMode::None;
                     app.input_buffer.clear();
@@ -158,6 +170,13 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     InputMode::CreateField | InputMode::CreateDescription
                 ) {
                     crate::create_flow::submit_create_input(app).await;
+                } else if app.input_mode == InputMode::TemplateExportName {
+                    crate::template_export_flow::submit_template_export_name(app).await;
+                } else if app.input_mode == InputMode::ClosedSearchQuery {
+                    app.closed_search_query = app.input_buffer.trim().to_string();
+                    app.input_mode = InputMode::None;
+                    app.input_buffer.clear();
+                    app.refresh_closed_search().await;
                 } else {
                     submit_input(app).await;
                 }
@@ -433,7 +452,12 @@ async fn submit_input(app: &mut App) {
             }
             return;
         }
-        InputMode::CreateField | InputMode::CreateDescription => return,
+        InputMode::CreateField
+        | InputMode::CreateDescription
+        | InputMode::TemplateExportName
+        | InputMode::ClosedSearchQuery => {
+            return;
+        }
         InputMode::OpenTicket | InputMode::None => return,
     };
 
@@ -923,11 +947,16 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('[') => app.scroll_page_up(),
         KeyCode::Char(']') => app.scroll_page_down(),
         KeyCode::Char('/') => {
-            app.filtering = true;
-            app.filter.clear();
             app.detail_open = false;
-            app.go_to_first();
-            app.invalidate_filter_cache();
+            if app.active_view == ViewMode::ClosedSearch {
+                app.input_mode = InputMode::ClosedSearchQuery;
+                app.input_buffer = app.closed_search_query.clone();
+            } else {
+                app.filtering = true;
+                app.filter.clear();
+                app.go_to_first();
+                app.invalidate_filter_cache();
+            }
         }
         KeyCode::Enter => {
             if app.show_help {
@@ -966,6 +995,18 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
                 app.invalidate_filter_cache();
             }
         }
+        KeyCode::Char('h') if app.active_view == ViewMode::ClosedSearch && !app.detail_open => {
+            app.toggle_closed_search_history();
+            let mode = if app.closed_search_ever_assigned {
+                "ever assigned to you"
+            } else {
+                "assignee when closed"
+            };
+            app.status.set_action_notice(format!("Closed search: {mode}"));
+            if !app.closed_search_query.trim().is_empty() {
+                app.refresh_closed_search().await;
+            }
+        }
         KeyCode::Char('h') if app.detail_open => {
             app.detail_tab = app.detail_tab.prev();
         }
@@ -998,10 +1039,11 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             start_open_ticket(app).await;
         }
         KeyCode::Char('1') => app.switch_to(ViewMode::MyIssues).await,
-        KeyCode::Char('2') => app.switch_to(ViewMode::Updated).await,
-        KeyCode::Char('3') => app.switch_to(ViewMode::Mentions).await,
-        KeyCode::Char('4') => app.switch_to(ViewMode::Watching).await,
+        KeyCode::Char('2') => app.switch_to(ViewMode::Mentions).await,
+        KeyCode::Char('3') => app.switch_to(ViewMode::Watching).await,
+        KeyCode::Char('4') => app.switch_to(ViewMode::Updated).await,
         KeyCode::Char('5') => app.switch_to(ViewMode::Sprint).await,
+        KeyCode::Char('6') => app.switch_to(ViewMode::ClosedSearch).await,
         KeyCode::Char('n') if !app.detail_open && app.create_session.is_none() => {
             crate::create_flow::start_create_blank(app).await;
         }
@@ -1010,6 +1052,9 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         }
         KeyCode::Char('C') if !app.detail_open && app.create_session.is_none() => {
             crate::create_flow::start_create_duplicate(app).await;
+        }
+        KeyCode::Char('X') if app.create_session.is_none() && app.template_export.is_none() => {
+            crate::template_export_flow::start_template_export_from_selection(app).await;
         }
         KeyCode::Char('t') | KeyCode::Char('T') => {
             if crate::create_flow::handle_create_normal_keys(app, code).await {

@@ -2,7 +2,12 @@
 
 tick is a terminal UI for **Jira Cloud**. It aggregates issues from one or more sites, lets you triage with filters and sorts, and perform common actions without opening the browser.
 
-**Full feature reference:** [FEATURES.md](FEATURES.md) — every capability in one place.
+| Doc | Use when |
+|-----|----------|
+| [features/README.md](features/README.md) | Deep dive on one capability (examples) |
+| [FEATURES.md](FEATURES.md) | One-page map of all features |
+| [KEYBINDINGS.md](KEYBINDINGS.md) | Every key, by context |
+| [CONFIGURATION.md](CONFIGURATION.md) | `config.toml` options |
 
 ## First-time setup
 
@@ -49,7 +54,7 @@ For OAuth instead of API tokens, see [OAUTH.md](OAUTH.md).
 
 ```
 ┌─ Header: site counts · live/cached status ─────────────────┐
-├─ Tabs: [Assigned] Updated Mentions Watched Sprint ───────────┤
+├─ Tabs: Assigned · Mentions · Watched · Updated · Sprint · Closed ┤
 ├─ Ticket table (virtualized — uses full terminal height) ────┤
 ├─ Footer: key hints · row/total · sort · cache age ──────────┤
 └─────────────────────────────────────────────────────────────┘
@@ -62,14 +67,15 @@ Press **`Enter`** on a row to open the **detail pane** (table shrinks to 60%, de
 | Tab | Key | Default JQL focus |
 |-----|-----|-------------------|
 | Assigned | `1` | Your open assignments |
-| Updated | `2` | Assigned, updated last 7 days |
-| Mentions | `3` | Issues where you are mentioned in comments |
-| Watched | `4` | Issues you watch |
+| Mentions | `2` | Issues where you are mentioned in comments |
+| Watched | `3` | Issues you watch |
+| Updated | `4` | Assigned, updated last 7 days |
 | Sprint | `5` | Your work in open sprints |
+| Closed | `6` | Done issues — press `/` to search (`h` = ever-assigned history) |
 
 Override any view with `[views]` in config — see [CONFIGURATION.md](CONFIGURATION.md#custom-jql-views).
 
-Each view is **cached** under `~/.config/tick/cache/`. On startup, tick loads cache immediately, then refreshes in the background.
+Each view is **cached** under `~/.config/tick/cache/`. On startup, tick loads cache immediately, then refreshes open tabs in the background (Closed is fetched when you search).
 
 ## Filtering and sorting
 
