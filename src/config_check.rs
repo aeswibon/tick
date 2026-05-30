@@ -52,6 +52,12 @@ pub fn validate_config(config: &Config) -> Vec<CheckFinding> {
         }
     }
 
+    for (i, hook) in config.hooks.on_refresh.iter().enumerate() {
+        if hook.command.trim().is_empty() {
+            out.push(err(format!("hooks.on_refresh[{i}] has empty command")));
+        }
+    }
+
     for t in &config.create.templates {
         if t.name.trim().is_empty() {
             out.push(err("Template with empty name"));
@@ -122,6 +128,7 @@ mod tests {
             auth: AuthMethod::Token,
             oauth: OAuthSettings::default(),
             create: CreateSettings::default(),
+            hooks: Default::default(),
             view_jql: Config::build_view_jql(&ViewQueries::default()),
         }
     }

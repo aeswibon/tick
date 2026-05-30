@@ -1,6 +1,6 @@
 [package]
 name = "tick"
-version = "0.14.0"
+version = "0.15.0"
 edition = "2021"
 license = "MIT"
 
@@ -10,7 +10,7 @@ crossterm = "0.28"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "time"] }
 toml = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }

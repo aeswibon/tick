@@ -44,3 +44,24 @@ Output is JSON with `ok` and `failed` arrays. Exit code `1` if any issue fails. 
 tick --check    # offline structural validation
 tick --doctor   # live Jira API probes
 ```
+
+## Refresh hooks
+
+After a **successful** refresh of the active view (`r` or background update), tick can run shell commands:
+
+```toml
+[[hooks.on_refresh]]
+command = "~/.local/bin/on-tick-refresh.sh"
+views = ["assigned", "mentions"]   # optional; default = all views
+timeout_secs = 30                  # optional; default 30
+```
+
+| Variable | Content |
+|----------|---------|
+| `TICK_VIEW` | View id: `assigned`, `mentions`, `watched`, `updated`, `sprint`, `closed`, or custom view **name** |
+| `TICK_JSON_PATH` | Path to a temp JSON file (array of issues) |
+| `TICK_ISSUE_COUNT` | Number of issues |
+
+Hooks run in the background. Failures print to stderr as `[tick hook] …`. Not run when the fetch returns site errors.
+
+Details: [CONFIGURATION.md](../CONFIGURATION.md#refresh-hooks).

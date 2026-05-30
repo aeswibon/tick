@@ -34,6 +34,12 @@ Single-page map of everything tick can do. For **step-by-step guides with exampl
 
 Custom JQL: `[views]` and `[[views.custom]]` in config. Cache: `~/.config/tick/cache/`.
 
+### v0.15 highlights
+
+| Feature | Guide |
+|---------|--------|
+| Refresh hooks | [automation.md](features/automation.md#refresh-hooks) — `[[hooks.on_refresh]]` |
+
 ### v0.14 highlights
 
 | Feature | Guide |

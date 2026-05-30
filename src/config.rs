@@ -244,6 +244,27 @@ impl IssueTemplate {
     }
 }
 
+/// Shell command run after a successful view refresh (`[[hooks.on_refresh]]`).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RefreshHook {
+    pub command: String,
+    /// View ids: `assigned`, `mentions`, `watched`, `updated`, `sprint`, `closed`, or custom view name.
+    #[serde(default)]
+    pub views: Vec<String>,
+    #[serde(default = "default_hook_timeout_secs")]
+    pub timeout_secs: u64,
+}
+
+fn default_hook_timeout_secs() -> u64 {
+    30
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct HooksSettings {
+    #[serde(default, rename = "on_refresh")]
+    pub on_refresh: Vec<RefreshHook>,
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct CreateSettings {
     #[serde(default = "default_clone_summary_prefix")]
@@ -306,6 +327,8 @@ pub struct Config {
     pub oauth: OAuthSettings,
     #[serde(default)]
     pub create: CreateSettings,
+    #[serde(default)]
+    pub hooks: HooksSettings,
     #[serde(skip)]
     pub view_jql: HashMap<ViewMode, String>,
 }

@@ -807,10 +807,14 @@ impl App {
         .await;
         self.view_cache.insert(self.active_view, tickets.clone());
         self.save_cache(self.active_view);
+        let hooks_ok = errors.is_empty();
         self.apply_fetch_result(tickets, errors, true);
         self.loading = false;
         self.last_refresh = Instant::now();
         self.view_fetched_at = Some(Utc::now());
+        if hooks_ok {
+            self.fire_refresh_hooks();
+        }
     }
 
     pub async fn refresh_custom_view(&mut self) {
@@ -829,10 +833,14 @@ impl App {
         let slug = view.cache_slug();
         self.custom_view_cache.insert(slug.clone(), tickets.clone());
         self.cache.save_custom_view(&slug, &tickets);
+        let hooks_ok = errors.is_empty();
         self.apply_fetch_result(tickets, errors, true);
         self.loading = false;
         self.last_refresh = Instant::now();
         self.view_fetched_at = Some(Utc::now());
+        if hooks_ok {
+            self.fire_refresh_hooks();
+        }
     }
 
     pub async fn refresh_all(&mut self) {
@@ -996,12 +1004,16 @@ impl App {
             } else if let Some(tickets) = active_tickets {
                 let selected_key = self.selected_ticket().map(|t| t.key);
                 let preserve_ui = same_ticket_keys(&previous_keys, &tickets);
+                let hooks_ok = all_errors.is_empty();
                 self.apply_fetch_result(tickets, all_errors, !preserve_ui);
                 if preserve_ui {
                     restore_selection_on_key(self, selected_key.as_deref());
                 }
                 self.maybe_notify_new_tickets(&previous_keys, &read_tickets(&self.tickets));
                 self.view_fetched_at = Some(Utc::now());
+                if hooks_ok {
+                    self.fire_refresh_hooks();
+                }
             } else {
                 self.status.set_site_warnings(all_errors);
             }
@@ -1011,6 +1023,20 @@ impl App {
         } else {
             false
         }
+    }
+
+    fn current_view_hook_id(&self) -> String {
+        if let Some(view) = self.active_custom_view() {
+            view.name.clone()
+        } else {
+            self.active_view.cache_key().to_string()
+        }
+    }
+
+    fn fire_refresh_hooks(&self) {
+        let view_id = self.current_view_hook_id();
+        let tickets = read_tickets(&self.tickets);
+        crate::hooks::fire_on_refresh(&self.config, &view_id, &tickets);
     }
 
     pub async fn switch_to_custom(&mut self, index: usize) {
@@ -1378,6 +1404,7 @@ mod tests {
             auth: Default::default(),
             oauth: Default::default(),
             create: Default::default(),
+            hooks: Default::default(),
             view_jql: Config::build_view_jql(&Default::default()),
         }
     }

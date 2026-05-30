@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.15.0] - 2026-05-30
+
+### Added
+
+- **Refresh hooks** — `[[hooks.on_refresh]]` runs a shell command after successful active-view refresh; env `TICK_VIEW`, `TICK_JSON_PATH`, `TICK_ISSUE_COUNT`
+
+### Documentation
+
+- [CONFIGURATION.md](docs/CONFIGURATION.md#refresh-hooks), [automation.md](docs/features/automation.md#refresh-hooks)
+
 ## [0.14.0] - 2026-05-30
 
 ### Added

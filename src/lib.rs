@@ -12,6 +12,7 @@ pub mod config_check;
 pub mod create_flow;
 pub mod fetch_status;
 pub mod global_search;
+pub mod hooks;
 pub mod input;
 pub mod issue_key;
 pub mod issue_relations_flow;

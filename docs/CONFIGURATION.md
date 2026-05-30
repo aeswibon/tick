@@ -176,6 +176,25 @@ After editing `config.toml` (or `e` to open it in your editor), press **`R`** in
 - At least one `[[sites]]` with `https://` base URL
 - OAuth: `oauth.json` must exist after `tick auth login`
 
+## Refresh hooks
+
+Run shell commands after a successful refresh of the **active** view (manual `r` or when a background refresh updates the tab you are on). Not run when Jira returns errors for that fetch.
+
+```toml
+[[hooks.on_refresh]]
+command = "jq length \"$TICK_JSON_PATH\" -r"   # example; use a script path in practice
+views = ["assigned"]                            # optional
+timeout_secs = 30                               # optional, default 30
+```
+
+| Variable | Meaning |
+|----------|---------|
+| `TICK_VIEW` | `assigned`, `mentions`, `watched`, `updated`, `sprint`, `closed`, or custom view `name` |
+| `TICK_JSON_PATH` | Temp file: JSON array of `{ key, site, summary, status, assignee, labels, url }` |
+| `TICK_ISSUE_COUNT` | Issue count |
+
+See [features/automation.md](features/automation.md#refresh-hooks).
+
 ## Example full config
 
 ```toml
