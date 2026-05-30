@@ -9,6 +9,7 @@ pub mod create_flow;
 pub mod fetch_status;
 pub mod input;
 pub mod issue_key;
+pub mod issue_relations_flow;
 pub mod oauth;
 pub mod platform;
 pub mod template_export;

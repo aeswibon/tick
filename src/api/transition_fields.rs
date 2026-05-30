@@ -7,6 +7,8 @@ use serde_json::{json, Value};
 pub enum TransitionFieldKind {
     /// `allowedValues` or loaded options (resolution, priority, select list).
     Picker,
+    /// `components`, `fixVersions` — Space toggles, Enter submits array of ids.
+    MultiPicker,
     User,
     Boolean,
     Date,
@@ -36,6 +38,7 @@ impl TransitionField {
             TransitionFieldKind::Number => "number",
             TransitionFieldKind::Text => "text",
             TransitionFieldKind::Picker => "choose an option",
+            TransitionFieldKind::MultiPicker => "Space toggles · Enter confirms",
         }
     }
 
@@ -48,7 +51,15 @@ impl TransitionField {
             TransitionFieldKind::Number => "Enter a number in the footer, then Enter",
             TransitionFieldKind::Text => "Enter text in the footer below, then Enter",
             TransitionFieldKind::Picker => "Select an option",
+            TransitionFieldKind::MultiPicker => {
+                "Space toggles options · Enter confirms (Esc cancels)"
+            }
         }
+    }
+
+    pub fn value_from_multi_choices(&self, picks: &[(String, String)]) -> Value {
+        let items: Vec<Value> = picks.iter().map(|(id, _)| json!({ "id": id })).collect();
+        json!(items)
     }
 
     pub fn value_from_choice(&self, id: &str, label: &str) -> Value {
@@ -107,6 +118,12 @@ impl TransitionField {
             TransitionFieldKind::Boolean | TransitionFieldKind::Picker => {
                 return Err(format!("Select a value for {} from the list", self.name));
             }
+            TransitionFieldKind::MultiPicker => {
+                return Err(format!(
+                    "Select one or more values for {} from the checklist",
+                    self.name
+                ));
+            }
         })
     }
 }
@@ -135,11 +152,17 @@ fn parse_datetime(s: &str) -> Result<String, String> {
 pub const BOOLEAN_OPTIONS: [(&str, &str); 2] = [("true", "Yes"), ("false", "No")];
 
 fn classify_field(
-    _meta: &Value,
+    id: &str,
     field_type: &str,
     system: &str,
     options: &[(String, String)],
 ) -> TransitionFieldKind {
+    if matches!(id, "components" | "fixVersions")
+        || matches!(system, "components" | "fixVersions")
+        || (field_type == "array" && matches!(system, "components" | "fixVersions"))
+    {
+        return TransitionFieldKind::MultiPicker;
+    }
     if !options.is_empty() {
         if field_type == "boolean" {
             return TransitionFieldKind::Boolean;
@@ -158,7 +181,8 @@ fn classify_field(
     }
     match system {
         "assignee" | "reporter" => TransitionFieldKind::User,
-        "resolution" | "priority" | "fixVersions" | "components" => TransitionFieldKind::Picker,
+        "fixVersions" | "components" => TransitionFieldKind::MultiPicker,
+        "resolution" | "priority" => TransitionFieldKind::Picker,
         _ => TransitionFieldKind::Text,
     }
 }
@@ -221,7 +245,7 @@ pub fn parse_transition_screen_fields(fields_obj: Option<&Value>) -> Vec<Transit
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
-            let kind = classify_field(meta, &field_type, &system, &options);
+            let kind = classify_field(id, &field_type, &system, &options);
             if kind == TransitionFieldKind::Boolean && options.is_empty() {
                 options = BOOLEAN_OPTIONS
                     .iter()
@@ -353,7 +377,7 @@ fn infer_field_from_id(key: &str) -> TransitionField {
         "resolution" => (TransitionFieldKind::Picker, "resolution", "resolution"),
         "assignee" | "reporter" => (TransitionFieldKind::User, "user", key),
         "priority" => (TransitionFieldKind::Picker, "priority", "priority"),
-        "fixVersions" | "components" => (TransitionFieldKind::Picker, "array", key),
+        "fixVersions" | "components" => (TransitionFieldKind::MultiPicker, "array", key),
         _ if key.contains("date") || key.ends_with("Date") => {
             (TransitionFieldKind::Date, "date", "")
         }

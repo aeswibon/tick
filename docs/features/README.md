@@ -15,7 +15,8 @@ Use these when you want **depth** on one capability. For a single scrollable ove
 
 - **[status-transitions.md](status-transitions.md)** — Workflow transitions, resolution, required fields
 - **[comments-and-worklogs.md](comments-and-worklogs.md)** — Comments with `@`, worklog time formats
-- **[editing-fields.md](editing-fields.md)** — Inline edits, sprint/backlog moves
+- **[editing-fields.md](editing-fields.md)** — Inline edits, sprint/backlog moves, watch/unwatch, due date
+- **[issue-links-subtasks.md](issue-links-subtasks.md)** — Links tab, subtasks, add link (`I`)
 - **[create-duplicate-templates.md](create-duplicate-templates.md)** — Create, duplicate, templates, export `X`
 
 ## Workflow extras

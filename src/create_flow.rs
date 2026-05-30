@@ -9,6 +9,7 @@ use crate::api::create::{
     template_picker_label, CreateDraft,
 };
 use crate::api::transition_fields::{self, TransitionField, TransitionFieldKind};
+use crate::api::{self, types::WorkflowTransition};
 use crate::app::{App, InputMode};
 use crate::config::IssueTemplate;
 use crate::config::Site;
@@ -40,6 +41,8 @@ pub fn cancel_create(app: &mut App) {
     app.showing_create_picker = false;
     app.showing_transition_field = false;
     app.transition_field_text_mode = false;
+    app.transition_multi_mode = false;
+    app.transition_multi_picked.clear();
     app.transition_field_user_search = false;
     app.transition_field_current = None;
     app.transition_field_options.clear();
@@ -350,7 +353,7 @@ async fn load_required_and_prompt(app: &mut App) {
         .unwrap_or_default();
     app.loading = true;
     app.loading_message = Some("Checking required fields…".into());
-    let pending = match app
+    let mut pending = match app
         .jira
         .required_fields_for_create(&base_url, &project_key, &issue_type)
         .await
@@ -361,6 +364,16 @@ async fn load_required_and_prompt(app: &mut App) {
             Vec::new()
         }
     };
+    if !pending.is_empty() {
+        let mut wt = WorkflowTransition {
+            id: String::new(),
+            name: String::new(),
+            to_status: String::new(),
+            required_fields: pending,
+        };
+        api::enrich_transition_fields(&app.jira, &base_url, Some(&project_key), &mut wt).await;
+        pending = wt.required_fields;
+    }
     app.loading = false;
     app.loading_message = None;
 
@@ -400,11 +413,22 @@ fn begin_next_create_required(app: &mut App) -> bool {
             app.input_buffer.clear();
         }
         TransitionFieldKind::Picker | TransitionFieldKind::Boolean if !field.options.is_empty() => {
+            app.transition_multi_mode = false;
+            app.transition_multi_picked.clear();
+            app.transition_field_text_mode = false;
+            app.transition_field_options = field.options;
+            app.transition_field_selected = 0;
+        }
+        TransitionFieldKind::MultiPicker if !field.options.is_empty() => {
+            app.transition_multi_mode = true;
+            app.transition_multi_picked = vec![false; field.options.len()];
             app.transition_field_text_mode = false;
             app.transition_field_options = field.options;
             app.transition_field_selected = 0;
         }
         _ => {
+            app.transition_multi_mode = false;
+            app.transition_multi_picked.clear();
             app.transition_field_text_mode = true;
             app.transition_field_options.clear();
             app.input_mode = InputMode::CreateField;
@@ -458,7 +482,7 @@ pub async fn refresh_create_user_search(app: &mut App, force_refresh: bool) {
     app.transition_field_text_mode = false;
 }
 
-fn advance_create_required(app: &mut App, field: &TransitionField, value: serde_json::Value) {
+pub fn advance_create_required(app: &mut App, field: &TransitionField, value: serde_json::Value) {
     if let Some(session) = app.create_session.as_mut() {
         session.required_values.insert(field.id.clone(), value);
         if session.required_pending.first().map(|f| f.id.as_str()) == Some(field.id.as_str()) {

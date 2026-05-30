@@ -3,6 +3,7 @@ pub mod adf_export;
 pub mod agile;
 pub mod assignable_users;
 pub mod create;
+pub mod issue_relations;
 pub mod jira_error;
 pub mod markdown;
 pub mod retry;
@@ -908,6 +909,7 @@ fn parse_single_transition(data: &serde_json::Value) -> Option<types::WorkflowTr
 pub async fn enrich_transition_fields(
     client: &JiraClient,
     base_url: &str,
+    project_key: Option<&str>,
     transition: &mut types::WorkflowTransition,
 ) {
     let needs_resolution = transition
@@ -919,11 +921,22 @@ pub async fn enrich_transition_fields(
             && f.options.is_empty()
             && f.kind == transition_fields::TransitionFieldKind::Picker
     });
-    if !needs_resolution && !needs_priority {
+    let needs_components = transition.required_fields.iter().any(|f| {
+        f.id == "components"
+            && f.options.is_empty()
+            && f.kind == transition_fields::TransitionFieldKind::MultiPicker
+    });
+    let needs_versions = transition.required_fields.iter().any(|f| {
+        f.id == "fixVersions"
+            && f.options.is_empty()
+            && f.kind == transition_fields::TransitionFieldKind::MultiPicker
+    });
+    if !needs_resolution && !needs_priority && !needs_components && !needs_versions {
         return;
     }
 
-    let (resolutions, priorities) = tokio::join!(
+    let pk = project_key.unwrap_or("");
+    let (resolutions, priorities, components, versions) = tokio::join!(
         async {
             if needs_resolution {
                 client.list_resolutions(base_url).await.ok()
@@ -937,7 +950,21 @@ pub async fn enrich_transition_fields(
             } else {
                 None
             }
-        }
+        },
+        async {
+            if needs_components && !pk.is_empty() {
+                client.list_project_components(base_url, pk).await.ok()
+            } else {
+                None
+            }
+        },
+        async {
+            if needs_versions && !pk.is_empty() {
+                client.list_project_versions(base_url, pk).await.ok()
+            } else {
+                None
+            }
+        },
     );
 
     if let Some(opts) = resolutions {
@@ -950,6 +977,20 @@ pub async fn enrich_transition_fields(
     if let Some(opts) = priorities {
         for field in &mut transition.required_fields {
             if (field.id == "priority" || field.system == "priority") && field.options.is_empty() {
+                field.options = opts.clone();
+            }
+        }
+    }
+    if let Some(opts) = components {
+        for field in &mut transition.required_fields {
+            if field.id == "components" && field.options.is_empty() {
+                field.options = opts.clone();
+            }
+        }
+    }
+    if let Some(opts) = versions {
+        for field in &mut transition.required_fields {
+            if field.id == "fixVersions" && field.options.is_empty() {
                 field.options = opts.clone();
             }
         }

@@ -73,7 +73,8 @@ r        # repeat search
 
 | Key | Action | Notes |
 |-----|--------|-------|
-| `h` / `l` | Prev / next detail tab | Details · Description · Comments |
+| `h` / `l` | Prev / next detail tab | Details · Description · Comments · **Links** |
+| `I` | Add issue link | Pick type → target key |
 | `Enter` / `Esc` | Close detail | |
 | `c` | Add comment | `@` mention picker |
 | `w` | Log work | e.g. `30m`, `1h` |
@@ -107,6 +108,7 @@ Status labels look like: `Start Progress → In Progress`.
 | Field type | Keys |
 |------------|------|
 | Picker (resolution, etc.) | `j`/`k`, `Enter`, `1`–`9` |
+| Multi (components, fix versions) | `j`/`k`, **Space** toggle, **Enter** confirm (≥1) |
 | User | Type in footer to filter; `j`/`k` pick; **⌘R** (macOS) or **Ctrl+R** load more users |
 | Boolean | Yes / No picker |
 | Date / text / number | Type in footer, `Enter` submit |

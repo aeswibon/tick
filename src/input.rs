@@ -57,6 +57,16 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         .create_session
         .as_ref()
         .is_some_and(|s| s.showing_required_field);
+    if app.showing_add_link {
+        crate::issue_relations_flow::handle_add_link_key(app, code).await;
+        return false;
+    }
+
+    if app.showing_transition_field && app.transition_multi_mode {
+        handle_transition_multi_field_key(app, code).await;
+        return false;
+    }
+
     if app.showing_transition_field && app.transition_field_user_search {
         if create_required {
             if crate::create_flow::handle_create_field_key(app, &key).await {
@@ -153,7 +163,9 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     crate::template_export_flow::cancel_template_export(app);
                 } else if matches!(
                     app.input_mode,
-                    InputMode::EditDueDate | InputMode::ClosedSearchQuery
+                    InputMode::EditDueDate
+                        | InputMode::ClosedSearchQuery
+                        | InputMode::AddIssueLinkTarget
                 ) {
                     app.input_mode = InputMode::None;
                     app.input_buffer.clear();
@@ -173,6 +185,8 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     crate::create_flow::submit_create_input(app).await;
                 } else if app.input_mode == InputMode::TemplateExportName {
                     crate::template_export_flow::submit_template_export_name(app).await;
+                } else if app.input_mode == InputMode::AddIssueLinkTarget {
+                    crate::issue_relations_flow::submit_add_link_target(app).await;
                 } else if app.input_mode == InputMode::ClosedSearchQuery {
                     app.closed_search_query = app.input_buffer.trim().to_string();
                     app.input_mode = InputMode::None;
@@ -474,7 +488,8 @@ async fn submit_input(app: &mut App) {
         InputMode::CreateField
         | InputMode::CreateDescription
         | InputMode::TemplateExportName
-        | InputMode::ClosedSearchQuery => {
+        | InputMode::ClosedSearchQuery
+        | InputMode::AddIssueLinkTarget => {
             return;
         }
         InputMode::OpenTicket | InputMode::None => return,
@@ -655,6 +670,8 @@ fn cancel_transition_collect(app: &mut App) {
     app.transition_collect = None;
     app.showing_transition_field = false;
     app.transition_field_text_mode = false;
+    app.transition_multi_mode = false;
+    app.transition_multi_picked.clear();
     app.transition_field_user_search = false;
     app.transition_field_current = None;
     app.transition_field_options.clear();
@@ -712,11 +729,22 @@ fn begin_next_field_prompt(app: &mut App) -> bool {
             app.input_buffer.clear();
         }
         TransitionFieldKind::Picker | TransitionFieldKind::Boolean if !field.options.is_empty() => {
+            app.transition_multi_mode = false;
+            app.transition_multi_picked.clear();
+            app.transition_field_text_mode = false;
+            app.transition_field_options = field.options;
+            app.transition_field_selected = 0;
+        }
+        TransitionFieldKind::MultiPicker if !field.options.is_empty() => {
+            app.transition_multi_mode = true;
+            app.transition_multi_picked = vec![false; field.options.len()];
             app.transition_field_text_mode = false;
             app.transition_field_options = field.options;
             app.transition_field_selected = 0;
         }
         _ => {
+            app.transition_multi_mode = false;
+            app.transition_multi_picked.clear();
             app.transition_field_text_mode = true;
             app.transition_field_options.clear();
             app.input_mode = InputMode::TransitionField;
@@ -724,6 +752,63 @@ fn begin_next_field_prompt(app: &mut App) -> bool {
         }
     }
     true
+}
+
+async fn handle_transition_multi_field_key(app: &mut App, code: KeyCode) {
+    match code {
+        KeyCode::Esc => cancel_transition_collect(app),
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.transition_field_selected = app.transition_field_selected.saturating_sub(1);
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if app.transition_field_selected + 1 < app.transition_field_options.len() {
+                app.transition_field_selected += 1;
+            }
+        }
+        KeyCode::Char(' ') => {
+            let i = app.transition_field_selected;
+            if let Some(slot) = app.transition_multi_picked.get_mut(i) {
+                *slot = !*slot;
+            }
+        }
+        KeyCode::Enter => {
+            let Some(field) = app.transition_field_current.clone() else {
+                return;
+            };
+            let picks: Vec<_> = app
+                .transition_field_options
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| {
+                    app.transition_multi_picked
+                        .get(*i)
+                        .copied()
+                        .unwrap_or(false)
+                })
+                .map(|(_, pair)| pair.clone())
+                .collect();
+            if picks.is_empty() {
+                app.status
+                    .set_action_error(format!("Select at least one value for {}", field.name));
+                return;
+            }
+            let value = field.value_from_multi_choices(&picks);
+            app.transition_multi_mode = false;
+            app.transition_multi_picked.clear();
+            let create_required = app
+                .create_session
+                .as_ref()
+                .is_some_and(|s| s.showing_required_field);
+            if create_required {
+                crate::create_flow::advance_create_required(app, &field, value);
+                crate::create_flow::prompt_next_create_required(app).await;
+            } else {
+                advance_transition_field(app, &field, value);
+                prompt_next_transition_field(app).await;
+            }
+        }
+        _ => {}
+    }
 }
 
 async fn prompt_next_transition_field(app: &mut App) {
@@ -875,7 +960,8 @@ async fn execute_transition_with(
             if let Some(base_url) = app.site_base_url(&sel.site) {
                 let mut tmp = transition.clone();
                 tmp.required_fields = pending.clone();
-                api::enrich_transition_fields(&app.jira, &base_url, &mut tmp).await;
+                let pk = crate::api::types::project_key_from_issue_key(&sel.key);
+                api::enrich_transition_fields(&app.jira, &base_url, Some(pk), &mut tmp).await;
                 pending = tmp.required_fields;
             }
             app.transition_collect = Some(TransitionCollect {
@@ -938,7 +1024,8 @@ async fn apply_transition(app: &mut App, idx: usize) {
             transition.required_fields.push(res);
         }
     }
-    api::enrich_transition_fields(&app.jira, &base_url, &mut transition).await;
+    let pk = crate::api::types::project_key_from_issue_key(&sel.key);
+    api::enrich_transition_fields(&app.jira, &base_url, Some(pk), &mut transition).await;
     app.loading = false;
     app.loading_message = None;
 
@@ -961,8 +1048,18 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('r') => {
             app.refresh().await;
         }
-        KeyCode::Up | KeyCode::Char('k') => app.move_selection_up(),
-        KeyCode::Down | KeyCode::Char('j') => app.move_selection_down(),
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.move_selection_up();
+            if app.detail_open {
+                app.refresh_issue_relations().await;
+            }
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.move_selection_down();
+            if app.detail_open {
+                app.refresh_issue_relations().await;
+            }
+        }
         KeyCode::Char('[') => app.scroll_page_up(),
         KeyCode::Char(']') => app.scroll_page_down(),
         KeyCode::Char('/') => {
@@ -982,11 +1079,13 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
                 app.show_help = false;
             } else if !app.detail_open {
                 app.detail_open = true;
+                app.refresh_issue_relations().await;
             }
         }
         KeyCode::Esc => {
             app.show_help = false;
             app.detail_open = false;
+            crate::issue_relations_flow::cancel_add_link(app);
             app.showing_transitions = false;
             cancel_transition_collect(app);
             crate::create_flow::cancel_create(app);
@@ -1029,9 +1128,18 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         }
         KeyCode::Char('h') if app.detail_open => {
             app.detail_tab = app.detail_tab.prev();
+            if app.detail_tab == crate::app::DetailTab::Links {
+                app.refresh_issue_relations().await;
+            }
         }
         KeyCode::Char('l') if app.detail_open => {
             app.detail_tab = app.detail_tab.next();
+            if app.detail_tab == crate::app::DetailTab::Links {
+                app.refresh_issue_relations().await;
+            }
+        }
+        KeyCode::Char('I') if app.detail_open => {
+            crate::issue_relations_flow::start_add_link(app);
         }
         KeyCode::Right => app.switch_to(app.active_view.next()).await,
         KeyCode::Left => app.switch_to(app.active_view.prev()).await,

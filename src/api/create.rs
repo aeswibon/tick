@@ -262,22 +262,8 @@ impl JiraClient {
         outward_key: &str,
         link_type_name: &str,
     ) -> Result<(), String> {
-        let url = format!("{}/rest/api/3/issueLink", base_url.trim_end_matches('/'));
-        let payload = json!({
-            "type": { "name": link_type_name },
-            "inwardIssue": { "key": inward_key },
-            "outwardIssue": { "key": outward_key },
-        });
-        let resp = self.send(|| self.post(&url).json(&payload).send()).await?;
-        if resp.status().is_success() {
-            Ok(())
-        } else {
-            Err(format!(
-                "Issue link {}: {}",
-                resp.status(),
-                resp.text().await.unwrap_or_default()
-            ))
-        }
+        self.link_issues(base_url, link_type_name, inward_key, outward_key)
+            .await
     }
 
     pub async fn resolve_priority_id(&self, base_url: &str, priority_name: &str) -> Option<String> {

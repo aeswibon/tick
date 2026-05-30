@@ -50,6 +50,11 @@ pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
             " Comments ",
             tab_style(app.detail_tab == DetailTab::Comments, dl, dv),
         ),
+        Span::styled(" | ", Style::default().fg(app.theme.border)),
+        Span::styled(
+            " Links ",
+            tab_style(app.detail_tab == DetailTab::Links, dl, dv),
+        ),
     ]);
 
     let mut lines = vec![tab_line, Line::from("")];
@@ -289,6 +294,78 @@ pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
                         }
                     }
                 }
+            }
+        }
+        DetailTab::Links => {
+            lines.push(Line::from(Span::styled(
+                "  I — add link · j/k move selection reloads links",
+                Style::default().fg(app.theme.border),
+            )));
+            lines.push(Line::from(""));
+            if app.loading && app.issue_relations.is_none() {
+                lines.push(Line::from(Span::styled(
+                    "  Loading…",
+                    Style::default().fg(app.theme.border),
+                )));
+            } else if let Some(ref rel) = app.issue_relations {
+                lines.push(Line::from(Span::styled(
+                    "Issue links",
+                    Style::default().fg(dl).add_modifier(Modifier::BOLD),
+                )));
+                if rel.links.is_empty() {
+                    lines.push(Line::from(Span::styled(
+                        "  (none)",
+                        Style::default().fg(app.theme.border),
+                    )));
+                } else {
+                    for link in &rel.links {
+                        lines.push(Line::from(vec![
+                            Span::styled(
+                                format!("  {} ", link.other_key),
+                                Style::default().fg(dv).add_modifier(Modifier::BOLD),
+                            ),
+                            Span::styled(
+                                format!("{} · ", link.direction),
+                                Style::default().fg(app.theme.border),
+                            ),
+                            Span::styled(link.other_status.clone(), Style::default().fg(dv)),
+                        ]));
+                        lines.push(Line::from(Span::styled(
+                            format!("    {}", link.other_summary),
+                            Style::default().fg(dv),
+                        )));
+                    }
+                }
+                lines.push(Line::from(""));
+                lines.push(Line::from(Span::styled(
+                    "Subtasks",
+                    Style::default().fg(dl).add_modifier(Modifier::BOLD),
+                )));
+                if rel.subtasks.is_empty() {
+                    lines.push(Line::from(Span::styled(
+                        "  (none)",
+                        Style::default().fg(app.theme.border),
+                    )));
+                } else {
+                    for st in &rel.subtasks {
+                        lines.push(Line::from(vec![
+                            Span::styled(
+                                format!("  {} ", st.key),
+                                Style::default().fg(dv).add_modifier(Modifier::BOLD),
+                            ),
+                            Span::styled(
+                                format!("{} · ", st.status),
+                                Style::default().fg(app.theme.border),
+                            ),
+                            Span::styled(st.summary.clone(), Style::default().fg(dv)),
+                        ]));
+                    }
+                }
+            } else {
+                lines.push(Line::from(Span::styled(
+                    "  Open this tab or press Enter on a ticket to load",
+                    Style::default().fg(app.theme.border),
+                )));
             }
         }
     }

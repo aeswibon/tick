@@ -5,6 +5,7 @@ pub mod draw;
 pub mod errors;
 pub mod field_picker;
 pub mod help;
+pub mod issue_links;
 pub mod mentions;
 pub mod priorities;
 pub mod sprints;

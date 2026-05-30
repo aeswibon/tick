@@ -97,6 +97,61 @@ pub fn draw_field_picker(
     f.render_widget(popup_widget, popup);
 }
 
+pub fn draw_multi_field_picker(
+    f: &mut Frame,
+    heading: &str,
+    options: &[(String, String)],
+    picked: &[bool],
+    selected: usize,
+    theme: &crate::theme::Theme,
+    area: Rect,
+) {
+    let height = (options.len() as u16).saturating_add(9);
+    let popup = centered_rect(58, height.min(area.height.saturating_sub(2)), area);
+    f.render_widget(Clear, popup);
+
+    let dl = theme.detail_label;
+    let dv = theme.detail_value;
+    let mut lines = vec![
+        Line::from(Span::styled(
+            format!(" {heading}"),
+            Style::default().fg(dl).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            " Space toggles · Enter confirms (at least one)",
+            Style::default().fg(theme.border),
+        )),
+        Line::from(""),
+    ];
+
+    for (i, (_, label)) in options.iter().enumerate() {
+        let is_sel = i == selected;
+        let on = picked.get(i).copied().unwrap_or(false);
+        let box_ch = if on { "☑" } else { "☐" };
+        let marker = if is_sel { "›" } else { " " };
+        let style = if is_sel {
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(dv)
+        };
+        lines.push(Line::from(vec![
+            Span::styled(format!(" {marker} {box_ch} "), style),
+            Span::styled(label.as_str(), style),
+        ]));
+    }
+
+    let block = Paragraph::new(Text::from(lines))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Select values "),
+        )
+        .wrap(Wrap { trim: false });
+    f.render_widget(block, popup);
+}
+
 fn centered_rect(percent_x: u16, height: u16, r: Rect) -> Rect {
     let vert = ratatui::layout::Layout::default()
         .direction(ratatui::layout::Direction::Vertical)

@@ -92,6 +92,7 @@ pub enum DetailTab {
     Details,
     Description,
     Comments,
+    Links,
 }
 
 impl DetailTab {
@@ -99,15 +100,17 @@ impl DetailTab {
         match self {
             Self::Details => Self::Description,
             Self::Description => Self::Comments,
-            Self::Comments => Self::Details,
+            Self::Comments => Self::Links,
+            Self::Links => Self::Details,
         }
     }
 
     pub fn prev(self) -> Self {
         match self {
-            Self::Details => Self::Comments,
+            Self::Details => Self::Links,
             Self::Description => Self::Details,
             Self::Comments => Self::Description,
+            Self::Links => Self::Comments,
         }
     }
 }
@@ -132,6 +135,8 @@ pub enum InputMode {
     TemplateExportName,
     /// Closed tab: JQL text search in footer.
     ClosedSearchQuery,
+    /// Add issue link: target KEY after picking link type.
+    AddIssueLinkTarget,
 }
 
 /// Collecting values for a workflow transition before POST.
@@ -183,6 +188,14 @@ pub struct App {
     pub transition_field_selected: usize,
     pub transition_field_heading: String,
     pub transition_field_current: Option<crate::api::transition_fields::TransitionField>,
+    /// Checkbox mode for components / fixVersions (Space toggles, Enter confirms).
+    pub transition_multi_mode: bool,
+    pub transition_multi_picked: Vec<bool>,
+    /// Lazy-loaded links + subtasks for the selected issue (Links tab).
+    pub issue_relations: Option<crate::api::issue_relations::IssueRelations>,
+    pub issue_relations_key: Option<(String, String)>,
+    pub showing_add_link: bool,
+    pub add_link_selected: usize,
     pub showing_priorities: bool,
     pub priority_selected: usize,
     pub priority_options: Vec<(String, String)>,
@@ -261,6 +274,12 @@ impl App {
             transition_field_selected: 0,
             transition_field_heading: String::new(),
             transition_field_current: None,
+            transition_multi_mode: false,
+            transition_multi_picked: Vec::new(),
+            issue_relations: None,
+            issue_relations_key: None,
+            showing_add_link: false,
+            add_link_selected: 0,
             showing_priorities: false,
             priority_selected: 0,
             priority_options: Vec::new(),
@@ -442,10 +461,15 @@ impl App {
         self.selected.saturating_sub(self.scroll_offset)
     }
 
+    pub fn invalidate_issue_relations_cache(&mut self) {
+        self.issue_relations_key = None;
+    }
+
     pub fn move_selection_up(&mut self) {
         if self.selected > 0 {
             self.selected -= 1;
             self.ensure_selection_visible();
+            self.invalidate_issue_relations_cache();
         }
     }
 
@@ -454,6 +478,7 @@ impl App {
         if count > 0 && self.selected + 1 < count {
             self.selected += 1;
             self.ensure_selection_visible();
+            self.invalidate_issue_relations_cache();
         }
     }
 
@@ -587,6 +612,37 @@ impl App {
     pub async fn refresh_all_notify(&mut self) {
         self.do_refresh_all(&ViewMode::background(), true, false)
             .await;
+    }
+
+    /// Load issue links and subtasks for the current selection (Links tab).
+    pub async fn refresh_issue_relations(&mut self) {
+        let Some(sel) = self.selected_ticket() else {
+            self.issue_relations = None;
+            self.issue_relations_key = None;
+            return;
+        };
+        let cache_key = (sel.site.clone(), sel.key.clone());
+        if self.issue_relations_key.as_ref() == Some(&cache_key) && self.issue_relations.is_some() {
+            return;
+        }
+        let Some(base_url) = self.site_base_url(&sel.site) else {
+            return;
+        };
+        self.loading = true;
+        self.loading_message = Some(format!("Loading links for {}…", sel.key));
+        match self.jira.fetch_issue_relations(&base_url, &sel.key).await {
+            Ok(rel) => {
+                self.issue_relations = Some(rel);
+                self.issue_relations_key = Some(cache_key);
+            }
+            Err(e) => {
+                self.issue_relations = None;
+                self.issue_relations_key = None;
+                self.status.set_action_error(e);
+            }
+        }
+        self.loading = false;
+        self.loading_message = None;
     }
 
     async fn fetch_views_parallel(

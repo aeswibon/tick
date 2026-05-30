@@ -59,33 +59,48 @@ pub fn render(f: &mut Frame, app: &mut App) {
     if app.show_site_errors {
         super::errors::draw_site_errors(f, app, f.area());
     }
+    if app.showing_add_link {
+        super::issue_links::draw_add_link_picker(f, app.add_link_selected, &app.theme, f.area());
+    }
     if app.showing_transition_field {
-        let modal_title = if app
-            .create_session
-            .as_ref()
-            .is_some_and(|s| s.showing_required_field)
-        {
-            "Create issue"
+        if app.transition_multi_mode {
+            super::field_picker::draw_multi_field_picker(
+                f,
+                &app.transition_field_heading,
+                &app.transition_field_options,
+                &app.transition_multi_picked,
+                app.transition_field_selected,
+                &app.theme,
+                f.area(),
+            );
         } else {
-            "Required field"
-        };
-        super::field_picker::draw_field_picker(
-            f,
-            modal_title,
-            &app.transition_field_heading,
-            app.transition_field_current
+            let modal_title = if app
+                .create_session
                 .as_ref()
-                .map(|f| f.modal_hint())
-                .unwrap_or(""),
-            &app.transition_field_options,
-            app.transition_field_selected,
-            app.transition_field_text_mode,
-            app.transition_field_current.as_ref().is_some_and(|f| {
-                f.kind == crate::api::transition_fields::TransitionFieldKind::User
-            }),
-            &app.theme,
-            f.area(),
-        );
+                .is_some_and(|s| s.showing_required_field)
+            {
+                "Create issue"
+            } else {
+                "Required field"
+            };
+            super::field_picker::draw_field_picker(
+                f,
+                modal_title,
+                &app.transition_field_heading,
+                app.transition_field_current
+                    .as_ref()
+                    .map(|f| f.modal_hint())
+                    .unwrap_or(""),
+                &app.transition_field_options,
+                app.transition_field_selected,
+                app.transition_field_text_mode,
+                app.transition_field_current.as_ref().is_some_and(|f| {
+                    f.kind == crate::api::transition_fields::TransitionFieldKind::User
+                }),
+                &app.theme,
+                f.area(),
+            );
+        }
     }
 
     render_footer(f, app, footer_area);
@@ -173,6 +188,11 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
                 " Due date (YYYY-MM-DD, empty clears): {}_",
                 app.input_buffer
             ),
+            app.theme.accent,
+        )
+    } else if app.input_mode == crate::app::InputMode::AddIssueLinkTarget {
+        (
+            format!(" Link target issue key: {}_", app.input_buffer),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::OpenTicket {

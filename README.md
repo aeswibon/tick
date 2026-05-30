@@ -85,6 +85,7 @@ base_url = "https://my-team.atlassian.net"
 | `t` / `T`, `c`, `w` | Status transition, comment, worklog |
 | `W` / `Shift+W` | Watch / unwatch issue |
 | `d` (detail) | Edit due date |
+| `I` (detail) | Add issue link (Links tab) |
 | `n`, `N`, `C`, `X` | New · template · duplicate · export template |
 | `?` | In-app help |
 

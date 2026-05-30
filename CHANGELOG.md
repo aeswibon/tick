@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.8.0] - 2026-05-30
+
+### Added
+
+- **Issue links** — Links detail tab lists related issues; **`I`** adds Relates / Blocks / Epic links
+- **Subtasks** — Shown on Links tab (lazy-loaded with issue links)
+- **Multi-select fields** — Components and fix versions on transitions and create (checklist modal)
+
 ## [0.7.2] - 2026-05-30
 
 ### Added

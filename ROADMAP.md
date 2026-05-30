@@ -4,6 +4,7 @@
 
 | Version | Highlights |
 |---------|------------|
+| **0.7.2** | Watch/unwatch; due date; CLI `tick template export` |
 | **0.7.1** | Closed tab + JQL search; template export (`X`); tab reorder; feature docs |
 | **0.7.0** | Create (`n`), duplicate (`C`), config templates (`N`) |
 | **0.6.9** | Required transition fields; assignable-user cache; ⌘R/Ctrl+R |
@@ -24,12 +25,12 @@ Order for upcoming work (user direction, 2026-05):
 
 | Item | Priority | Notes |
 |------|----------|-------|
-| Watch / unwatch | A | Complements Watched tab |
-| Edit due date | A | Missing vs other field edits |
-| Issue links (view + add) | A | Beyond duplicate Cloners |
-| Subtasks in detail | A | Parent shown; children not |
-| Richer transition/create fields | A | Multi-select, components (ROADMAP since 0.6.9) |
-| `tick template export` CLI | B | Library exists; TUI `X` only today |
+| Watch / unwatch | A | Shipped 0.7.2 |
+| Edit due date | A | Shipped 0.7.2 |
+| Issue links (view + add) | A | Shipped 0.8.0 |
+| Subtasks in detail | A | Shipped 0.8.0 |
+| Richer transition/create fields | A | Multi-select components/versions (0.8.0) |
+| `tick template export` CLI | B | Shipped 0.7.2 |
 | Template edit/delete in TUI | B | |
 | Saved JQL / extra views | B | Config-driven tabs |
 | Closed tab: persist query, local filter | B | |

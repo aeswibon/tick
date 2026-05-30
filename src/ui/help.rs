@@ -50,7 +50,8 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
             " Detail Pane",
             Style::default().add_modifier(Modifier::UNDERLINED),
         )),
-        Line::from("  h / l                  Prev / next detail tab"),
+        Line::from("  h / l                  Prev / next detail tab (Details · Description · Comments · Links)"),
+        Line::from("  I (Links tab)          Add issue link (Relates / Blocks / Epic)"),
         Line::from(""),
         Line::from(Span::styled(
             " View",
