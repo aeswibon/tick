@@ -92,6 +92,20 @@ pub fn validate_config(config: &Config) -> Vec<CheckFinding> {
         }
     }
 
+    for (i, hook) in config.hooks.on_config_reload.iter().enumerate() {
+        if hook.command.trim().is_empty() {
+            out.push(err(format!(
+                "hooks.on_config_reload[{i}] has empty command"
+            )));
+        }
+    }
+
+    for (i, hook) in config.hooks.on_mark.iter().enumerate() {
+        if hook.command.trim().is_empty() {
+            out.push(err(format!("hooks.on_mark[{i}] has empty command")));
+        }
+    }
+
     for t in &config.create.templates {
         if t.name.trim().is_empty() {
             out.push(err("Template with empty name"));

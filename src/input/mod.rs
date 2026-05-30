@@ -437,9 +437,12 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
     if matches!(code, KeyCode::Char(' ')) && crate::bulk::bulk_table_active(app) {
         if key.modifiers.contains(KeyModifiers::SHIFT) {
             crate::bulk::mark_all_filtered(app);
-        } else if let Some(t) = app.selected_ticket_entry() {
-            match app.toggle_bulk_mark(&t.site, &t.key) {
-                Ok(()) => {}
+        } else if let Some(ticket) = app.selected_ticket_entry() {
+            match app.toggle_bulk_mark(&ticket.site, &ticket.key) {
+                Ok(true) => {
+                    crate::hooks::fire_on_mark(&app.config, &ticket);
+                }
+                Ok(false) => {}
                 Err(e) => app.status.set_action_error(e),
             }
         }

@@ -212,6 +212,37 @@ timeout_secs = 30
 
 Fires after TUI bulk table actions and `tick bulk` (including partial failures). See [features/automation.md](features/automation.md#bulk-complete-hooks).
 
+### Config-reload hooks
+
+```toml
+[[hooks.on_config_reload]]
+command = "~/.local/bin/on-tick-config-reload.sh"
+```
+
+| Variable | Meaning |
+|----------|---------|
+| `TICK_CONFIG_PATH` | Path to `config.toml` |
+| `TICK_JSON_PATH` | Temp file: `[{ "level", "message" }, ...]` from `tick --check`-style validation |
+| `TICK_CHECK_ERRORS` | Error count |
+| `TICK_CHECK_WARNS` | Warning count |
+
+Runs after **`R`** reload succeeds. See [features/automation.md](features/automation.md#config-reload-hooks).
+
+### Mark hooks
+
+```toml
+[[hooks.on_mark]]
+command = "~/.local/bin/on-tick-mark.sh"
+```
+
+| Variable | Meaning |
+|----------|---------|
+| `TICK_KEY` | Issue key |
+| `TICK_SITE` | Site name |
+| `TICK_JSON_PATH` | Temp file: single issue `{ key, site, summary, status, assignee, labels, url }` |
+
+Runs when **Space** adds a bulk mark (not unmark or mark-all). See [features/automation.md](features/automation.md#mark-hooks).
+
 ### Editable custom fields
 
 ```toml

@@ -192,5 +192,5 @@ Plugins are **trusted code with restricted APIs**, not arbitrary code execution.
 ## References
 
 - [product roadmap — automation ladder](../superpowers/specs/2026-05-30-product-and-automation-roadmap.md#c--plugin-runtime-months-814)
-- [hooks feature guide](../features/automation-hooks.md)
+- [hooks feature guide](../features/automation.md)
 - [architecture overview](README.md)

@@ -397,11 +397,12 @@ impl App {
         }
     }
 
-    pub fn toggle_bulk_mark(&mut self, site: &str, key: &str) -> Result<(), String> {
+    /// Returns `true` when the issue was newly marked, `false` when unmarked.
+    pub fn toggle_bulk_mark(&mut self, site: &str, key: &str) -> Result<bool, String> {
         let id = (site.to_string(), key.to_string());
         if self.bulk_marked.contains(&id) {
             self.bulk_marked.remove(&id);
-            return Ok(());
+            return Ok(false);
         }
         if self.bulk_marked.len() >= crate::bulk::BULK_MAX_SELECTED {
             return Err(format!(
@@ -410,7 +411,7 @@ impl App {
             ));
         }
         self.bulk_marked.insert(id);
-        Ok(())
+        Ok(true)
     }
 
     pub fn bulk_marked_refs_in_filter_order(&self) -> Vec<TicketRef> {
@@ -575,6 +576,12 @@ impl App {
         self.invalidate_filter_cache();
         self.status
             .set_action_notice("Config reloaded — press r to refresh views");
+
+        let config_path = Config::config_path()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let findings = crate::config_check::validate_config(&self.config);
+        crate::hooks::fire_on_config_reload(&self.config, &config_path, &findings);
         Ok(())
     }
 

@@ -267,6 +267,22 @@ pub struct BulkCompleteHook {
     pub timeout_secs: u64,
 }
 
+/// Shell command run after `R` reloads `config.toml` (`[[hooks.on_config_reload]]`).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ConfigReloadHook {
+    pub command: String,
+    #[serde(default = "default_hook_timeout_secs")]
+    pub timeout_secs: u64,
+}
+
+/// Shell command when a row is bulk-marked with Space (`[[hooks.on_mark]]`).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MarkHook {
+    pub command: String,
+    #[serde(default = "default_hook_timeout_secs")]
+    pub timeout_secs: u64,
+}
+
 /// Detail pane settings (`[detail]` and `[[detail.editable_fields]]`).
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct DetailSettings {
@@ -338,6 +354,10 @@ pub struct HooksSettings {
     pub on_refresh: Vec<RefreshHook>,
     #[serde(default, rename = "on_bulk_complete")]
     pub on_bulk_complete: Vec<BulkCompleteHook>,
+    #[serde(default, rename = "on_config_reload")]
+    pub on_config_reload: Vec<ConfigReloadHook>,
+    #[serde(default, rename = "on_mark")]
+    pub on_mark: Vec<MarkHook>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -911,6 +931,30 @@ options = ["Alpha", "Beta"]
         assert_eq!(cfg.detail.editable_fields[0].options.len(), 2);
         let ids = cfg.custom_field_ids_for_fetch();
         assert!(ids.contains(&"customfield_10042".to_string()));
+    }
+
+    #[test]
+    fn parses_on_config_reload_and_mark_hooks() {
+        let raw = r#"
+email = "a@b.com"
+token = "secret"
+
+[[sites]]
+name = "one"
+base_url = "https://one.atlassian.net"
+
+[[hooks.on_config_reload]]
+command = "true"
+
+[[hooks.on_mark]]
+command = "true"
+timeout_secs = 5
+"#;
+        let mut cfg: Config = toml::from_str(raw).unwrap();
+        cfg.view_jql = Config::build_view_jql(&cfg.views);
+        assert_eq!(cfg.hooks.on_config_reload.len(), 1);
+        assert_eq!(cfg.hooks.on_mark.len(), 1);
+        assert_eq!(cfg.hooks.on_mark[0].timeout_secs, 5);
     }
 
     #[test]

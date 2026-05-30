@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.24.0] - 2026-05-30
+
+### Added
+
+- **`[[hooks.on_config_reload]]`** — After `R` reloads config, runs shell commands with `TICK_CONFIG_PATH`, `TICK_JSON_PATH` (`tick --check` findings), `TICK_CHECK_ERRORS`, `TICK_CHECK_WARNS`
+- **`[[hooks.on_mark]]`** — When **Space** adds a bulk mark (not unmark or Shift+Space mark-all); env `TICK_KEY`, `TICK_SITE`, `TICK_JSON_PATH` (single issue)
+
+### Documentation
+
+- [automation.md](docs/features/automation.md#config-reload-hooks), [CONFIGURATION.md](docs/CONFIGURATION.md)
+- Examples: `examples/automation/on-config-reload.sh`, `on-mark.sh`
+
 ## [0.23.0] - 2026-05-30
 
 ### Added

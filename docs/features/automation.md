@@ -7,7 +7,7 @@ Headless commands, config hooks, and Lua plugins share the same `config.toml`, a
 | Need | Use | Why |
 |------|-----|-----|
 | Cron, CI, Slack bot, one-off shell | **`tick` CLI** | Separate process; easy to test; no TUI required |
-| React when a view refreshes or bulk finishes in the TUI | **Hooks** (`[[hooks.on_refresh]]`, `[[hooks.on_bulk_complete]]`) | tick passes JSON on disk + env vars; no plugin runtime |
+| React when a view refreshes, bulk finishes, config reloads, or a row is marked | **Hooks** (`on_refresh`, `on_bulk_complete`, `on_config_reload`, `on_mark`) | tick passes JSON on disk + env vars; no plugin runtime |
 | Filter table rows or bind keys inside tick | **Lua plugins** | In-process; read `tick.tickets` / `tick.selected`; optional `run_transition` |
 | Custom fields, complex transitions, admin | **Jira REST** (or Automation app) | tick does not expose every Jira API |
 
@@ -164,6 +164,42 @@ timeout_secs = 30   # optional; default 30
 Hooks run even when some issues fail (so you can alert or log partial failures). Same background + stderr `[tick hook] …` behavior as refresh hooks.
 
 Example scripts: [examples/automation/](../../examples/automation/).
+
+## Config reload hooks
+
+After **`R`** successfully reloads `config.toml` (sites, views, templates, plugins):
+
+```toml
+[[hooks.on_config_reload]]
+command = "~/.local/bin/on-tick-config-reload.sh"
+timeout_secs = 30
+```
+
+| Variable | Content |
+|----------|---------|
+| `TICK_CONFIG_PATH` | Path to `config.toml` |
+| `TICK_JSON_PATH` | Temp JSON array of `{ "level": "error" \| "warn", "message": "..." }` from offline validation (same rules as `tick --check`) |
+| `TICK_CHECK_ERRORS` | Error count |
+| `TICK_CHECK_WARNS` | Warning count |
+
+Hooks run even when validation reports warnings or errors (so scripts can alert). Reload itself must succeed (valid TOML, auth).
+
+## Mark hooks
+
+Opt-in: only configured when you add `[[hooks.on_mark]]` entries.
+
+Fires when **Space** newly marks the selected row for bulk actions. Does **not** run on unmark, **Shift+Space** mark-all, or marks cleared with **Esc**.
+
+```toml
+[[hooks.on_mark]]
+command = "~/.local/bin/on-tick-mark.sh"
+```
+
+| Variable | Content |
+|----------|---------|
+| `TICK_KEY` | Issue key |
+| `TICK_SITE` | Site name |
+| `TICK_JSON_PATH` | Temp JSON object: `{ key, site, summary, status, assignee, labels, url }` |
 
 ## Plugins (Lua)
 
