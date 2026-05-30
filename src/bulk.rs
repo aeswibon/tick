@@ -1,4 +1,4 @@
-//! Multi-select table actions (transition, assign).
+//! Multi-select table actions (transition, assign, watch).
 
 use std::collections::HashMap;
 
@@ -126,8 +126,60 @@ pub async fn bulk_assign_to_me(app: &mut App) {
     }
     app.loading = false;
     app.loading_message = None;
-    app.refresh_all().await;
+    app.refresh().await;
     bulk_result_notice(app, "Bulk assign", ok, failures);
+}
+
+pub async fn bulk_watch(app: &mut App) {
+    bulk_watch_toggle(app, false).await;
+}
+
+pub async fn bulk_unwatch(app: &mut App) {
+    bulk_watch_toggle(app, true).await;
+}
+
+async fn bulk_watch_toggle(app: &mut App, unwatch: bool) {
+    let refs = app.bulk_marked_refs_in_filter_order();
+    if refs.is_empty() {
+        return;
+    }
+    if app.bulk_same_site().is_none() {
+        app.status
+            .set_action_error("Bulk actions require a single site");
+        return;
+    }
+    let site = refs[0].site.clone();
+    let Some(base_url) = app.site_base_url(&site) else {
+        app.status.set_action_error("Unknown site for bulk watch");
+        return;
+    };
+
+    let label = if unwatch {
+        "Bulk unwatch"
+    } else {
+        "Bulk watch"
+    };
+    let total = refs.len();
+    let mut ok = 0usize;
+    let mut failures: Vec<String> = Vec::new();
+
+    app.loading = true;
+    for (i, r) in refs.iter().enumerate() {
+        app.loading_message = Some(format!("{label} {}/{}…", i + 1, total));
+        let result = if unwatch {
+            app.jira.unwatch_issue(&base_url, &r.key).await
+        } else {
+            app.jira.watch_issue(&base_url, &r.key).await
+        };
+        match result {
+            Ok(()) => ok += 1,
+            Err(e) => failures.push(format!("{}: {e}", r.key)),
+        }
+    }
+    app.loading = false;
+    app.loading_message = None;
+    app.refresh().await;
+    bulk_result_notice(app, label, ok, failures);
 }
 
 pub async fn apply_bulk_transition_by_name(
@@ -156,7 +208,7 @@ pub async fn apply_bulk_transition_by_name(
     }
     app.loading = false;
     app.loading_message = None;
-    app.refresh_all().await;
+    app.refresh().await;
     bulk_result_notice(app, "Bulk transition", ok, failures);
 }
 

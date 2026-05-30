@@ -38,7 +38,7 @@ Custom JQL: `[views]` and `[[views.custom]]` in config. Cache: `~/.config/tick/c
 
 | Feature | Guide |
 |---------|--------|
-| Bulk table actions | [bulk-actions.md](features/bulk-actions.md) — `Space`, bulk `t` / `a` |
+| Bulk table actions | [bulk-actions.md](features/bulk-actions.md) — `Space`, bulk `t` / `a` / `W` |
 | Template description edit | [saved-views-templates-columns.md](features/saved-views-templates-columns.md#template-manager-shifte) — `Shift+E` → `b` |
 
 ### v0.10 highlights

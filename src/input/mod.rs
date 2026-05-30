@@ -285,7 +285,13 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
     }
 
     if code == KeyCode::Char('W') {
-        if key.modifiers.contains(KeyModifiers::SHIFT) {
+        if app.bulk_mark_count() > 0 && !app.detail_open {
+            if key.modifiers.contains(KeyModifiers::SHIFT) {
+                crate::bulk::bulk_unwatch(app).await;
+            } else {
+                crate::bulk::bulk_watch(app).await;
+            }
+        } else if key.modifiers.contains(KeyModifiers::SHIFT) {
             unwatch_ticket(app).await;
         } else {
             watch_ticket(app).await;

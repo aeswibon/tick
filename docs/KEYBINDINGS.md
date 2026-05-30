@@ -33,6 +33,7 @@ For workflows and examples, see the [feature guides](features/README.md).
 | `Shift+Space` | Mark all filtered rows | Up to cap |
 | `t` / `T` | Workflow transition picker | Bulk: when rows marked |
 | `a` | Assign to me (bulk) | Table + marks; detail uses `a` too |
+| `W` / `Shift+W` | Watch / unwatch (bulk) | Table + marks; same as single-issue when no marks |
 | `!` | Site errors overlay | When warnings exist |
 | `←` / `→` | Previous / next tab | |
 | `Tab` / `Shift+Tab` | Next / previous tab | |

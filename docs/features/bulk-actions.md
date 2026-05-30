@@ -16,7 +16,7 @@ Marked rows show `✓` in the **Key** column. The footer shows how many are sele
 
 ## Same-site rule
 
-Bulk **transition** and **assign to me** require every marked issue to be on the **same** `[[sites]]` entry. Mixed sites show: `Bulk actions require a single site`.
+Bulk **transition**, **assign**, and **watch** require every marked issue to be on the **same** `[[sites]]` entry. Mixed sites show: `Bulk actions require a single site`.
 
 ## Bulk transition (`t`)
 
@@ -35,6 +35,17 @@ Bulk **transition** and **assign to me** require every marked issue to be on the
 ## Bulk assign (`a`)
 
 With marks active on the table (detail closed), `a` assigns the **current Jira user** to every marked issue on that site.
+
+## Bulk watch (`W` / `Shift+W`)
+
+With marks on the table (detail closed):
+
+| Key | Action |
+|-----|------|
+| `W` | Watch all marked issues |
+| `Shift+W` | Unwatch all marked issues |
+
+Only the **active tab** is refreshed afterward (not every background view).
 
 ## Related
 

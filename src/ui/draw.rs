@@ -365,7 +365,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     } else if app.bulk_mark_count() > 0 {
         (
             format!(
-                " {} selected · t transition · a assign me · Esc clear",
+                " {} selected · t transition · a assign · W watch · Shift+W unwatch · Esc clear",
                 app.bulk_mark_count()
             ),
             app.theme.accent,

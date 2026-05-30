@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## [Unreleased]
+## [0.12.1] - 2026-05-30
 
 ### Added
 
@@ -11,6 +11,11 @@ All notable changes to this project are documented in this file.
 - **Release checklist** — maintainer issue template (`.github/ISSUE_TEMPLATE/release_checklist.yml`)
 - **Tests** — wiremock retry paths (429/403/503), proptest (issue keys, JQL), insta UI snapshots
 - **Benchmarks** — `cargo bench` pipeline (JQL, filter/sort, theme, issue keys)
+- **Bulk watch** — `W` / `Shift+W` on marked table rows (same-site)
+
+### Changed
+
+- **Bulk writes** — transition and assign refresh the **active view** only (not all background tabs)
 
 ## [0.12.0] - 2026-05-30
 
