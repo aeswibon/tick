@@ -1,5 +1,6 @@
 target
 .superpowers
+docs/specs/
 docs/superpowers/
 releases/
 .DS_Store
