@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.11.1] - 2026-05-30
+
+### Changed
+
+- **Internal** — Split `src/input.rs` into `src/input/` (`mod`, `mentions`, `transitions`, `normal`, `detail_actions`, `key_tests`); no user-facing behavior change.
+
 ## [0.11.0] - 2026-05-30
 
 ### Added
@@ -12,10 +18,6 @@ All notable changes to this project are documented in this file.
 ### Documentation
 
 - [KEYBINDINGS.md](docs/KEYBINDINGS.md), [CONFIGURATION.md](docs/CONFIGURATION.md), [ROADMAP.md](ROADMAP.md) updated for v0.11
-
-### Notes
-
-- `input.rs` modular split remains planned; behavior unchanged in this release.
 
 ## [0.10.0] - 2026-05-30
 
