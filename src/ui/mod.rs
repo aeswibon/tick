@@ -13,3 +13,6 @@ mod table;
 pub mod template_export;
 pub mod template_manage;
 pub mod transitions;
+
+#[cfg(test)]
+mod snapshots;

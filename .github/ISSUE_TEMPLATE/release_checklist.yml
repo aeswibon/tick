@@ -1,0 +1,38 @@
+name: Release checklist
+description: Maintainer checklist for tagging a new tick version (do not use for bugs/features)
+title: "release: vX.Y.Z"
+labels: ["release"]
+body:
+  - type: markdown
+    value: |
+      Copy this checklist when cutting a release. See [CONTRIBUTING.md](../../CONTRIBUTING.md#release-checklist) for details.
+  - type: checkboxes
+    id: prep
+    attributes:
+      label: Prepare
+      options:
+        - label: `Cargo.toml` version matches tag (e.g. 0.12.0 → v0.12.0)
+        - label: [CHANGELOG.md](../../CHANGELOG.md) updated for this version
+        - label: `cargo fmt --all`, `cargo clippy --all-targets -- -D warnings`, `cargo test` pass locally
+        - label: `cargo deny check` pass (optional locally; required in CI)
+    validations:
+      required: true
+  - type: checkboxes
+    id: ship
+    attributes:
+      label: Ship
+      options:
+        - label: Merged to `master`; CI green on latest commit
+        - label: `git tag vX.Y.Z && git push origin vX.Y.Z`
+        - label: GitHub Release has all platform binaries + `CHECKSUMS.txt` + `tick.rb`
+        - label: Homebrew tap updated (automated via `HOMEBREW_TAP_TOKEN` or manual)
+        - label: Smoke test — `brew upgrade tick` or install binary; `tick --help`
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Release notes draft
+      description: Paste into GitHub Release description when publishing.
+    validations:
+      required: false

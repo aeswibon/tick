@@ -34,11 +34,13 @@ Each guide covers one area: what it does, keys, config, examples, and pitfalls.
 | [OAUTH.md](OAUTH.md) | Atlassian OAuth 2.0 app + `tick auth` |
 | [../themes/README.md](../themes/README.md) | Built-in and custom themes |
 
-## Specs (design notes)
+## For contributors
 
 | Document | Contents |
 |----------|----------|
-| [specs/](specs/) | Implementation design notes |
+| [architecture/README.md](architecture/README.md) | Module map, event loop, state model |
+| [architecture/testing.md](architecture/testing.md) | Unit, wiremock, insta, proptest, benches |
+| [../CONTRIBUTING.md](../CONTRIBUTING.md) | First PR, CI, release checklist |
 
 ## External
 

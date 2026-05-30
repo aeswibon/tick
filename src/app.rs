@@ -1259,6 +1259,17 @@ fn same_ticket_keys(previous: &[String], tickets: &[Ticket]) -> bool {
     a == b
 }
 
+/// Exposed for `cargo bench` (ticket filter + sort hot path).
+#[doc(hidden)]
+pub fn compute_filtered_indices_bench(
+    tickets: &[Ticket],
+    filter: &str,
+    sort_mode: SortMode,
+    sort_order: SortOrder,
+) -> Vec<usize> {
+    compute_filtered_indices(tickets, filter, sort_mode, sort_order)
+}
+
 fn compute_filtered_indices(
     tickets: &[Ticket],
     filter: &str,

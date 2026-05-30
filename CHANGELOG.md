@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Contributor docs** — `docs/architecture/` (module map, testing guide), expanded [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Dependabot** — weekly Cargo and GitHub Actions updates (`.github/dependabot.yml`)
+- **Release checklist** — maintainer issue template (`.github/ISSUE_TEMPLATE/release_checklist.yml`)
+- **Tests** — wiremock retry paths (429/403/503), proptest (issue keys, JQL), insta UI snapshots
+- **Benchmarks** — `cargo bench` pipeline (JQL, filter/sort, theme, issue keys)
+
 ## [0.12.0] - 2026-05-30
 
 ### Added
@@ -36,7 +46,7 @@ All notable changes to this project are documented in this file.
 
 ### Documentation
 
-- [KEYBINDINGS.md](docs/KEYBINDINGS.md), [CONFIGURATION.md](docs/CONFIGURATION.md), [ROADMAP.md](ROADMAP.md) updated for v0.11
+- [KEYBINDINGS.md](docs/KEYBINDINGS.md), [CONFIGURATION.md](docs/CONFIGURATION.md) updated for v0.11
 
 ## [0.10.0] - 2026-05-30
 

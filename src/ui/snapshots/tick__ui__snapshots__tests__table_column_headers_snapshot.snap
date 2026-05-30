@@ -1,0 +1,5 @@
+---
+source: src/ui/snapshots.rs
+expression: line
+---
+ Site | Key | Type | Status | Priority | Age | Due | Assignee | Reporter

@@ -139,4 +139,94 @@ mod tests {
         assert!(!should_retry_status(StatusCode::INTERNAL_SERVER_ERROR));
         assert!(!should_retry_status(StatusCode::UNAUTHORIZED));
     }
+
+    #[tokio::test]
+    async fn with_retry_recovers_from_429_then_200() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        clear_rate_limit_hint();
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/ping"))
+            .respond_with(
+                ResponseTemplate::new(429).insert_header("retry-after", "0"),
+            )
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/ping"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("ok"))
+            .mount(&server)
+            .await;
+
+        let client = reqwest::Client::new();
+        let url = format!("{}/ping", server.uri());
+        let resp = with_retry(|| {
+            let url = url.clone();
+            let client = client.clone();
+            async move { client.get(&url).send().await }
+        })
+        .await
+        .expect("retry succeeds");
+        assert!(resp.status().is_success());
+    }
+
+    #[tokio::test]
+    async fn with_retry_does_not_retry_403() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        clear_rate_limit_hint();
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/deny"))
+            .respond_with(ResponseTemplate::new(403))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let client = reqwest::Client::new();
+        let url = format!("{}/deny", server.uri());
+        let resp = with_retry(|| {
+            let url = url.clone();
+            let client = client.clone();
+            async move { client.get(&url).send().await }
+        })
+        .await
+        .expect("returns 403 without retry loop error");
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn with_retry_recovers_from_503() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        clear_rate_limit_hint();
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/gw"))
+            .respond_with(ResponseTemplate::new(503))
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/gw"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("ok"))
+            .mount(&server)
+            .await;
+
+        let client = reqwest::Client::new();
+        let url = format!("{}/gw", server.uri());
+        let resp = with_retry(|| {
+            let url = url.clone();
+            let client = client.clone();
+            async move { client.get(&url).send().await }
+        })
+        .await
+        .expect("503 retry");
+        assert!(resp.status().is_success());
+    }
 }

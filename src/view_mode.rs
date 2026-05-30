@@ -186,4 +186,30 @@ mod tests {
         let jql = build_closed_search_jql("statusCategory = Done", r#"C:\tmp "bug""#);
         assert!(jql.contains(r#"text ~ "C:\\tmp \"bug\"""#));
     }
+
+    mod proptest_jql {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #[test]
+            fn escape_jql_never_has_unescaped_quotes(s in "\\PC*") {
+                let escaped = escape_jql_text(&s);
+                let mut chars = escaped.chars().peekable();
+                while let Some(c) = chars.next() {
+                    if c == '\\' {
+                        prop_assert!(chars.next().is_some(), "trailing backslash");
+                    } else if c == '"' {
+                        prop_assert!(false, "unescaped quote in {escaped:?}");
+                    }
+                }
+            }
+
+            #[test]
+            fn build_closed_search_jql_always_orders_by_updated(query in "\\PC*") {
+                let jql = build_closed_search_jql("assignee = currentUser()", &query);
+                prop_assert!(jql.contains("ORDER BY updated DESC"));
+            }
+        }
+    }
 }

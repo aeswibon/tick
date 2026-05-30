@@ -150,4 +150,24 @@ mod tests {
         assert!(host_from_url("example.com/browse/X-1").is_none());
         assert!(host_from_url("https:///browse/X-1").is_none());
     }
+
+    mod proptest_issue_key {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #[test]
+            fn normalize_round_trips_valid_keys(project in "[A-Z][A-Z0-9_]{0,9}", num in 1u32..99999) {
+                let key = format!("{project}-{num}");
+                let normalized = normalize_issue_key(&key).expect("valid key");
+                prop_assert!(normalized.contains('-'));
+                prop_assert!(parse_issue_key(&normalized).as_deref() == Some(normalized.as_str()));
+            }
+
+            #[test]
+            fn parse_never_panics(input in "\\PC*") {
+                let _ = parse_issue_key(&input);
+            }
+        }
+    }
 }
