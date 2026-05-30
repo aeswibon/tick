@@ -1049,15 +1049,19 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             app.refresh().await;
         }
         KeyCode::Up | KeyCode::Char('k') => {
-            app.move_selection_up();
-            if app.detail_open {
-                app.refresh_issue_relations().await;
+            if app.detail_open && app.detail_tab == crate::app::DetailTab::Links {
+                app.links_selected = app.links_selected.saturating_sub(1);
+            } else {
+                app.move_selection_up();
             }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            app.move_selection_down();
-            if app.detail_open {
-                app.refresh_issue_relations().await;
+            if app.detail_open && app.detail_tab == crate::app::DetailTab::Links {
+                if app.links_selected + 1 < app.links_row_count() {
+                    app.links_selected += 1;
+                }
+            } else {
+                app.move_selection_down();
             }
         }
         KeyCode::Char('[') => app.scroll_page_up(),
@@ -1077,6 +1081,8 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Enter => {
             if app.show_help {
                 app.show_help = false;
+            } else if app.detail_open && app.detail_tab == crate::app::DetailTab::Links {
+                crate::issue_relations_flow::jump_to_selected_link(app).await;
             } else if !app.detail_open {
                 app.detail_open = true;
                 app.refresh_issue_relations().await;
@@ -1155,6 +1161,9 @@ async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
                         .set_action_error("Clipboard unavailable on this system");
                 }
             }
+        }
+        KeyCode::Char('o') if app.detail_open && app.detail_tab == crate::app::DetailTab::Links => {
+            crate::issue_relations_flow::open_selected_link_in_browser(app).await;
         }
         KeyCode::Char('o') if !app.detail_open => {
             if let Some(sel) = app.selected_ticket() {

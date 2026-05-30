@@ -27,6 +27,22 @@ pub struct IssueRelations {
     pub subtasks: Vec<SubtaskView>,
 }
 
+impl IssueRelations {
+    pub fn combined_len(&self) -> usize {
+        self.links.len() + self.subtasks.len()
+    }
+
+    pub fn key_at(&self, index: usize) -> Option<&str> {
+        if index < self.links.len() {
+            Some(self.links[index].other_key.as_str())
+        } else {
+            self.subtasks
+                .get(index - self.links.len())
+                .map(|s| s.key.as_str())
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct IssueRelationsResponse {
     fields: IssueRelationsFields,
@@ -316,6 +332,51 @@ mod tests {
         assert_eq!(rel.links.len(), 1);
         assert_eq!(rel.links[0].other_key, "B-2");
         assert_eq!(rel.subtasks[0].key, "B-10");
+    }
+
+    #[test]
+    fn combined_list_keys_links_then_subtasks() {
+        let rel = IssueRelations {
+            links: vec![IssueLinkView {
+                link_type: "Relates".into(),
+                direction: "relates to".into(),
+                other_key: "A-2".into(),
+                other_summary: String::new(),
+                other_status: String::new(),
+            }],
+            subtasks: vec![SubtaskView {
+                key: "A-10".into(),
+                summary: String::new(),
+                status: String::new(),
+            }],
+        };
+        assert_eq!(rel.combined_len(), 2);
+        assert_eq!(rel.key_at(0), Some("A-2"));
+        assert_eq!(rel.key_at(1), Some("A-10"));
+    }
+
+    #[tokio::test]
+    async fn fetch_issue_relations_gets_fields() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/DEMO-1"))
+            .and(wiremock::matchers::query_param("fields", "issuelinks,subtasks"))
+            .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "fields": {
+                    "issuelinks": [],
+                    "subtasks": [{ "key": "DEMO-2", "fields": { "summary": "Sub", "status": { "name": "Open" } } }]
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        let rel = client
+            .fetch_issue_relations(&server.uri(), "DEMO-1")
+            .await
+            .unwrap();
+        assert_eq!(rel.subtasks.len(), 1);
+        assert_eq!(rel.subtasks[0].key, "DEMO-2");
     }
 
     #[tokio::test]

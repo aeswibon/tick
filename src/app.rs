@@ -194,6 +194,8 @@ pub struct App {
     /// Lazy-loaded links + subtasks for the selected issue (Links tab).
     pub issue_relations: Option<crate::api::issue_relations::IssueRelations>,
     pub issue_relations_key: Option<(String, String)>,
+    /// Combined links + subtasks row index on Links tab.
+    pub links_selected: usize,
     pub showing_add_link: bool,
     pub add_link_selected: usize,
     pub showing_priorities: bool,
@@ -278,6 +280,7 @@ impl App {
             transition_multi_picked: Vec::new(),
             issue_relations: None,
             issue_relations_key: None,
+            links_selected: 0,
             showing_add_link: false,
             add_link_selected: 0,
             showing_priorities: false,
@@ -463,6 +466,55 @@ impl App {
 
     pub fn invalidate_issue_relations_cache(&mut self) {
         self.issue_relations_key = None;
+        self.links_selected = 0;
+    }
+
+    pub fn links_row_count(&self) -> usize {
+        self.issue_relations
+            .as_ref()
+            .map(|r| r.combined_len())
+            .unwrap_or(0)
+    }
+
+    pub fn clamp_links_selection(&mut self) {
+        let max = self.links_row_count().saturating_sub(1);
+        if self.links_selected > max {
+            self.links_selected = max;
+        }
+    }
+
+    /// Key of the selected row on the Links tab, if any.
+    pub fn selected_link_key(&self) -> Option<String> {
+        let rel = self.issue_relations.as_ref()?;
+        rel.key_at(self.links_selected).map(str::to_string)
+    }
+
+    /// Select a row in the filtered table by issue key. Returns whether a match was found.
+    pub fn try_select_ticket_by_key(&mut self, key: &str) -> bool {
+        self.invalidate_filter_cache();
+        let indices = self.filtered_indices();
+        let tickets = match self.tickets.read() {
+            Ok(g) => g,
+            Err(_) => return false,
+        };
+        let found = indices.iter().position(|&ticket_idx| {
+            tickets
+                .get(ticket_idx)
+                .is_some_and(|t| t.key.eq_ignore_ascii_case(key))
+        });
+        drop(tickets);
+        if let Some(view_idx) = found {
+            self.selected = view_idx;
+            self.ensure_selection_visible();
+            self.invalidate_issue_relations_cache();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn select_ticket_by_key(&mut self, key: &str) {
+        self.try_select_ticket_by_key(key);
     }
 
     pub fn move_selection_up(&mut self) {
@@ -516,23 +568,6 @@ impl App {
         let max_offset = count.saturating_sub(viewport);
         if self.scroll_offset > max_offset {
             self.scroll_offset = max_offset;
-        }
-    }
-
-    pub fn select_ticket_by_key(&mut self, key: &str) {
-        self.invalidate_filter_cache();
-        let indices = self.filtered_indices();
-        let tickets = match self.tickets.read() {
-            Ok(g) => g,
-            Err(_) => return,
-        };
-        let found = indices
-            .iter()
-            .position(|&ticket_idx| tickets.get(ticket_idx).is_some_and(|t| t.key == key));
-        drop(tickets);
-        if let Some(view_idx) = found {
-            self.selected = view_idx;
-            self.ensure_selection_visible();
         }
     }
 
@@ -634,6 +669,7 @@ impl App {
             Ok(rel) => {
                 self.issue_relations = Some(rel);
                 self.issue_relations_key = Some(cache_key);
+                self.clamp_links_selection();
             }
             Err(e) => {
                 self.issue_relations = None;

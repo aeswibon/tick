@@ -2,16 +2,18 @@
 
 View and add Jira issue links without opening the browser.
 
-## Links tab
+## Links tab navigation
 
 Open a ticket (`Enter`), then **`l`** until **Links** is active (or cycle with **`h`** / **`l`**).
 
-The tab shows:
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Move selection in the combined links + subtasks list |
+| `Enter` | Jump to selected issue (select in table if visible, else open in browser) |
+| `o` | Open selected issue in browser |
+| `I` | Add issue link (type picker → target key) |
 
-- **Issue links** — type, direction, key, status, summary
-- **Subtasks** — child issues under the parent
-
-Links and subtasks load when you open detail or change selection with detail open.
+Relations load when you open detail or switch to the Links tab — not on every table `j`/`k` while another detail tab is active.
 
 ## Add a link (`I`)
 

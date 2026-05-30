@@ -302,6 +302,9 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         let mut left = " ? help  / filter  ! errors  j/k  s/S sort  y copy  o/O open  t/T status  [ ] scroll  ←/→ view  1-6 tabs  q quit".to_string();
         if app.detail_open {
             left.push_str("  S/P/L/M/D fields  h/l tabs");
+            if app.detail_tab == crate::app::DetailTab::Links {
+                left.push_str("  Enter jump  o open");
+            }
         }
         let total = app.filtered_count();
         let row = if total == 0 { 0 } else { app.selected + 1 };

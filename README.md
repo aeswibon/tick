@@ -81,7 +81,7 @@ base_url = "https://my-team.atlassian.net"
 | `j` / `k`, `g` / `G`, `[` / `]` | Navigate / scroll |
 | `1`–`6` | Assigned · Mentions · Watched · Updated · Sprint · Closed |
 | `/` | Filter (or JQL search on Closed tab) |
-| `Enter` | Detail pane |
+| `Enter` | Detail pane (Links tab: jump to link/subtask) |
 | `t` / `T`, `c`, `w` | Status transition, comment, worklog |
 | `W` / `Shift+W` | Watch / unwatch issue |
 | `d` (detail) | Edit due date |

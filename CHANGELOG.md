@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.9.0] - 2026-05-30
+
+### Added
+
+- **Links tab navigation** — `j`/`k` select link or subtask row; `Enter` jump (select in table or open in browser); `o` open in browser
+- Relations fetch only when **Links** tab is active (not on every table row change)
+
 ## [0.8.0] - 2026-05-30
 
 ### Added

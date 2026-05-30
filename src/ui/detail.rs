@@ -298,7 +298,7 @@ pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
         }
         DetailTab::Links => {
             lines.push(Line::from(Span::styled(
-                "  I — add link · j/k move selection reloads links",
+                "  j/k select · Enter jump · o open · I add link",
                 Style::default().fg(app.theme.border),
             )));
             lines.push(Line::from(""));
@@ -308,6 +308,7 @@ pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
                     Style::default().fg(app.theme.border),
                 )));
             } else if let Some(ref rel) = app.issue_relations {
+                let mut row = 0usize;
                 lines.push(Line::from(Span::styled(
                     "Issue links",
                     Style::default().fg(dl).add_modifier(Modifier::BOLD),
@@ -319,11 +320,19 @@ pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
                     )));
                 } else {
                     for link in &rel.links {
+                        let is_sel = row == app.links_selected;
+                        row += 1;
+                        let marker = if is_sel { "›" } else { " " };
+                        let row_style = if is_sel {
+                            Style::default()
+                                .fg(app.theme.accent)
+                                .add_modifier(Modifier::BOLD)
+                        } else {
+                            Style::default().fg(dv)
+                        };
                         lines.push(Line::from(vec![
-                            Span::styled(
-                                format!("  {} ", link.other_key),
-                                Style::default().fg(dv).add_modifier(Modifier::BOLD),
-                            ),
+                            Span::styled(format!(" {marker} "), row_style),
+                            Span::styled(format!("{} ", link.other_key), row_style),
                             Span::styled(
                                 format!("{} · ", link.direction),
                                 Style::default().fg(app.theme.border),
@@ -348,11 +357,19 @@ pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
                     )));
                 } else {
                     for st in &rel.subtasks {
+                        let is_sel = row == app.links_selected;
+                        row += 1;
+                        let marker = if is_sel { "›" } else { " " };
+                        let row_style = if is_sel {
+                            Style::default()
+                                .fg(app.theme.accent)
+                                .add_modifier(Modifier::BOLD)
+                        } else {
+                            Style::default().fg(dv)
+                        };
                         lines.push(Line::from(vec![
-                            Span::styled(
-                                format!("  {} ", st.key),
-                                Style::default().fg(dv).add_modifier(Modifier::BOLD),
-                            ),
+                            Span::styled(format!(" {marker} "), row_style),
+                            Span::styled(format!("{} ", st.key), row_style),
                             Span::styled(
                                 format!("{} · ", st.status),
                                 Style::default().fg(app.theme.border),

@@ -74,7 +74,10 @@ r        # repeat search
 | Key | Action | Notes |
 |-----|--------|-------|
 | `h` / `l` | Prev / next detail tab | Details · Description · Comments · **Links** |
+| `j` / `k` | On **Links** tab: move link/subtask selection | Does not move table row |
+| `Enter` | On **Links** tab: jump to selected link/subtask | Else toggle detail pane |
 | `I` | Add issue link | Pick type → target key |
+| `o` | On **Links** tab: open selected in browser | Table: open current row |
 | `Enter` / `Esc` | Close detail | |
 | `c` | Add comment | `@` mention picker |
 | `w` | Log work | e.g. `30m`, `1h` |

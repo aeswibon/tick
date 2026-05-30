@@ -101,3 +101,57 @@ pub async fn handle_add_link_key(app: &mut App, code: crossterm::event::KeyCode)
         _ => {}
     }
 }
+
+pub async fn jump_to_selected_link(app: &mut App) {
+    let Some(key) = app.selected_link_key() else {
+        app.status
+            .set_action_error("No link or subtask to jump to (j/k on Links tab)");
+        return;
+    };
+    jump_to_issue_key(app, &key).await;
+}
+
+pub async fn open_selected_link_in_browser(app: &mut App) {
+    let Some(key) = app.selected_link_key() else {
+        app.status.set_action_error("No link or subtask selected");
+        return;
+    };
+    app.loading = true;
+    app.loading_message = Some(format!("Resolving {key}…"));
+    match app.resolve_ticket_url(&key).await {
+        Ok(url) => {
+            if crate::platform::open_url(&url).is_err() {
+                app.status.set_action_error("Could not open browser");
+            }
+        }
+        Err(e) => app.status.set_action_error(e),
+    }
+    app.loading = false;
+    app.loading_message = None;
+}
+
+async fn jump_to_issue_key(app: &mut App, key: &str) {
+    if app.try_select_ticket_by_key(key) {
+        if app.detail_tab == crate::app::DetailTab::Links {
+            app.refresh_issue_relations().await;
+        }
+        app.status.set_action_notice(format!("Selected {key}"));
+        return;
+    }
+
+    app.loading = true;
+    app.loading_message = Some(format!("Looking up {key}…"));
+    match app.resolve_ticket_url(key).await {
+        Ok(url) => {
+            if crate::platform::open_url(&url).is_ok() {
+                app.status
+                    .set_action_notice(format!("{key} not in current view — opened in browser"));
+            } else {
+                app.status.set_action_error("Could not open browser");
+            }
+        }
+        Err(e) => app.status.set_action_error(e),
+    }
+    app.loading = false;
+    app.loading_message = None;
+}

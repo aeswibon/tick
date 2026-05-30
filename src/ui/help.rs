@@ -51,7 +51,10 @@ pub fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
             Style::default().add_modifier(Modifier::UNDERLINED),
         )),
         Line::from("  h / l                  Prev / next detail tab (Details · Description · Comments · Links)"),
+        Line::from("  j / k                  On Links tab: select link/subtask row"),
+        Line::from("  Enter                  Links tab: jump to row; else toggle detail"),
         Line::from("  I (Links tab)          Add issue link (Relates / Blocks / Epic)"),
+        Line::from("  o                      Links tab: open selected row in browser"),
         Line::from(""),
         Line::from(Span::styled(
             " View",
