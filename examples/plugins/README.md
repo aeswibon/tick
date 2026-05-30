@@ -20,6 +20,8 @@ cp -R examples/plugins/hide-epics ~/.config/tick/plugins/
 tick --doctor   # should list "Loaded: hide-epics"
 ```
 
-Plugins load at startup; config reload **`R`** re-scans `~/.config/tick/plugins/` and reloads Lua scripts.
+Plugins load at startup; **`R`** re-scans `~/.config/tick/plugins/` and reloads Lua scripts.
+
+Multiple filters run as a **pipeline** (subdirectory name order). `tick --doctor` shows load order, capabilities, and errors.
 
 See [docs/features/plugins.md](../../docs/features/plugins.md) and [docs/architecture/plugin-rfc.md](../../docs/architecture/plugin-rfc.md).

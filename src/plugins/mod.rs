@@ -153,6 +153,7 @@ pub struct PluginTransitionResult {
 
 struct LuaPlugin {
     name: String,
+    version: String,
     lua: Lua,
     filter: Option<Function>,
     on_key: Option<Function>,
@@ -167,6 +168,8 @@ pub struct PluginHost {
     /// Chord label → plugin indices (load order).
     key_index: HashMap<String, Vec<usize>>,
     pub load_errors: Vec<String>,
+    /// Plugin subdirs skipped during scan (no manifest, etc.).
+    skipped: Vec<String>,
 }
 
 impl PluginHost {
@@ -175,6 +178,7 @@ impl PluginHost {
             plugins: Vec::new(),
             key_index: HashMap::new(),
             load_errors: Vec::new(),
+            skipped: Vec::new(),
         };
         let dir = match plugins_dir() {
             Ok(d) => d,
@@ -203,6 +207,11 @@ impl PluginHost {
         for plugin_dir in entries {
             let manifest_path = plugin_dir.join("tick.plugin.toml");
             if !manifest_path.is_file() {
+                let label = plugin_dir
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("?");
+                host.skipped.push(format!("{label}/: no tick.plugin.toml"));
                 continue;
             }
             match load_plugin(&plugin_dir, &manifest_path) {
@@ -281,6 +290,22 @@ impl PluginHost {
             }
         };
         lines.push(format!("  Plugins dir: {}", dir.display()));
+        lines.push(format!("  Plugin API supported: {API_VERSION}"));
+        lines.push("  Reload: press R in the TUI (re-scans plugins dir)".into());
+
+        let filter_names: Vec<&str> = self
+            .plugins
+            .iter()
+            .filter(|p| p.filter.is_some())
+            .map(|p| p.name.as_str())
+            .collect();
+        if !filter_names.is_empty() {
+            lines.push(format!(
+                "  Filter pipeline (directory order): {}",
+                filter_names.join(" → ")
+            ));
+        }
+
         if self.plugins.is_empty() {
             lines.push("  Loaded: none".into());
         } else {
@@ -295,25 +320,25 @@ impl PluginHost {
                 if p.run_transition {
                     caps.push("run_transition".into());
                 }
-                lines.push(format!("  Loaded: {} ({})", p.name, caps.join(", ")));
+                lines.push(format!(
+                    "  Loaded: {} v{} ({})",
+                    p.name,
+                    p.version,
+                    caps.join(", ")
+                ));
             }
+        }
+        for note in &self.skipped {
+            lines.push(format!("  Skipped: {note}"));
         }
         for e in &self.load_errors {
             lines.push(format!("  Error: {e}"));
         }
-        if dir.is_dir() {
-            if let Ok(rd) = std::fs::read_dir(&dir) {
-                let dirs: Vec<_> = rd
-                    .filter_map(|e| e.ok())
-                    .filter(|e| e.path().is_dir())
-                    .map(|e| e.file_name().to_string_lossy().into_owned())
-                    .collect();
-                if dirs.is_empty() {
-                    lines.push("  (no plugin subdirectories)".into());
-                }
-            }
-        } else {
-            lines.push("  (directory does not exist yet)".into());
+        if !dir.is_dir() {
+            lines.push("  (directory does not exist yet — mkdir to add plugins)".into());
+        } else if self.plugins.is_empty() && self.skipped.is_empty() && self.load_errors.is_empty()
+        {
+            lines.push("  (no plugin subdirectories)".into());
         }
         lines
     }
@@ -514,6 +539,7 @@ fn load_plugin(plugin_dir: &Path, manifest_path: &Path) -> Result<LuaPlugin, Str
 
     Ok(LuaPlugin {
         name: manifest.name,
+        version: manifest.version,
         lua,
         filter,
         on_key,
@@ -535,6 +561,47 @@ mod tests {
     use super::*;
 
     #[test]
+    fn filter_tickets_pipeline_runs_in_directory_order() {
+        let script_a = r#"
+function filter_tickets(tickets)
+  local out = {}
+  for _, t in ipairs(tickets) do
+    if t.key:sub(1,1) == "A" then table.insert(out, t) end
+  end
+  return out
+end
+"#;
+        let script_b = r#"
+function filter_tickets(tickets)
+  local out = {}
+  for _, t in ipairs(tickets) do
+    if t.key == "A-2" then table.insert(out, t) end
+  end
+  return out
+end
+"#;
+        let a = test_filter_plugin("alpha", script_a);
+        let b = test_filter_plugin("beta", script_b);
+        let host = PluginHost::test_with_plugins(vec![a, b]);
+        let mut tickets = vec![
+            ticket("A-1", "Story"),
+            ticket("A-2", "Story"),
+            ticket("B-1", "Story"),
+        ];
+        host.filter_tickets(&mut tickets).unwrap();
+        assert_eq!(tickets.len(), 1);
+        assert_eq!(tickets[0].key, "A-2");
+    }
+
+    #[test]
+    fn doctor_lines_include_api_and_reload_hints() {
+        let host = PluginHost::test_with_plugins(vec![]);
+        let text = host.doctor_lines().join("\n");
+        assert!(text.contains("Plugin API supported: 1"));
+        assert!(text.contains("Reload: press R"));
+    }
+
+    #[test]
     fn filter_tickets_drops_epics() {
         let script = r#"
 function filter_tickets(tickets)
@@ -552,6 +619,7 @@ end
         let filter: Function = lua.globals().get("filter_tickets").unwrap();
         let plugin = LuaPlugin {
             name: "test".into(),
+            version: "0.0.0".into(),
             lua,
             filter: Some(filter),
             on_key: None,
@@ -580,6 +648,7 @@ end
         let on_key: Function = lua.globals().get("on_key").unwrap();
         let plugin = LuaPlugin {
             name: "test".into(),
+            version: "0.0.0".into(),
             lua,
             filter: None,
             on_key: Some(on_key),
@@ -607,6 +676,21 @@ end
             plugin.call_on_key("ctrl+g", &ctx, &mut bridge).unwrap(),
             (false, None)
         );
+    }
+
+    fn test_filter_plugin(name: &str, script: &str) -> LuaPlugin {
+        let lua = Lua::new();
+        lua.load(script).exec().unwrap();
+        let filter: Function = lua.globals().get("filter_tickets").unwrap();
+        LuaPlugin {
+            name: name.into(),
+            version: "0.0.0".into(),
+            lua,
+            filter: Some(filter),
+            on_key: None,
+            run_transition: false,
+            chords: Vec::new(),
+        }
     }
 
     fn plugin_test_app() -> crate::app::App {
@@ -669,6 +753,17 @@ end
             project_key: "A".into(),
             custom_fields: Default::default(),
             detail_loaded: false,
+        }
+    }
+
+    impl PluginHost {
+        fn test_with_plugins(plugins: Vec<LuaPlugin>) -> Self {
+            Self {
+                plugins,
+                key_index: HashMap::new(),
+                load_errors: Vec::new(),
+                skipped: Vec::new(),
+            }
         }
     }
 }

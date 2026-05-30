@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.25.0] - 2026-05-30
+
+### Improved
+
+- **Plugin polish** — `tick --doctor` reports plugin API version, filter pipeline order, manifest versions, skipped directories, and `R` reload hint
+- **Docs** — [plugins.md](docs/features/plugins.md): pipeline semantics, `tick.selected`, reload behavior; [plugin-rfc.md](docs/architecture/plugin-rfc.md) open questions resolved
+
 ## [0.24.0] - 2026-05-30
 
 ### Added

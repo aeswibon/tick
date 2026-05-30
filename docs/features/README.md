@@ -12,7 +12,7 @@ Use these when you want **depth** on one capability. For a single scrollable ove
 - **[table-and-navigation.md](table-and-navigation.md)** — Row selection, filter, sort, `page_size`, column ids
 - **[bulk-actions.md](bulk-actions.md)** — Multi-select (`Space`), bulk transition, assign, labels, watch
 - **[automation.md](automation.md)** — Headless CLI, refresh/bulk hooks (`tick issue`, `tick search`, `tick bulk`, `tick --check`)
-- **[plugins.md](plugins.md)** — Lua `filter_tickets` plugins (`~/.config/tick/plugins/`)
+- **[plugins.md](plugins.md)** — Lua plugins: `filter_tickets`, `on_key`, `run_transition`
 - **[custom-fields.md](custom-fields.md)** — Edit configured custom fields from detail (`F`)
 - **[quick-search.md](quick-search.md)** — Search cached views (`g`)
 - **[detail-pane.md](detail-pane.md)** — Detail layout, ADF rendering, markdown round-trip

@@ -1,6 +1,6 @@
 # RFC: tick plugin runtime (track C)
 
-**Status:** C.1–C.3 implemented (v0.21–v0.23); C.4 (WASM) on demand  
+**Status:** C.1–C.3 implemented (v0.21–v0.23); polish v0.25 (doctor, pipeline docs); C.4 (WASM) on demand  
 **Authors:** tick maintainers  
 
 ## Summary
@@ -25,7 +25,7 @@ This document chooses between Lua and WebAssembly, defines a minimal API surface
 - Plugin marketplace or signed distribution (initially: user drops files in a config dir)
 - Replacing `[[hooks.*]]` shell scripts (hooks stay the simple default)
 - Jira Server / Data Center–specific plugin APIs
-- Hot-reload of plugin code without restart (may come later)
+- Hot-reload without **config reload (`R`)** or restart (full in-process reload without `R` is not supported)
 
 ## Background
 
@@ -182,12 +182,16 @@ Plugins are **trusted code with restricted APIs**, not arbitrary code execution.
 3. **WASM-only** — Better isolation but worse ergonomics for v1.
 4. **LSP / external daemon** — More flexible but conflicts with “single binary” distribution goal.
 
-## Open questions
+## Decisions (resolved)
 
-1. Should multiple plugins chain `filter_tickets` (pipeline) or merge (union/intersection policy)?
-2. Should plugins access **detail pane** state (selected issue ADF) read-only?
-3. Config reload (`R`): reload plugins or require restart?
-4. Windows code-signing expectations for corporate laptops?
+| Question | Decision |
+|----------|----------|
+| Multiple `filter_tickets` plugins | **Pipeline** in lexical subdirectory order; each stage receives the prior output |
+| Detail pane / ADF | **Deferred** — v1 exposes table rows + `tick.selected` only |
+| Config reload (`R`) | **Reload plugins** from disk (same scan as startup); no separate restart required |
+| `on_key` dispatch | First plugin returning `"handled"` wins (load order) |
+| Filter return values | Rows must match existing `(key, site)` pairs; unknown rows dropped |
+| Windows code signing | Out of scope for v1; distribute via GitHub releases / Homebrew |
 
 ## References
 
