@@ -201,15 +201,27 @@ async fn print_oauth_section(config: &Config) {
             if !tokens.email.is_empty() {
                 println!("  Account: {}", tokens.email);
             }
+            let expired = tokens.is_expired();
             println!(
                 "  Expires: {} ({})",
                 tokens.expires_at,
-                if tokens.is_expired() {
-                    "expired — will refresh on next run"
+                if expired {
+                    "expired — will refresh on next API call"
                 } else {
                     "valid"
                 }
             );
+            if expired && config.auth == AuthMethod::Oauth {
+                match std::env::var("TICK_OAUTH_CLIENT_SECRET") {
+                    Ok(s) if !s.trim().is_empty() => {}
+                    _ => println!(
+                        "  Refresh: set TICK_OAUTH_CLIENT_SECRET (required to refresh without re-login)"
+                    ),
+                }
+            }
+            if config.auth == AuthMethod::Oauth {
+                println!("  Re-login: tick auth logout && tick auth login");
+            }
             crate::oauth::print_accessible_resources(&tokens.access_token).await;
         }
         Err(e) => {

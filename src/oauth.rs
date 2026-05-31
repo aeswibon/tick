@@ -168,12 +168,27 @@ pub async fn refresh_tokens(
     Ok(stored)
 }
 
+fn oauth_refresh_hint(err: String) -> String {
+    let lower = err.to_ascii_lowercase();
+    if lower.contains("401")
+        || lower.contains("403")
+        || lower.contains("invalid")
+        || lower.contains("revoked")
+    {
+        format!("{err}. Re-authenticate: tick auth logout && tick auth login")
+    } else {
+        err
+    }
+}
+
 pub async fn load_auth(settings: &OAuthSettings) -> Result<Auth, String> {
     let client_id = resolve_client_id(settings)?;
     let mut tokens = load_tokens()?;
     if tokens.is_expired() {
         let secret = resolve_client_secret()?;
-        tokens = refresh_tokens(&client_id, &secret, &tokens.refresh_token).await?;
+        tokens = refresh_tokens(&client_id, &secret, &tokens.refresh_token)
+            .await
+            .map_err(oauth_refresh_hint)?;
         save_tokens(&tokens)?;
     }
     Ok(Auth::bearer(tokens.access_token, tokens.email))

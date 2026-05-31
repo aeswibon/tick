@@ -113,6 +113,9 @@ tick --doctor             # Test API, sprint fields, agile boards
 tick auth login           # OAuth (optional)
 tick --list-themes        # List themes
 tick template export my-site HIN-1 -o templates/local.toml  # Export issue as template TOML
+tick issue comment HIN-1 --body "Done" --site my-team     # Headless comment
+tick issue assign HIN-1 --me --site my-team
+tick issue watch HIN-1 --site my-team
 ```
 
 ## Contributing

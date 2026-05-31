@@ -63,6 +63,25 @@ pub fn require_site<'a>(config: &'a Config, name: &str) -> Result<&'a Site, Stri
         .ok_or_else(|| format!("Unknown site '{name}'"))
 }
 
+/// `--body` argument or stdin when omitted (for piped comments).
+pub fn read_body_arg(body: Option<String>) -> Result<String, String> {
+    if let Some(b) = body {
+        if b.trim().is_empty() {
+            return Err("comment body must not be empty".into());
+        }
+        return Ok(b);
+    }
+    use std::io::Read;
+    let mut buf = String::new();
+    std::io::stdin()
+        .read_to_string(&mut buf)
+        .map_err(|e| format!("read stdin: {e}"))?;
+    if buf.trim().is_empty() {
+        return Err("comment body required: pass --body or pipe text on stdin".into());
+    }
+    Ok(buf)
+}
+
 pub fn parse_keys_list(keys: &[String]) -> Result<Vec<String>, String> {
     let mut out = Vec::new();
     for k in keys {

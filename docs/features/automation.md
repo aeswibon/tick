@@ -29,6 +29,31 @@ tick issue transition HIN-123 --to "In Progress" --site zeta
 
 Applies a workflow transition **by name**. Fails if the transition requires extra fields (use the TUI for those).
 
+## `tick issue comment`
+
+```bash
+tick issue comment HIN-123 --body "Shipped in v0.27" --site zeta
+echo "From CI" | tick issue comment HIN-123 --site zeta
+```
+
+Adds a comment (markdown body). `@mentions` are not resolved from the CLI (use the TUI for mention picker).
+
+## `tick issue assign`
+
+```bash
+tick issue assign HIN-123 --me --site zeta
+tick issue assign HIN-123 --unassign --site zeta
+```
+
+## `tick issue watch` / `unwatch`
+
+```bash
+tick issue watch HIN-123 --site zeta
+tick issue unwatch HIN-123 --site zeta
+```
+
+All `issue` subcommands print JSON `{ "key", "site", "action", "ok": true, ... }` on success.
+
 ## `tick search`
 
 ```bash

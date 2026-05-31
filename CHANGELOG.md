@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.27.0] - 2026-05-30
+
+### Added
+
+- **CLI `tick issue`** — `comment` (`--body` or stdin), `assign` (`--me` / `--unassign`), `watch`, `unwatch` (Automation A.3)
+
+### Improved
+
+- **OAuth** — clearer refresh failure message with re-login steps; `tick auth status` notes `TICK_OAUTH_CLIENT_SECRET` when tokens are expired
+
+### Documentation
+
+- [automation.md](docs/features/automation.md#issue-commands)
+
 ## [0.26.0] - 2026-05-30
 
 ### Added
