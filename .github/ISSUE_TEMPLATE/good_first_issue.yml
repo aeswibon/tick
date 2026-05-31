@@ -1,0 +1,41 @@
+name: Good first issue (maintainer)
+description: Scoped task for a first-time contributor (maintainers use this template)
+title: "[good first issue] "
+labels: ["good first issue", "help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Maintainer template — keep scope small (roughly one module or one screen).
+        See [docs/MAINTAINER.md](../../docs/MAINTAINER.md).
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What should change and why?
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Files / modules
+      description: Where should contributors look?
+      placeholder: "e.g. src/ui/help.rs, docs/KEYBINDINGS.md"
+    validations:
+      required: true
+  - type: textarea
+    id: test
+    attributes:
+      label: How to test
+      description: Commands or manual steps
+      placeholder: "cargo test ui::snapshots\nManual: press ? in TUI"
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Maintainer checklist
+      options:
+        - label: Issue is self-contained (no hidden dependencies on unreleased work)
+        - label: Acceptance criteria are explicit
+        - label: Linked from docs/MAINTAINER.md backlog table (optional)

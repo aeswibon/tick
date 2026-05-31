@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.26.0] - 2026-05-30
+
+### Added
+
+- **OSS foundation** — [MAINTAINER.md](docs/MAINTAINER.md), issue chooser + good-first-issue template, Discussion templates (Q&A, ideas), PR labeler and stale workflows
+- **SECURITY.md** — supported versions updated through 0.25.x
+
+### Documentation
+
+- [OSS_ROADMAP.md](docs/OSS_ROADMAP.md) — Phase 1 status refresh; links to maintainer playbook and community templates
+
 ## [0.25.0] - 2026-05-30
 
 ### Improved

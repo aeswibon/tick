@@ -1,0 +1,20 @@
+'area: api':
+  - 'src/api/**'
+
+'area: ui':
+  - 'src/ui/**'
+  - 'src/input/**'
+
+'area: plugins':
+  - 'src/plugins/**'
+
+'area: config':
+  - 'src/config.rs'
+  - 'src/config_check.rs'
+
+'area: docs':
+  - 'docs/**'
+  - '**/*.md'
+
+'area: ci':
+  - '.github/**'

@@ -77,8 +77,10 @@ Use a **developer Cloud site** only for manual TUI QA (create `tick --init`, API
 
 ## Community
 
-- **Bug reports / features:** [GitHub Issues](https://github.com/aeswibon/tick/issues)
-- **Discussions:** enable in repo settings for Q&A and ideas (maintainers)
+- **Bug reports / features:** [GitHub Issues](https://github.com/aeswibon/tick/issues) — use the issue chooser (bug / feature / good first issue)
+- **Q&A and ideas:** [GitHub Discussions](https://github.com/aeswibon/tick/discussions) (enable under repo Settings if the link 404s)
+- **OSS roadmap:** [docs/OSS_ROADMAP.md](docs/OSS_ROADMAP.md)
+- **Maintainers:** [docs/MAINTAINER.md](docs/MAINTAINER.md) — labels, triage bots, release checklist
 
 ## Releases
 

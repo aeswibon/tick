@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Q&A and ideas (Discussions)
+    url: https://github.com/aeswibon/tick/discussions
+    about: Questions, troubleshooting, and feature brainstorming
+  - name: Security advisory
+    url: https://github.com/aeswibon/tick/security/policy
+    about: Report a vulnerability privately (do not open a public issue)

@@ -40,6 +40,8 @@ Each guide covers one area: what it does, keys, config, examples, and pitfalls.
 |----------|----------|
 | [architecture/README.md](architecture/README.md) | Module map, event loop, state model |
 | [architecture/testing.md](architecture/testing.md) | Unit, wiremock, insta, proptest, benches |
+| [OSS_ROADMAP.md](OSS_ROADMAP.md) | Community / project-health roadmap |
+| [MAINTAINER.md](MAINTAINER.md) | Labels, GFI pipeline, release setup (maintainers) |
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | First PR, CI, release checklist |
 
 ## External

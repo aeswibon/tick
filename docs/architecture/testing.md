@@ -93,6 +93,8 @@ For manual QA, use a **developer Cloud site** (free tier) and a dedicated API to
 
 ## Planned improvements
 
-- More wiremock coverage for timeout and 403 paths
+- Wiremock: Jira client paths for timeout / connection errors (retry layer covers 429, 403, 503 — see `src/api/retry.rs`)
 - Snapshot coverage for transition picker and detail pane sections
 - Optional `cargo-fuzz` on JSON response parsing (future work)
+
+Good starter tasks: [MAINTAINER.md](../MAINTAINER.md#starter-backlog-ideas).

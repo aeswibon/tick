@@ -1,0 +1,36 @@
+title: "Q&A: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask a question about installing, configuring, or using tick.
+        For bugs with reproduction steps, use the **Bug report** issue template instead.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Install / build
+        - config.toml / auth
+        - TUI / keybindings
+        - CLI (`tick issue`, `tick bulk`, …)
+        - Plugins
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What are you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: tick version, OS, install method
+      placeholder: "tick 0.25.0, macOS 15, Homebrew"
+    validations:
+      required: true
