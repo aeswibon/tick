@@ -4,8 +4,9 @@
 
 | Version | Supported |
 | ------- | --------- |
+| 1.1.x   | Yes       |
 | 1.0.x   | Yes       |
-| 0.27.x  | Yes (upgrade to 1.0.x recommended) |
+| 0.27.x  | Yes (upgrade to 1.1.x recommended) |
 | 0.12.x – 0.26.x | Best-effort only |
 | < 0.12  | No        |
 

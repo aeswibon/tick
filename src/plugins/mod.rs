@@ -720,6 +720,7 @@ end
                 create: Default::default(),
                 hooks: Default::default(),
                 detail: Default::default(),
+                notice_secs: 5,
                 view_jql: Config::build_view_jql(&Default::default()),
             },
             Theme::default(),
@@ -753,6 +754,7 @@ end
             project_key: "A".into(),
             custom_fields: Default::default(),
             detail_loaded: false,
+            detail_error: None,
         }
     }
 

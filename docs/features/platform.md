@@ -10,7 +10,7 @@ Reload applies:
 
 - `[[sites]]`, `[views]`, `[[views.custom]]`
 - `[[create.templates]]` and `create.templates_file`
-- `columns`, `theme`, `max_results`, `page_size`
+- `columns`, `theme`, `max_results`, `page_size`, `notice_secs`
 - API token / OAuth client (re-authenticates)
 
 **Not reset:** current ticket list, selection, or open detail pane. Press **`r`** after reload to fetch fresh data.
@@ -51,9 +51,23 @@ Raise `max_results` (default 500, max 5000) if you need larger views; Jira rate 
 
 View refresh (`r`, tab switch, background refresh) fetches **table fields only** — not description or comments for every row.
 
-When you **open the detail pane** (`Enter`) or move to another issue with detail open, tick loads description and comments for that issue only. Description and Comments tabs show “Loading…” until the fetch completes.
+When you **open the detail pane** (`Enter`), **switch to Description/Comments**, or **move to another issue** with detail open, tick loads description and comments for that issue only. Tabs show “Loading…” until the fetch completes.
+
+On failure, the tab shows the error (not endless loading) and the footer shows **Error:** … — press **`r`** to refresh the view and retry.
 
 Headless **`tick issue show`** still includes full issue body in JSON.
+
+Full UX: [detail-pane.md](detail-pane.md#lazy-load-description-and-comments).
+
+## Footer notice timeout (`notice_secs`)
+
+Success notices in the footer (watch/unwatch, bulk summaries, config reload confirmation, etc.) disappear after **`notice_secs`** seconds (default **5**):
+
+```toml
+notice_secs = 5   # set to 0 to disable auto-clear
+```
+
+Action **errors** stay visible until replaced by another error or cleared by a successful action.
 
 ## Related
 

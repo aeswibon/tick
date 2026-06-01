@@ -20,8 +20,8 @@ These are covered by the 1.x stability promise:
 
 | Surface | Notes |
 |---------|--------|
-| **`config.toml`** | Existing keys and `[[sites]]` / `[[hooks.*]]` / `[[detail.editable_fields]]` shapes |
-| **Headless CLI** | `tick issue`, `tick search`, `tick bulk` — JSON field names on success objects |
+| **`config.toml`** | Existing keys and `[[sites]]` / `[[hooks.*]]` / `[[detail.editable_fields]]` shapes; new optional keys (e.g. `notice_secs` in 1.1) are additive |
+| **Headless CLI** | `tick issue`, `tick search`, `tick bulk`, `tick fields list` — JSON field names on success objects |
 | **Hook env vars** | `TICK_VIEW`, `TICK_JSON_PATH`, `TICK_BULK_*`, `TICK_CONFIG_PATH`, `TICK_CHECK_*`, `TICK_KEY`, `TICK_SITE`, etc. |
 | **Plugin manifest** | `api = "1"` with capabilities `filter_tickets`, `on_key`, `run_transition` |
 | **Lua `tick` table** | `version`, `view`, `tickets`, `selected`, transition helpers when enabled |

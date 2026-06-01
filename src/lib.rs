@@ -103,6 +103,11 @@ pub enum TickCommand {
         #[command(subcommand)]
         action: cli::bulk_cmd::BulkCommand,
     },
+    /// Discover Jira fields (custom field phase 2)
+    Fields {
+        #[command(subcommand)]
+        action: cli::fields_cmd::FieldsCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -215,6 +220,14 @@ pub async fn run_doctor(config: &Config) {
     for line in host.doctor_lines() {
         println!("{line}");
     }
+
+    if let Some(site) = config.sites.first() {
+        println!("\n--- Custom fields (sample) ---");
+        println!(
+            "  Run: tick fields list --site {} [--project KEY]",
+            site.name
+        );
+    }
 }
 
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -240,6 +253,12 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     if let Some(TickCommand::Bulk { action }) = cli.command {
         return cli::bulk_cmd::run(action)
+            .await
+            .map_err(|e| -> Box<dyn std::error::Error> { e.into() });
+    }
+
+    if let Some(TickCommand::Fields { action }) = cli.command {
+        return cli::fields_cmd::run(action)
             .await
             .map_err(|e| -> Box<dyn std::error::Error> { e.into() });
     }
@@ -324,6 +343,10 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     while !should_quit {
         if app.apply_pending_updates() {
             app.spawn_background_refresh();
+        }
+        app.expire_status_notices();
+        if app.needs_detail_fetch() {
+            app.ensure_selected_issue_detail().await;
         }
         terminal.draw(|f| ui::draw::render(f, &mut app))?;
 

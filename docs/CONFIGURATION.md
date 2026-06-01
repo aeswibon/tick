@@ -20,6 +20,7 @@ Probe live Jira APIs: `tick --doctor`
 | `page_size` | integer | `10` | Rows to scroll with `[` / `]` |
 | `theme` | string | `"default"` | Theme name |
 | `notify_on_refresh` | bool | `false` | Desktop notify on new issues |
+| `notice_secs` | integer | `5` | Seconds before footer **success** notices clear (`0` = never auto-clear; errors are unaffected) |
 | `columns` | array | built-in | Table column ids (see below) |
 
 CLI overrides: `--max-results`, `--page-size`, `--theme`

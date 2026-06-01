@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.1.0] - 2026-05-30
+
+### Added
+
+- **`tick fields list`** — Discover `customfield_*` ids, suggested types, and `config_snippet` TOML (`--project` adds select options from create metadata)
+- **Custom fields phase 2** — `type = "auto"` and select fields without `options` load **editmeta** from Jira when editing from detail (`F`)
+- **`notice_secs`** (default `5`) — Footer success notices (watch, bulk results, config reload, etc.) auto-clear after N seconds; errors stay until the next action
+
+### Fixed
+
+- **Detail pane loading** — Description and Comments tabs no longer stay on “Loading…” forever when the fetch fails or was skipped; errors show in-tab with a hint to press **`r`**
+- Lazy detail fetch runs when opening detail, switching tickets with detail open, switching to Description/Comments tabs, and while the pane is open (fixes missed loads after tab changes)
+
+### Improved
+
+- `tick --check` warns when `select` has no options (suggests `auto` or `fields list`)
+- `tick --doctor` points to `tick fields list`
+
+### Documentation
+
+- [custom-fields.md](docs/features/custom-fields.md), [detail-pane.md](docs/features/detail-pane.md), [platform.md](docs/features/platform.md), [automation.md](docs/features/automation.md#tick-fields-list), [CONFIGURATION.md](docs/CONFIGURATION.md) (`notice_secs`)
+
 ## [1.0.0] - 2026-05-30
 
 First **stable** release. Same functionality as 0.27.0; semver now signals a stability commitment for config, CLI JSON, hooks, and plugin API `1`. See [docs/STABILITY.md](docs/STABILITY.md).

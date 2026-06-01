@@ -131,12 +131,22 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             app.detail_tab = app.detail_tab.prev();
             if app.detail_tab == crate::app::DetailTab::Links {
                 app.refresh_issue_relations().await;
+            } else if matches!(
+                app.detail_tab,
+                crate::app::DetailTab::Description | crate::app::DetailTab::Comments
+            ) {
+                app.ensure_selected_issue_detail().await;
             }
         }
         KeyCode::Char('l') if app.detail_open => {
             app.detail_tab = app.detail_tab.next();
             if app.detail_tab == crate::app::DetailTab::Links {
                 app.refresh_issue_relations().await;
+            } else if matches!(
+                app.detail_tab,
+                crate::app::DetailTab::Description | crate::app::DetailTab::Comments
+            ) {
+                app.ensure_selected_issue_detail().await;
             }
         }
         KeyCode::Right => app.switch_to(app.active_view.next()).await,
@@ -252,7 +262,7 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             }
         }
         KeyCode::Char('F') if app.detail_open && !app.config.detail.editable_fields.is_empty() => {
-            crate::editable_fields::start_editable_field_flow(app);
+            crate::editable_fields::start_editable_field_flow(app).await;
         }
         KeyCode::Char('D') if app.detail_open => {
             if let Some(ticket) = app.selected_ticket_entry() {

@@ -348,6 +348,7 @@ mod tests {
             create: Default::default(),
             hooks: Default::default(),
             detail: Default::default(),
+            notice_secs: 5,
             view_jql: Config::build_view_jql(&Default::default()),
         };
         let jira = Arc::new(crate::api::JiraClient::new("a@b.com", "t", false));

@@ -273,8 +273,12 @@ pub struct App {
     pub custom_field_select_options: Vec<String>,
     pub custom_field_select_selected: usize,
     pub custom_field_editing: Option<crate::config::EditableFieldConfig>,
+    /// Jira editmeta for `type = "auto"` or select without options.
+    pub custom_field_meta: Option<crate::api::transition_fields::TransitionField>,
     /// Loading description/comments for the open detail pane.
     pub detail_loading: bool,
+    /// In-flight lazy detail fetch for `(site, key)` (avoids stale loading state).
+    pub detail_fetch_key: Option<(String, String)>,
     pub plugins: crate::plugins::PluginHost,
 }
 
@@ -368,7 +372,9 @@ impl App {
             custom_field_select_options: Vec::new(),
             custom_field_select_selected: 0,
             custom_field_editing: None,
+            custom_field_meta: None,
             detail_loading: false,
+            detail_fetch_key: None,
             plugins: crate::plugins::PluginHost::load(),
         };
         for err in &app.plugins.load_errors {
@@ -914,6 +920,33 @@ impl App {
             .await;
     }
 
+    pub fn expire_status_notices(&mut self) {
+        let max_age = std::time::Duration::from_secs(self.config.notice_secs);
+        self.status.expire_action_notice(max_age);
+    }
+
+    /// True when the detail pane should load description/comments for the selection.
+    pub fn needs_detail_fetch(&self) -> bool {
+        if !self.detail_open || self.detail_loading {
+            return false;
+        }
+        let Some(idx) = self.selected_ticket_index() else {
+            return false;
+        };
+        let tickets = crate::ticket_lock::read_tickets(&self.tickets);
+        let Some(t) = tickets.get(idx) else {
+            return false;
+        };
+        !t.detail_loaded && t.detail_error.is_none()
+    }
+
+    fn finish_detail_fetch(&mut self, site: &str, key: &str) {
+        if self.detail_fetch_key.as_ref() == Some(&(site.to_string(), key.to_string())) {
+            self.detail_loading = false;
+            self.detail_fetch_key = None;
+        }
+    }
+
     /// Fetch description and comments when the detail pane is open (lazy detail).
     pub async fn ensure_selected_issue_detail(&mut self) {
         if !self.detail_open {
@@ -930,23 +963,55 @@ impl App {
         if already_loaded {
             return;
         }
+        if self.detail_loading && self.detail_fetch_key.as_ref() == Some(&(site.clone(), key.clone()))
+        {
+            return;
+        }
         let Some(base_url) = self.site_base_url(&site) else {
-            self.status.set_action_error("Unknown site for ticket");
+            let msg = "Unknown site for ticket".to_string();
+            self.status.set_action_error(&msg);
+            Self::update_ticket_detail(&self.tickets, &site, &key, |t| {
+                t.mark_detail_failed(&msg);
+            });
             return;
         };
         self.detail_loading = true;
-        match self.jira.fetch_issue_detail(&base_url, &key).await {
-            Ok(fields) => {
-                let mut tickets = crate::ticket_lock::write_tickets(&self.tickets);
-                if let Some(t) = tickets.get_mut(idx) {
-                    if t.key == key && t.site == site {
+        self.detail_fetch_key = Some((site.clone(), key.clone()));
+        let result = self.jira.fetch_issue_detail(&base_url, &key).await;
+        let still_selected = self
+            .selected_ticket()
+            .is_some_and(|t| t.site == site && t.key == key);
+        if still_selected {
+            match result {
+                Ok(fields) => {
+                    Self::update_ticket_detail(&self.tickets, &site, &key, |t| {
                         t.apply_detail_fields(&fields);
-                    }
+                    });
+                }
+                Err(e) => {
+                    self.status.set_action_error(&e);
+                    Self::update_ticket_detail(&self.tickets, &site, &key, |t| {
+                        t.mark_detail_failed(e);
+                    });
                 }
             }
-            Err(e) => self.status.set_action_error(e),
         }
-        self.detail_loading = false;
+        self.finish_detail_fetch(&site, &key);
+    }
+
+    fn update_ticket_detail(
+        tickets: &Arc<RwLock<Vec<Ticket>>>,
+        site: &str,
+        key: &str,
+        update: impl FnOnce(&mut Ticket),
+    ) {
+        let mut tickets = crate::ticket_lock::write_tickets(tickets);
+        if let Some(t) = tickets
+            .iter_mut()
+            .find(|t| t.site == site && t.key == key)
+        {
+            update(t);
+        }
     }
 
     /// Load issue links and subtasks for the current selection (Links tab).
@@ -1606,6 +1671,7 @@ mod tests {
             create: Default::default(),
             hooks: Default::default(),
             detail: Default::default(),
+            notice_secs: 5,
             view_jql: Config::build_view_jql(&Default::default()),
         }
     }
@@ -1635,6 +1701,7 @@ mod tests {
             project_key: String::new(),
             custom_fields: std::collections::HashMap::new(),
             detail_loaded: false,
+            detail_error: None,
         }
     }
 

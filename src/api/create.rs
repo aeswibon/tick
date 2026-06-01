@@ -129,7 +129,7 @@ impl JiraClient {
         Ok(transition_fields::parse_create_fields(&fields_obj))
     }
 
-    async fn fetch_create_meta_fields(
+    pub(crate) async fn fetch_create_meta_fields(
         &self,
         base_url: &str,
         project_key: &str,
@@ -521,6 +521,7 @@ mod tests {
             project_key: "DEMO".into(),
             custom_fields: std::collections::HashMap::new(),
             detail_loaded: false,
+            detail_error: None,
         };
         let mut draft = CreateDraft::default();
         seed_draft_from_ticket(&mut draft, &ticket, "Copy of: ");

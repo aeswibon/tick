@@ -3,12 +3,13 @@
 use crossterm::event::KeyCode;
 use serde_json::{json, Value};
 
+use crate::api::fields::{select_options_from_transition_field, tick_type_from_transition_field};
 use crate::api::transition_fields::{TransitionField, TransitionFieldKind};
 use crate::app::{App, InputMode};
 use crate::config::{EditableFieldConfig, EditableFieldKind};
 
-pub fn start_editable_field_flow(app: &mut App) {
-    let fields = &app.config.detail.editable_fields;
+pub async fn start_editable_field_flow(app: &mut App) {
+    let fields = app.config.detail.editable_fields.clone();
     if fields.is_empty() {
         app.status.set_action_error(
             "No [[detail.editable_fields]] in config — add fields to edit custom values",
@@ -16,39 +17,39 @@ pub fn start_editable_field_flow(app: &mut App) {
         return;
     }
     if fields.len() == 1 {
-        begin_edit_field(app, fields[0].clone());
+        begin_edit_field(app, fields[0].clone()).await;
         return;
     }
     app.editable_field_picker_selected = 0;
     app.showing_editable_field_picker = true;
 }
 
-pub fn handle_editable_field_picker_key(app: &mut App, code: KeyCode) {
-    let fields = &app.config.detail.editable_fields;
+pub async fn handle_editable_field_picker_key(app: &mut App, code: KeyCode) {
+    let field_count = app.config.detail.editable_fields.len();
     match code {
         KeyCode::Up | KeyCode::Char('k') => {
             app.editable_field_picker_selected =
                 app.editable_field_picker_selected.saturating_sub(1);
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            if app.editable_field_picker_selected + 1 < fields.len() {
+            if app.editable_field_picker_selected + 1 < field_count {
                 app.editable_field_picker_selected += 1;
             }
         }
         KeyCode::Enter => {
             let idx = app.editable_field_picker_selected;
-            if idx < fields.len() {
-                let field = fields[idx].clone();
+            if idx < field_count {
+                let field = app.config.detail.editable_fields[idx].clone();
                 app.showing_editable_field_picker = false;
-                begin_edit_field(app, field);
+                begin_edit_field(app, field).await;
             }
         }
         KeyCode::Char(n) if ('1'..='9').contains(&n) => {
             let idx = (n as u8 - b'1') as usize;
-            if idx < fields.len() {
-                let field = fields[idx].clone();
+            if idx < field_count {
+                let field = app.config.detail.editable_fields[idx].clone();
                 app.showing_editable_field_picker = false;
-                begin_edit_field(app, field);
+                begin_edit_field(app, field).await;
             }
         }
         KeyCode::Esc => cancel_custom_field_edit(app),
@@ -56,7 +57,7 @@ pub fn handle_editable_field_picker_key(app: &mut App, code: KeyCode) {
     }
 }
 
-fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
+async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
     let kind = match field.parsed_kind() {
         Ok(k) => k,
         Err(e) => {
@@ -64,58 +65,140 @@ fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
             return;
         }
     };
+
+    let needs_meta = matches!(kind, EditableFieldKind::Auto)
+        || (matches!(kind, EditableFieldKind::Select) && field.options.is_empty());
+
+    let mut resolved_kind = kind;
+    let mut options = field.options.clone();
+    let mut meta: Option<TransitionField> = None;
+
+    if needs_meta {
+        let Some(sel) = app.selected_ticket() else {
+            app.status.set_action_error("Select a ticket first");
+            return;
+        };
+        let Some(base_url) = app.site_base_url(&sel.site) else {
+            app.status.set_action_error("Unknown site for ticket");
+            return;
+        };
+        match app
+            .jira
+            .fetch_editmeta_field(&base_url, &sel.key, &field.id)
+            .await
+        {
+            Ok(Some(tf)) => {
+                if matches!(kind, EditableFieldKind::Auto) {
+                    resolved_kind = match tick_type_from_transition_field(&tf) {
+                        "user" => EditableFieldKind::User,
+                        "select" => EditableFieldKind::Select,
+                        "text" => EditableFieldKind::Text,
+                        _ => {
+                            app.status.set_action_error(format!(
+                                "{} cannot be edited from the detail pane",
+                                field.display_label()
+                            ));
+                            return;
+                        }
+                    };
+                }
+                if matches!(resolved_kind, EditableFieldKind::Select) {
+                    options = select_options_from_transition_field(&tf);
+                    if options.is_empty() {
+                        app.status.set_action_error(format!(
+                            "No options for {} on this issue",
+                            field.display_label()
+                        ));
+                        return;
+                    }
+                }
+                meta = Some(tf);
+            }
+            Ok(None) => {
+                app.status.set_action_error(format!(
+                    "{} is not editable on this issue",
+                    field.display_label()
+                ));
+                return;
+            }
+            Err(e) => {
+                app.status.set_action_error(e);
+                return;
+            }
+        }
+    }
+
     let current = app
         .selected_ticket_entry()
         .and_then(|t| t.custom_fields.get(&field.id).cloned())
         .unwrap_or_default();
 
     app.custom_field_editing = Some(field.clone());
+    app.custom_field_meta = meta;
 
-    match kind {
+    match resolved_kind {
         EditableFieldKind::Text => {
             app.input_mode = InputMode::EditCustomField;
             app.input_buffer = current;
         }
         EditableFieldKind::Select => {
-            app.custom_field_select_options = field.options.clone();
-            app.custom_field_select_selected = field
-                .options
+            app.custom_field_select_options = options;
+            app.custom_field_select_selected = app
+                .custom_field_select_options
                 .iter()
                 .position(|o| o == &current)
                 .unwrap_or(0);
             app.showing_custom_field_select = true;
         }
         EditableFieldKind::User => {
-            let transition_field = TransitionField {
-                id: field.id.clone(),
-                name: field.display_label(),
-                field_type: "user".into(),
-                system: String::new(),
-                kind: TransitionFieldKind::User,
-                options: Vec::new(),
-            };
-            app.transition_field_heading = transition_field.name.clone();
-            app.transition_field_current = Some(transition_field);
-            app.showing_transition_field = true;
-            app.transition_field_text_mode = true;
-            app.transition_field_user_search = true;
-            app.transition_field_options.clear();
-            app.transition_field_selected = 0;
-            app.input_mode = InputMode::TransitionField;
-            app.input_buffer.clear();
+            let transition_field =
+                app.custom_field_meta
+                    .clone()
+                    .unwrap_or_else(|| TransitionField {
+                        id: field.id.clone(),
+                        name: field.display_label(),
+                        field_type: "user".into(),
+                        system: String::new(),
+                        kind: TransitionFieldKind::User,
+                        options: Vec::new(),
+                    });
+            start_user_field_editor(app, transition_field);
         }
+        EditableFieldKind::Auto => unreachable!("resolved before match"),
     }
+}
+
+fn start_user_field_editor(app: &mut App, transition_field: TransitionField) {
+    app.transition_field_heading = transition_field.name.clone();
+    app.transition_field_current = Some(transition_field);
+    app.showing_transition_field = true;
+    app.transition_field_text_mode = true;
+    app.transition_field_user_search = true;
+    app.transition_field_options.clear();
+    app.transition_field_selected = 0;
+    app.input_mode = InputMode::TransitionField;
+    app.input_buffer.clear();
 }
 
 pub async fn submit_custom_field_text(app: &mut App, buffer: String) {
     let Some(field) = app.custom_field_editing.clone() else {
         return;
     };
-    let trimmed = buffer.trim();
-    let value = if trimmed.is_empty() {
-        Value::Null
+    let value = if let Some(meta) = app.custom_field_meta.as_ref() {
+        match meta.value_from_text(&buffer) {
+            Ok(v) => v,
+            Err(e) => {
+                app.status.set_action_error(e);
+                return;
+            }
+        }
     } else {
-        json!({ "value": trimmed })
+        let trimmed = buffer.trim();
+        if trimmed.is_empty() {
+            Value::Null
+        } else {
+            json!({ "value": trimmed })
+        }
     };
     apply_custom_field_value(app, &field, value).await;
 }
@@ -128,12 +211,20 @@ pub async fn apply_custom_field_select(app: &mut App, idx: usize) {
         return;
     }
     let option = app.custom_field_select_options[idx].clone();
-    let value = json!({ "value": option });
+    let value = if let Some(meta) = app.custom_field_meta.as_ref() {
+        if let Some((id, _)) = meta.options.iter().find(|(_, label)| label == &option) {
+            meta.value_from_choice(id, &option)
+        } else {
+            json!({ "value": option })
+        }
+    } else {
+        json!({ "value": option })
+    };
     apply_custom_field_value(app, &field, value).await;
 }
 
 pub async fn apply_custom_field_user_pick(app: &mut App, account_id: String) {
-    let Some(field) = app.custom_field_editing.take() else {
+    let Some(field) = app.custom_field_editing.clone() else {
         return;
     };
     let value = json!({ "accountId": account_id });
@@ -170,6 +261,7 @@ async fn apply_custom_field_value(app: &mut App, field: &EditableFieldConfig, va
 
 pub fn cancel_custom_field_edit(app: &mut App) {
     app.custom_field_editing = None;
+    app.custom_field_meta = None;
     app.showing_editable_field_picker = false;
     app.showing_custom_field_select = false;
     app.custom_field_select_options.clear();

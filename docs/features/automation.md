@@ -54,6 +54,15 @@ tick issue unwatch HIN-123 --site zeta
 
 All `issue` subcommands print JSON `{ "key", "site", "action", "ok": true, ... }` on success.
 
+## `tick fields list`
+
+```bash
+tick fields list --site zeta
+tick fields list --site zeta --project HIN
+```
+
+Lists custom fields with suggested `[[detail.editable_fields]]` types and optional `config_snippet` TOML. Use `--project` to include select `options` from the create screen.
+
 ## `tick search`
 
 ```bash

@@ -347,7 +347,7 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
     }
 
     if app.showing_editable_field_picker {
-        crate::editable_fields::handle_editable_field_picker_key(app, code);
+        crate::editable_fields::handle_editable_field_picker_key(app, code).await;
         return false;
     }
 

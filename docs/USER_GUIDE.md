@@ -101,7 +101,7 @@ If Jira is unreachable, tick **keeps the last cached tickets** instead of cleari
 ## Detail pane workflow
 
 1. **`Enter`** on a ticket
-2. Use **`h`/`l`** for Details / Description / Comments tabs
+2. Use **`h`/`l`** for **Details** / **Description** / **Comments** / **Links** tabs — description and comments load on demand (see [features/detail-pane.md](features/detail-pane.md))
 3. Common actions:
 
 | Goal | Key |
@@ -116,11 +116,14 @@ If Jira is unreachable, tick **keeps the last cached tickets** instead of cleari
 | Set labels | `L` (comma-separated) |
 | Move to sprint/backlog | `M` |
 | Edit description | `D` (markdown: `#` headings, `-` lists, `**bold**`, `@` mentions) |
+| Custom fields | `F` — configured in `[[detail.editable_fields]]`; discover ids with `tick fields list` |
 | Open in browser | `o` (selected row) |
 | Open by key/clipboard | `O` (multi-site: checks each instance) |
 | Copy key | `y` |
 
 After writes, tick refreshes all views.
+
+Footer **success** messages (watch, bulk, etc.) clear after `notice_secs` (default 5) — see [CONFIGURATION.md](CONFIGURATION.md).
 
 ## Sprint column and moves
 

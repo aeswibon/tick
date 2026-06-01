@@ -76,8 +76,8 @@ pub fn validate_config(config: &Config) -> Vec<CheckFinding> {
         match field.parsed_kind() {
             Err(e) => out.push(err(format!("detail.editable_fields[{i}]: {e}"))),
             Ok(crate::config::EditableFieldKind::Select) if field.options.is_empty() => {
-                out.push(err(format!(
-                    "detail.editable_fields[{i}] (select) needs options"
+                out.push(warn(format!(
+                    "detail.editable_fields[{i}] (select) has no options — use type = \"auto\" or run: tick fields list --site <name>"
                 )));
             }
             _ => {}
@@ -178,6 +178,7 @@ mod tests {
             create: CreateSettings::default(),
             hooks: Default::default(),
             detail: Default::default(),
+            notice_secs: 5,
             view_jql: Config::build_view_jql(&ViewQueries::default()),
         }
     }

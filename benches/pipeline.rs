@@ -31,6 +31,7 @@ fn sample_tickets(n: usize) -> Vec<Ticket> {
             project_key: "DEMO".into(),
             custom_fields: Default::default(),
             detail_loaded: false,
+            detail_error: None,
         })
         .collect()
 }

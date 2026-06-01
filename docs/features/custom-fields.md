@@ -2,6 +2,17 @@
 
 Read custom fields in the table via `columns = ["customfield_10042", ...]`. Edit configured fields from the **Details** tab.
 
+## Discover field ids (phase 2)
+
+```bash
+tick fields list --site my-team
+tick fields list --site my-team --project HIN
+```
+
+JSON includes `id`, `name`, `suggested_type`, optional `options` (with `--project`), and a ready-made `config_snippet` for `config.toml`.
+
+`tick --doctor` reminds you to run `fields list` per site.
+
 ## Config
 
 ```toml
@@ -20,15 +31,22 @@ options = ["Dev", "Staging", "Prod"]
 id = "customfield_10002"
 label = "Reviewer"
 type = "user"
+
+# Resolve type + select options from Jira edit metadata per issue
+[[detail.editable_fields]]
+id = "customfield_10003"
+label = "Team"
+type = "auto"
 ```
 
 | `type` | Edit UX |
 |--------|---------|
 | `text` | Footer prompt; empty clears the field |
-| `select` | Picker from `options` |
+| `select` | Picker from `options` (or from Jira when `options` omitted / `auto`) |
 | `user` | User search picker (same as transition user fields) |
+| `auto` | Fetches **editmeta** for the selected issue; supports text, select, and user |
 
-Field ids must be `customfield_<digits>` (discover with `tick --doctor`).
+Field ids must be `customfield_<digits>`.
 
 Editable fields are **fetched on refresh** even when not in `columns`.
 

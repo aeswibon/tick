@@ -18,7 +18,7 @@
 <p align="center">
   <a href="https://www.producthunt.com/products/tick-4?launch=tick-4"><strong>We’re live on Product Hunt — your upvote helps →</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/aeswibon/tick/releases"><strong>v1.0.0</strong></a>
+  <a href="https://github.com/aeswibon/tick/releases"><strong>v1.1.0</strong></a>
   &nbsp;·&nbsp;
   <a href="docs/USER_GUIDE.md">User guide</a>
   &nbsp;·&nbsp;
@@ -44,7 +44,8 @@ Jira’s web UI is powerful but slow for **daily triage**: too many clicks to mo
 | **Triage** | Filter, sort, virtualized scroll, detail pane (summary / description / comments) |
 | **Write-back** | Transitions, comments, worklogs, summary, priority, labels, description, sprint |
 | **Create** | New (`n`), template (`N`), duplicate (`C`), export (`X`), manage templates (`Shift+E`) |
-| **Views+** | Custom JQL tabs (`7`–`9`), Closed search persist, custom field columns |
+| **Views+** | Custom JQL tabs (`7`–`9`), Closed search persist, custom field columns, `tick fields list` |
+| **Custom fields** | Edit from detail (`F`); `type = "auto"` loads Jira editmeta per issue |
 | **Offline** | Per-view disk cache; `live` / `cached` / `offline` header |
 | **Themes** | Built-in + custom TOML — [`themes/`](themes/) |
 
@@ -117,6 +118,7 @@ tick template export my-site HIN-1 -o templates/local.toml  # Export issue as te
 tick issue comment HIN-1 --body "Done" --site my-team     # Headless comment
 tick issue assign HIN-1 --me --site my-team
 tick issue watch HIN-1 --site my-team
+tick fields list --site my-team --project HIN   # custom field discovery
 ```
 
 ## Contributing

@@ -34,6 +34,15 @@ Single-page map of everything tick can do. For **step-by-step guides with exampl
 
 Custom JQL: `[views]` and `[[views.custom]]` in config. Cache: `~/.config/tick/cache/`.
 
+### v1.1 highlights
+
+| Feature | Guide |
+|---------|--------|
+| `tick fields list` | [custom-fields.md](features/custom-fields.md#discover-field-ids-phase-2) — discover `customfield_*` ids and config snippets |
+| Custom fields `auto` | [custom-fields.md](features/custom-fields.md) — editmeta from Jira when editing (`F`) |
+| Detail load fixes | [detail-pane.md](features/detail-pane.md#lazy-load-description-and-comments) — reliable lazy description/comments |
+| `notice_secs` | [platform.md](features/platform.md#footer-notice-timeout-notice_secs) — auto-clear footer success messages |
+
 ### v0.19 highlights
 
 | Feature | Guide |

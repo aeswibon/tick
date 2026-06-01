@@ -313,6 +313,8 @@ pub enum EditableFieldKind {
     Text,
     Select,
     User,
+    /// Resolve type and options from Jira edit metadata for the selected issue.
+    Auto,
 }
 
 impl EditableFieldConfig {
@@ -330,6 +332,7 @@ impl EditableFieldConfig {
             "text" | "string" => Ok(EditableFieldKind::Text),
             "select" | "option" => Ok(EditableFieldKind::Select),
             "user" => Ok(EditableFieldKind::User),
+            "auto" => Ok(EditableFieldKind::Auto),
             other => Err(format!("unknown editable field type '{other}'")),
         }
     }
@@ -426,8 +429,15 @@ pub struct Config {
     pub hooks: HooksSettings,
     #[serde(default)]
     pub detail: DetailSettings,
+    /// How long footer success notices stay visible (seconds).
+    #[serde(default = "default_notice_secs")]
+    pub notice_secs: u64,
     #[serde(skip)]
     pub view_jql: HashMap<ViewMode, String>,
+}
+
+fn default_notice_secs() -> u64 {
+    5
 }
 
 fn default_theme() -> String {

@@ -62,6 +62,9 @@ pub struct Ticket {
     /// Description and comments were fetched (lazy detail load).
     #[serde(default)]
     pub detail_loaded: bool,
+    /// Set when lazy detail fetch failed (avoids infinite "Loading…").
+    #[serde(default, skip_serializing)]
+    pub detail_error: Option<String>,
 }
 
 pub(crate) fn project_key_from_issue_key(key: &str) -> &str {
@@ -322,9 +325,18 @@ impl Ticket {
         self.latest_comment = None;
         self.all_comments.clear();
         self.detail_loaded = false;
+        self.detail_error = None;
+    }
+
+    /// Mark lazy detail as finished after a failed fetch (stops perpetual loading UI).
+    pub fn mark_detail_failed(&mut self, message: impl Into<String>) {
+        self.clear_detail_fields();
+        self.detail_loaded = true;
+        self.detail_error = Some(message.into());
     }
 
     pub fn apply_detail_fields(&mut self, fields: &IssueDetailFields) {
+        self.detail_error = None;
         self.description_adf = fields.description.clone();
         self.description = self.description_adf.as_ref().and_then(extract_text);
         self.all_comments = comments_from_jira(fields.comment.as_ref());
@@ -401,6 +413,7 @@ impl Ticket {
                 })
                 .collect(),
             detail_loaded: false,
+            detail_error: None,
         };
 
         if include_detail {

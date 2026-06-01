@@ -143,6 +143,7 @@ mod tests {
             project_key: String::new(),
             custom_fields: std::collections::HashMap::new(),
             detail_loaded: false,
+            detail_error: None,
         }
     }
 

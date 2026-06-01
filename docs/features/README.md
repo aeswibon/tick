@@ -13,9 +13,9 @@ Use these when you want **depth** on one capability. For a single scrollable ove
 - **[bulk-actions.md](bulk-actions.md)** — Multi-select (`Space`), bulk transition, assign, labels, watch
 - **[automation.md](automation.md)** — Headless CLI, refresh/bulk hooks (`tick issue`, `tick search`, `tick bulk`, `tick --check`)
 - **[plugins.md](plugins.md)** — Lua plugins: `filter_tickets`, `on_key`, `run_transition`
-- **[custom-fields.md](custom-fields.md)** — Edit configured custom fields from detail (`F`)
+- **[custom-fields.md](custom-fields.md)** — `tick fields list`, edit from detail (`F`), `type = "auto"`
 - **[quick-search.md](quick-search.md)** — Search cached views (`g`)
-- **[detail-pane.md](detail-pane.md)** — Detail layout, ADF rendering, markdown round-trip
+- **[detail-pane.md](detail-pane.md)** — Detail layout, lazy description/comments, ADF rendering
 
 ## Jira write-back
 
@@ -29,7 +29,7 @@ Use these when you want **depth** on one capability. For a single scrollable ove
 
 - **[open-and-multi-site.md](open-and-multi-site.md)** — Browser open, clipboard lookup, site errors
 - **[auth-cli-cache.md](auth-cli-cache.md)** — Auth, CLI flags, refresh, desktop notify
-- **[platform.md](platform.md)** — Config reload (`R`), Jira 429 footer UX
+- **[platform.md](platform.md)** — Config reload (`R`), `notice_secs`, Jira 429 footer UX
 
 ## Example: triage morning routine
 

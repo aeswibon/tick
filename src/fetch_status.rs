@@ -1,9 +1,12 @@
+use std::time::Instant;
+
 /// Per-site fetch warnings (partial success) vs a single action error (transition, comment, etc.).
 #[derive(Debug, Clone, Default)]
 pub struct FetchStatus {
     pub site_warnings: Vec<String>,
     pub action_error: Option<String>,
     pub action_notice: Option<String>,
+    pub action_notice_at: Option<Instant>,
 }
 
 impl FetchStatus {
@@ -13,6 +16,17 @@ impl FetchStatus {
 
     pub fn clear_action_notice(&mut self) {
         self.action_notice = None;
+        self.action_notice_at = None;
+    }
+
+    /// Clear the footer notice when it has been visible long enough.
+    pub fn expire_action_notice(&mut self, max_age: std::time::Duration) {
+        let Some(at) = self.action_notice_at else {
+            return;
+        };
+        if at.elapsed() >= max_age {
+            self.clear_action_notice();
+        }
     }
 
     pub fn set_action_error(&mut self, message: impl Into<String>) {
@@ -23,6 +37,7 @@ impl FetchStatus {
     pub fn set_action_notice(&mut self, message: impl Into<String>) {
         self.action_error = None;
         self.action_notice = Some(message.into());
+        self.action_notice_at = Some(Instant::now());
     }
 
     pub fn set_site_warnings(&mut self, warnings: Vec<String>) {
@@ -114,5 +129,13 @@ mod tests {
         let mut s = FetchStatus::default();
         s.set_site_warnings(vec!["acme: HTTP 401".into()]);
         assert_eq!(s.format_warnings(0), "");
+    }
+
+    #[test]
+    fn action_notice_expires_after_max_age() {
+        let mut s = FetchStatus::default();
+        s.set_action_notice("saved");
+        s.expire_action_notice(std::time::Duration::from_secs(0));
+        assert!(s.action_notice.is_none());
     }
 }

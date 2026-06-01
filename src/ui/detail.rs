@@ -251,7 +251,16 @@ pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
             }
         }
         DetailTab::Description => {
-            if app.detail_loading || !ticket.detail_loaded {
+            if let Some(ref err) = ticket.detail_error {
+                lines.push(Line::from(Span::styled(
+                    format!("  Could not load description: {err}"),
+                    Style::default().fg(app.theme.error_fg),
+                )));
+                lines.push(Line::from(Span::styled(
+                    "  Press r to refresh",
+                    Style::default().fg(app.theme.border),
+                )));
+            } else if app.detail_loading || !ticket.detail_loaded {
                 lines.push(Line::from(Span::styled(
                     "  Loading description…",
                     Style::default().fg(app.theme.border),
@@ -278,7 +287,16 @@ pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
             }
         }
         DetailTab::Comments => {
-            if app.detail_loading || !ticket.detail_loaded {
+            if let Some(ref err) = ticket.detail_error {
+                lines.push(Line::from(Span::styled(
+                    format!("  Could not load comments: {err}"),
+                    Style::default().fg(app.theme.error_fg),
+                )));
+                lines.push(Line::from(Span::styled(
+                    "  Press r to refresh",
+                    Style::default().fg(app.theme.border),
+                )));
+            } else if app.detail_loading || !ticket.detail_loaded {
                 lines.push(Line::from(Span::styled(
                     "  Loading comments…",
                     Style::default().fg(app.theme.border),

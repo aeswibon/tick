@@ -3,6 +3,7 @@ pub mod adf_export;
 pub mod agile;
 pub mod assignable_users;
 pub mod create;
+pub mod fields;
 pub mod issue_relations;
 pub mod jira_error;
 pub mod markdown;
@@ -1185,6 +1186,7 @@ mod fetch_integration {
             create: Default::default(),
             hooks: Default::default(),
             detail: Default::default(),
+            notice_secs: 5,
             view_jql: Config::build_view_jql(&Default::default()),
         }
     }
