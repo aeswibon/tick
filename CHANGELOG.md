@@ -2,6 +2,37 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.0] - 2026-05-30
+
+First **stable** release. Same functionality as 0.27.0; semver now signals a stability commitment for config, CLI JSON, hooks, and plugin API `1`. See [docs/STABILITY.md](docs/STABILITY.md).
+
+### Highlights (since early 0.12)
+
+**TUI — daily Jira Cloud triage**
+
+- Multi-site inbox, six built-in tabs plus custom JQL views (`7`–`9`)
+- Bulk marks (50 cap): transition, assign, labels, watch
+- Detail write-back: summary, priority, labels, description, due date, comments, worklog, links, subtasks
+- Create / duplicate / templates; editable configured custom fields (`F`)
+- Lazy detail load, JQL pagination (`max_results`), global search (`Ctrl+g`)
+- Themes, disk cache, `tick --check` / `--doctor`
+
+**Automation**
+
+- CLI: `issue` (show, transition, comment, assign, watch), `search`, `bulk`
+- Hooks: `on_refresh`, `on_bulk_complete`, `on_config_reload`, `on_mark`
+- Lua plugins: `filter_tickets`, `on_key`, `run_transition`
+- Cookbook: [docs/features/automation.md](docs/features/automation.md), [examples/automation/](examples/automation/)
+
+**Platform**
+
+- API token + OAuth; release binaries and Homebrew tap
+- CI: fmt, clippy, test, `cargo deny`
+
+### Documentation
+
+- [STABILITY.md](docs/STABILITY.md) — what 1.x promises
+
 ## [0.27.0] - 2026-05-30
 
 ### Added

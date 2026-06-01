@@ -18,7 +18,7 @@
 <p align="center">
   <a href="https://www.producthunt.com/products/tick-4?launch=tick-4"><strong>We’re live on Product Hunt — your upvote helps →</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/aeswibon/tick/releases">Releases</a>
+  <a href="https://github.com/aeswibon/tick/releases"><strong>v1.0.0</strong></a>
   &nbsp;·&nbsp;
   <a href="docs/USER_GUIDE.md">User guide</a>
   &nbsp;·&nbsp;
@@ -103,6 +103,7 @@ Full reference: [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md)
 | [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md) | Complete keyboard map |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | `config.toml` reference |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [docs/STABILITY.md](docs/STABILITY.md) | **1.x** API stability (config, CLI, hooks, plugins) |
 
 ## CLI
 

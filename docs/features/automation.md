@@ -32,7 +32,7 @@ Applies a workflow transition **by name**. Fails if the transition requires extr
 ## `tick issue comment`
 
 ```bash
-tick issue comment HIN-123 --body "Shipped in v0.27" --site zeta
+tick issue comment HIN-123 --body "Shipped in 1.0" --site zeta
 echo "From CI" | tick issue comment HIN-123 --site zeta
 ```
 

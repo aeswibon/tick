@@ -1,6 +1,6 @@
 # RFC: tick plugin runtime (track C)
 
-**Status:** C.1–C.3 implemented (v0.21–v0.23); polish v0.25 (doctor, pipeline docs); C.4 (WASM) on demand  
+**Status:** C.1–C.3 stable in **tick 1.0** (`api = "1"`); C.4 (WASM) on demand  
 **Authors:** tick maintainers  
 
 ## Summary

@@ -4,10 +4,9 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 0.25.x  | Yes       |
-| 0.24.x  | Yes       |
-| 0.23.x  | Yes       |
-| 0.12.x – 0.22.x | Yes |
+| 1.0.x   | Yes       |
+| 0.27.x  | Yes (upgrade to 1.0.x recommended) |
+| 0.12.x – 0.26.x | Best-effort only |
 | < 0.12  | No        |
 
 ## Reporting a vulnerability
