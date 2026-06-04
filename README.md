@@ -18,7 +18,7 @@
 <p align="center">
   <a href="https://www.producthunt.com/products/tick-4?launch=tick-4"><strong>We’re live on Product Hunt — your upvote helps →</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/aeswibon/tick/releases"><strong>v1.1.0</strong></a>
+  <a href="https://github.com/aeswibon/tick/releases"><strong>v1.1.1</strong></a>
   &nbsp;·&nbsp;
   <a href="docs/USER_GUIDE.md">User guide</a>
   &nbsp;·&nbsp;

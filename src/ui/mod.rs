@@ -3,6 +3,7 @@ pub mod create;
 pub mod create_preview;
 pub mod detail;
 pub mod draw;
+pub mod duplicate_review;
 pub mod editable_fields;
 pub mod errors;
 pub mod field_picker;

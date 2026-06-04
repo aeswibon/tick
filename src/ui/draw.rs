@@ -2,14 +2,20 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::Style,
     text::{Line, Span},
-    widgets::Paragraph,
+    widgets::{Paragraph, Wrap},
     Frame,
 };
 
 use crate::app::App;
+use crate::input::multiline_input_mode;
 use crate::view_mode::ViewMode;
 
 pub fn render(f: &mut Frame, app: &mut App) {
+    let footer_rows = if multiline_input_mode(app.input_mode) {
+        3u16
+    } else {
+        1
+    };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -17,7 +23,7 @@ pub fn render(f: &mut Frame, app: &mut App) {
             Constraint::Length(1),
             Constraint::Min(1),
             Constraint::Length(1),
-            Constraint::Length(1),
+            Constraint::Length(footer_rows),
         ])
         .split(f.area());
 
@@ -35,6 +41,15 @@ pub fn render(f: &mut Frame, app: &mut App) {
 
     if app.show_help {
         super::help::draw_help(f, app, f.area());
+    }
+    if app
+        .create_session
+        .as_ref()
+        .is_some_and(|s| s.step == crate::create_flow::CreateStep::DuplicateReview)
+    {
+        if let Some(session) = app.create_session.as_ref() {
+            super::duplicate_review::draw_duplicate_review(f, session, &app.theme, f.area());
+        }
     }
     if app.showing_create_picker {
         super::create::draw_create_picker(f, app, f.area());
@@ -206,10 +221,10 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         let hint = if app.showing_mention_picker {
             " @mention"
         } else {
-            " (@ to tag)"
+            " (@ · Shift+Enter newline)"
         };
         (
-            format!(" Comment{hint}: {}_", app.input_buffer),
+            format!(" Comment{hint}:\n{}_", app.input_buffer),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::Worklog {
@@ -386,10 +401,10 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         let hint = if app.showing_mention_picker {
             " @mention"
         } else {
-            " (markdown, @)"
+            " (markdown · Shift+Enter newline)"
         };
         (
-            format!(" Description{hint}: {}_", app.input_buffer),
+            format!(" Description{hint}:\n{}_", app.input_buffer),
             app.theme.accent,
         )
     } else if app.loading && !app.showing_transition_field {
@@ -441,11 +456,9 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     };
 
     f.render_widget(
-        Paragraph::new(Line::from(Span::styled(
-            footer_text,
-            Style::default().fg(fg_color),
-        )))
-        .style(Style::default().bg(app.theme.footer_bg)),
+        Paragraph::new(footer_text)
+            .wrap(Wrap { trim: false })
+            .style(Style::default().fg(fg_color).bg(app.theme.footer_bg)),
         area,
     );
 }

@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::api::create::{
-    apply_template_to_draft, build_create_fields, enrich_draft_from_clone, seed_draft_from_ticket,
-    template_picker_label, CreateDraft,
+    apply_duplicate_field_rows, apply_template_to_draft, build_create_fields,
+    enrich_draft_from_clone, seed_draft_from_ticket, template_picker_label, CreateDraft,
 };
 use crate::api::transition_fields::{self, TransitionField, TransitionFieldKind};
 use crate::api::{self, types::WorkflowTransition};
@@ -20,6 +20,8 @@ pub enum CreateStep {
     Project,
     IssueType,
     Template,
+    /// After duplicate (`C`): choose which source fields to copy (Space), then Enter.
+    DuplicateReview,
     Summary,
     Description,
 }
@@ -36,6 +38,17 @@ pub struct CreateSession {
     pub showing_required_field: bool,
     /// Live markdown preview while editing description (`Ctrl+P`).
     pub description_preview: bool,
+    /// Field include/clear picker after duplicate (same rows as template export).
+    pub duplicate_field_rows: Vec<crate::template_export::TemplateFieldRow>,
+    pub duplicate_field_selected: usize,
+    /// Which pass of the duplicate field picker is active.
+    pub duplicate_review_phase: DuplicateReviewPhase,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DuplicateReviewPhase {
+    IncludeFields,
+    ClearValues,
 }
 
 pub fn cancel_create(app: &mut App) {
@@ -63,6 +76,22 @@ fn clone_prefix(app: &App) -> String {
     app.config.create.clone_summary_prefix.clone()
 }
 
+fn new_create_session(draft: CreateDraft, step: CreateStep) -> CreateSession {
+    CreateSession {
+        draft,
+        step,
+        picker_options: Vec::new(),
+        picker_selected: 0,
+        required_pending: Vec::new(),
+        required_values: HashMap::new(),
+        showing_required_field: false,
+        description_preview: false,
+        duplicate_field_rows: Vec::new(),
+        duplicate_field_selected: 0,
+        duplicate_review_phase: DuplicateReviewPhase::IncludeFields,
+    }
+}
+
 pub async fn start_create_from_template(app: &mut App) {
     cancel_create(app);
     let site_filter = if app.config.sites.len() == 1 {
@@ -81,16 +110,9 @@ pub async fn start_create_from_template(app: &mut App) {
         .iter()
         .map(|t| (t.name.clone(), template_picker_label(t)))
         .collect();
-    app.create_session = Some(CreateSession {
-        draft: CreateDraft::default(),
-        step: CreateStep::Template,
-        picker_options,
-        picker_selected: 0,
-        required_pending: Vec::new(),
-        required_values: HashMap::new(),
-        showing_required_field: false,
-        description_preview: false,
-    });
+    let mut session = new_create_session(CreateDraft::default(), CreateStep::Template);
+    session.picker_options = picker_options;
+    app.create_session = Some(session);
     app.showing_create_picker = true;
 }
 
@@ -102,16 +124,10 @@ pub async fn start_create_blank(app: &mut App) {
         draft.site_name = site.name.clone();
         draft.base_url = site.base_url.clone();
         apply_site_defaults(&mut draft, site);
-        app.create_session = Some(CreateSession {
+        app.create_session = Some(new_create_session(
             draft,
-            step: next_step_after_site(app, &site.name),
-            picker_options: Vec::new(),
-            picker_selected: 0,
-            required_pending: Vec::new(),
-            required_values: HashMap::new(),
-            showing_required_field: false,
-            description_preview: false,
-        });
+            next_step_after_site(app, &site.name),
+        ));
         advance_create_step(app).await;
     } else {
         let options: Vec<(String, String)> = app
@@ -120,16 +136,9 @@ pub async fn start_create_blank(app: &mut App) {
             .iter()
             .map(|s| (s.name.clone(), format!("{} — {}", s.name, s.base_url)))
             .collect();
-        app.create_session = Some(CreateSession {
-            draft,
-            step: CreateStep::Site,
-            picker_options: options,
-            picker_selected: 0,
-            required_pending: Vec::new(),
-            required_values: HashMap::new(),
-            showing_required_field: false,
-            description_preview: false,
-        });
+        let mut session = new_create_session(draft, CreateStep::Site);
+        session.picker_options = options;
+        app.create_session = Some(session);
         app.showing_create_picker = true;
     }
 }
@@ -158,15 +167,30 @@ pub async fn start_create_duplicate(app: &mut App) {
     };
     seed_draft_from_ticket(&mut draft, &ticket, &clone_prefix(app));
 
+    let custom_ids: Vec<String> = app.config.custom_field_ids_for_fetch();
+    let custom_refs: Vec<&str> = custom_ids.iter().map(String::as_str).collect();
+
     app.loading = true;
     app.loading_message = Some("Loading issue fields for duplicate…".into());
     match app
         .jira
-        .fetch_issue_for_clone(&draft.base_url, &ticket_key, sprint_field.as_deref())
+        .fetch_issue_for_clone(
+            &draft.base_url,
+            &ticket_key,
+            sprint_field.as_deref(),
+            &custom_refs,
+        )
         .await
     {
         Ok(issue) => {
-            enrich_draft_from_clone(&app.jira, &mut draft, &issue, sprint_field.as_deref()).await;
+            enrich_draft_from_clone(
+                &app.jira,
+                &mut draft,
+                &issue,
+                sprint_field.as_deref(),
+                &custom_refs,
+            )
+            .await;
         }
         Err(e) => {
             app.status
@@ -176,17 +200,102 @@ pub async fn start_create_duplicate(app: &mut App) {
     app.loading = false;
     app.loading_message = None;
 
-    app.create_session = Some(CreateSession {
-        draft,
-        step: CreateStep::Summary,
-        picker_options: Vec::new(),
-        picker_selected: 0,
-        required_pending: Vec::new(),
-        required_values: HashMap::new(),
-        showing_required_field: false,
-        description_preview: false,
-    });
-    begin_summary_input(app);
+    let sprint_ref = sprint_field.as_deref();
+    let mut rows = crate::template_export::exportable_field_rows(&draft, sprint_ref);
+    crate::template_export::append_custom_field_rows(&draft, &mut rows, sprint_ref);
+
+    let mut session = new_create_session(draft, CreateStep::DuplicateReview);
+    session.duplicate_field_rows = rows;
+    session.duplicate_review_phase = DuplicateReviewPhase::IncludeFields;
+    app.create_session = Some(session);
+}
+
+pub fn handle_duplicate_review_key(app: &mut App, code: KeyCode) {
+    let Some(session) = app.create_session.as_mut() else {
+        return;
+    };
+    if session.step != CreateStep::DuplicateReview {
+        return;
+    }
+    let nav: Vec<usize> = match session.duplicate_review_phase {
+        DuplicateReviewPhase::IncludeFields => (0..session.duplicate_field_rows.len()).collect(),
+        DuplicateReviewPhase::ClearValues => session
+            .duplicate_field_rows
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| r.include)
+            .map(|(i, _)| i)
+            .collect(),
+    };
+    if nav.is_empty() {
+        cancel_create(app);
+        return;
+    }
+    let pos = nav
+        .iter()
+        .position(|&i| i == session.duplicate_field_selected)
+        .unwrap_or(0);
+
+    match code {
+        KeyCode::Esc => cancel_create(app),
+        KeyCode::Up | KeyCode::Char('k') => {
+            session.duplicate_field_selected = nav[pos.saturating_sub(1)];
+        }
+        KeyCode::Down | KeyCode::Char('j') if pos + 1 < nav.len() => {
+            session.duplicate_field_selected = nav[pos + 1];
+        }
+        KeyCode::Char(' ') => {
+            let row = &mut session.duplicate_field_rows[session.duplicate_field_selected];
+            match session.duplicate_review_phase {
+                DuplicateReviewPhase::IncludeFields => {
+                    row.include = !row.include;
+                    if !row.include {
+                        row.clear_value = false;
+                    }
+                }
+                DuplicateReviewPhase::ClearValues => {
+                    row.clear_value = !row.clear_value;
+                }
+            }
+        }
+        KeyCode::Enter => advance_duplicate_review(app),
+        _ => {}
+    }
+}
+
+fn advance_duplicate_review(app: &mut App) {
+    let Some(session) = app.create_session.as_mut() else {
+        return;
+    };
+    match session.duplicate_review_phase {
+        DuplicateReviewPhase::IncludeFields => {
+            if !session.duplicate_field_rows.iter().any(|r| r.include) {
+                app.status
+                    .set_action_error("Select at least one field to copy (Space)");
+                return;
+            }
+            session.duplicate_review_phase = DuplicateReviewPhase::ClearValues;
+            session.duplicate_field_selected = session
+                .duplicate_field_rows
+                .iter()
+                .enumerate()
+                .find(|(_, r)| r.include)
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+        }
+        DuplicateReviewPhase::ClearValues => {
+            let rows = session.duplicate_field_rows.clone();
+            let sprint_field = app
+                .config
+                .sites
+                .iter()
+                .find(|s| s.name == session.draft.site_name)
+                .and_then(|s| s.sprint_field.as_deref());
+            apply_duplicate_field_rows(&mut session.draft, &rows, sprint_field);
+            session.step = CreateStep::Summary;
+            begin_summary_input(app);
+        }
+    }
 }
 
 fn apply_site_defaults(draft: &mut CreateDraft, site: &Site) {
@@ -261,6 +370,7 @@ async fn advance_create_step(app: &mut App) {
             begin_summary_input(app);
         }
         Some(CreateStep::Summary) | Some(CreateStep::Description) | Some(CreateStep::Template) => {}
+        Some(CreateStep::DuplicateReview) => {}
         None => {}
     }
 }
@@ -596,16 +706,10 @@ pub async fn submit_create(app: &mut App) {
                 .iter()
                 .map(|(id, _)| transition_fields::field_for_error_key(id, &[]))
                 .collect();
-            app.create_session = Some(CreateSession {
-                draft,
-                step: CreateStep::Summary,
-                picker_options: Vec::new(),
-                picker_selected: 0,
-                required_pending: pending,
-                required_values,
-                showing_required_field: false,
-                description_preview: false,
-            });
+            let mut session = new_create_session(draft, CreateStep::Summary);
+            session.required_pending = pending;
+            session.required_values = required_values;
+            app.create_session = Some(session);
             app.status.set_action_error(e.message);
             if !begin_next_create_required(app) {
                 app.create_session = None;
@@ -792,6 +896,7 @@ pub async fn submit_create_input(app: &mut App) {
             }
         }
         InputMode::CreateDescription => {
+            let buffer = crate::input::buffer_for_submit(&app.input_buffer, mode);
             if let Some(session) = app.create_session.as_mut() {
                 session.draft.description = buffer;
                 session.draft.description_adf = None;

@@ -23,7 +23,7 @@ Create and duplicate work from the **table** (detail pane can be open or closed)
 2. Project picker (skipped if `create_project` set)  
 3. Issue type picker (skipped if `create_issue_type` set)  
 4. Summary (required)  
-5. Description (optional markdown) — **`Ctrl+P`** toggles live preview (same rendering as the detail Description tab)  
+5. Description (optional markdown) — **`Shift+Enter`** for new lines, **`Ctrl+P`** toggles live preview  
 6. Required custom fields from create metadata (same UI as transition fields)
 
 ### Config shortcuts
@@ -77,10 +77,19 @@ Enter                # optional description, then required fields
 
 ## Duplicate (`C`)
 
-Copies from the **selected** row (re-fetches full issue for accurate IDs):
+Copies from the **selected** row (re-fetches full issue from Jira):
 
-- Project, type, labels, priority, assignee, due date, parent, description, sprint (if configured)  
-- Summary: `[create].clone_summary_prefix` + original summary (default `Copy of: `)
+- Summary, description, **labels**, priority, assignee, due date, parent, sprint (if configured), **components**, and **custom fields** from `columns` / `[[detail.editable_fields]]`
+- Summary prefix: `[create].clone_summary_prefix` + original (default `Copy of: `)
+
+### Field picker (two steps)
+
+After **`C`**, before editing summary:
+
+1. **Fields to copy** — `Space` toggles each field (labels included by default). `Enter` continues.
+2. **Leave blank** — for included fields, `Space` marks fields you will fill in manually during the wizard. `Enter` continues to summary/description.
+
+Then edit summary and description as usual (`Shift+Enter` for multiline description; paste supported).
 
 ```toml
 [[sites]]
@@ -97,7 +106,7 @@ Save the selected issue into config for reuse with **`N`**.
 ### Steps
 
 1. **`X`** on a selected ticket — loads full issue from Jira.  
-2. **Fields to save** — `Space` toggles include (summary, description, labels, priority, assignee, parent, sprint, due date). `Enter` continues.  
+2. **Fields to save** — `Space` toggles include (summary, description, labels, priority, assignee, parent, sprint, due date, **custom fields**). `Enter` continues.  
 3. **Clear values** — for included fields, `Space` marks “empty when creating from template”. `Enter` continues.  
 4. **Name** — footer template id (e.g. `hin-471632-payment-fix`). `Enter` saves.
 

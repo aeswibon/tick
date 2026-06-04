@@ -963,7 +963,8 @@ impl App {
         if already_loaded {
             return;
         }
-        if self.detail_loading && self.detail_fetch_key.as_ref() == Some(&(site.clone(), key.clone()))
+        if self.detail_loading
+            && self.detail_fetch_key.as_ref() == Some(&(site.clone(), key.clone()))
         {
             return;
         }
@@ -1006,10 +1007,7 @@ impl App {
         update: impl FnOnce(&mut Ticket),
     ) {
         let mut tickets = crate::ticket_lock::write_tickets(tickets);
-        if let Some(t) = tickets
-            .iter_mut()
-            .find(|t| t.site == site && t.key == key)
-        {
+        if let Some(t) = tickets.iter_mut().find(|t| t.site == site && t.key == key) {
             update(t);
         }
     }

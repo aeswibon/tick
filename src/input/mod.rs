@@ -1,10 +1,12 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{App, InputMode};
 
 mod detail_actions;
 mod mentions;
 mod normal;
+mod text;
+pub use text::{buffer_for_submit, insert_paste, multiline_input_mode};
 mod transitions;
 
 #[cfg(test)]
@@ -59,6 +61,37 @@ pub fn load_more_users_key(key: &KeyEvent) -> bool {
         || mods.contains(KeyModifiers::META)
 }
 
+/// Handle bracketed paste (avoids multiline paste firing Enter per line).
+pub fn handle_paste(app: &mut App, pasted: String) {
+    if app.input_mode == InputMode::None && !app.filtering {
+        return;
+    }
+    if app.filtering {
+        text::insert_paste(&mut app.filter, &pasted);
+        app.invalidate_filter_cache();
+        return;
+    }
+    text::insert_paste(&mut app.input_buffer, &pasted);
+    if app.input_mode == InputMode::GlobalSearchQuery {
+        app.global_search_hits = crate::global_search::refresh_hits(app, &app.input_buffer);
+        app.global_search_selected = 0;
+    }
+}
+
+/// Poll and dispatch one terminal event. Returns `true` to quit.
+pub async fn handle_event(app: &mut App, event: Event) -> bool {
+    match event {
+        Event::Key(key) if key.kind == crossterm::event::KeyEventKind::Press => {
+            handle_key(app, key).await
+        }
+        Event::Paste(text) => {
+            handle_paste(app, text);
+            false
+        }
+        _ => false,
+    }
+}
+
 /// Returns `true` when the app should quit.
 pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
     let code = key.code;
@@ -97,6 +130,15 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         } else {
             handle_transition_field_key(app, code).await;
         }
+        return false;
+    }
+
+    if app
+        .create_session
+        .as_ref()
+        .is_some_and(|s| s.step == crate::create_flow::CreateStep::DuplicateReview)
+    {
+        crate::create_flow::handle_duplicate_review_key(app, code);
         return false;
     }
 
@@ -177,8 +219,12 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     app.global_search_hits =
                         crate::global_search::refresh_hits(app, &app.input_buffer);
                     app.global_search_selected = 0;
-                } else if mentions_enabled(app.input_mode) {
+                } else if mentions_enabled(app.input_mode)
+                    && mentions::active_mention_query(&app.input_buffer).is_some()
+                {
                     refresh_mention_picker(app).await;
+                } else if mentions_enabled(app.input_mode) {
+                    clear_mention_picker(app);
                 } else if app.input_mode == InputMode::TransitionField
                     && app.transition_field_user_search
                 {
@@ -199,8 +245,12 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     app.global_search_hits =
                         crate::global_search::refresh_hits(app, &app.input_buffer);
                     app.global_search_selected = 0;
-                } else if mentions_enabled(app.input_mode) {
+                } else if mentions_enabled(app.input_mode)
+                    && mentions::active_mention_query(&app.input_buffer).is_some()
+                {
                     refresh_mention_picker(app).await;
+                } else if mentions_enabled(app.input_mode) {
+                    clear_mention_picker(app);
                 } else if app.input_mode == InputMode::TransitionField
                     && app.transition_field_user_search
                 {
@@ -278,6 +328,9 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     app.input_buffer.clear();
                     app.input_mentions.clear();
                 }
+            }
+            KeyCode::Enter if text::should_insert_newline_on_enter(&key) => {
+                app.input_buffer.push('\n');
             }
             KeyCode::Enter => {
                 if app.input_mode == InputMode::OpenTicket {

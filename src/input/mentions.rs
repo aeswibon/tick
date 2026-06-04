@@ -123,11 +123,19 @@ pub(crate) async fn handle_mention_picker_key(app: &mut App, key: &KeyEvent) {
         }
         KeyCode::Char(c) => {
             app.input_buffer.push(c);
-            refresh_mention_picker(app).await;
+            if active_mention_query(&app.input_buffer).is_some() {
+                refresh_mention_picker(app).await;
+            } else {
+                clear_mention_picker(app);
+            }
         }
         KeyCode::Backspace => {
             app.input_buffer.pop();
-            refresh_mention_picker(app).await;
+            if active_mention_query(&app.input_buffer).is_some() {
+                refresh_mention_picker(app).await;
+            } else {
+                clear_mention_picker(app);
+            }
         }
         _ => {}
     }

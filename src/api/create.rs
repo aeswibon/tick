@@ -187,6 +187,7 @@ impl JiraClient {
         base_url: &str,
         key: &str,
         sprint_field: Option<&str>,
+        custom_field_ids: &[&str],
     ) -> Result<Value, String> {
         let mut field_list = vec![
             "summary",
@@ -198,9 +199,17 @@ impl JiraClient {
             "assignee",
             "duedate",
             "parent",
+            "components",
         ];
         if let Some(sf) = sprint_field {
-            field_list.push(sf);
+            if !field_list.contains(&sf) {
+                field_list.push(sf);
+            }
+        }
+        for id in custom_field_ids {
+            if !field_list.contains(id) {
+                field_list.push(*id);
+            }
         }
         let fields = field_list.join(",");
         let url = format!(
@@ -331,6 +340,7 @@ pub async fn enrich_draft_from_clone(
     draft: &mut CreateDraft,
     issue: &Value,
     sprint_field: Option<&str>,
+    custom_field_ids: &[&str],
 ) {
     let fields = issue.get("fields").unwrap_or(issue);
     if let Some(s) = fields.get("summary").and_then(|v| v.as_str()) {
@@ -387,11 +397,86 @@ pub async fn enrich_draft_from_clone(
             .resolve_priority_id(&draft.base_url, &draft.priority_name)
             .await;
     }
+    for id in custom_field_ids {
+        if sprint_field == Some(*id) {
+            continue;
+        }
+        if let Some(val) = fields.get(*id) {
+            if !val.is_null() {
+                draft.extra_fields.insert((*id).to_string(), val.clone());
+            }
+        }
+    }
     if let Some(sf) = sprint_field {
         if let Some(val) = fields.get(sf) {
             if !val.is_null() {
                 draft.extra_fields.insert(sf.to_string(), val.clone());
             }
+        }
+    }
+}
+
+/// Apply duplicate field picker choices onto the create draft.
+pub fn apply_duplicate_field_rows(
+    draft: &mut CreateDraft,
+    rows: &[crate::template_export::TemplateFieldRow],
+    sprint_field: Option<&str>,
+) {
+    use crate::template_export::TemplateFieldId;
+
+    let include = |id: TemplateFieldId| -> bool {
+        rows.iter().find(|r| r.id == id).is_some_and(|r| r.include)
+    };
+    let clear = |id: TemplateFieldId| -> bool {
+        rows.iter()
+            .find(|r| r.id == id)
+            .is_some_and(|r| r.include && r.clear_value)
+    };
+
+    if !include(TemplateFieldId::Labels) || clear(TemplateFieldId::Labels) {
+        draft.labels.clear();
+    }
+    if !include(TemplateFieldId::Priority) || clear(TemplateFieldId::Priority) {
+        draft.priority_name.clear();
+        draft.priority_id = None;
+    }
+    if !include(TemplateFieldId::Assignee) || clear(TemplateFieldId::Assignee) {
+        draft.assignee_account_id = None;
+    }
+    if !include(TemplateFieldId::Parent) || clear(TemplateFieldId::Parent) {
+        draft.parent_key = None;
+    }
+    if !include(TemplateFieldId::DueDate) || clear(TemplateFieldId::DueDate) {
+        draft.due_date = None;
+    }
+    if !include(TemplateFieldId::Description) || clear(TemplateFieldId::Description) {
+        draft.description.clear();
+        draft.description_adf = None;
+    }
+    if clear(TemplateFieldId::Summary) {
+        draft.summary = "[fill in summary]".into();
+    }
+
+    if let Some(sf) = sprint_field {
+        if !include(TemplateFieldId::Sprint) || clear(TemplateFieldId::Sprint) {
+            draft.extra_fields.remove(sf);
+        }
+    }
+
+    let custom_ids: Vec<String> = rows
+        .iter()
+        .filter_map(|r| match &r.id {
+            TemplateFieldId::Custom(id) => Some(id.clone()),
+            _ => None,
+        })
+        .collect();
+    for id in custom_ids {
+        let row = rows
+            .iter()
+            .find(|r| matches!(&r.id, TemplateFieldId::Custom(cf) if cf == &id));
+        let Some(row) = row else { continue };
+        if !row.include || row.clear_value {
+            draft.extra_fields.remove(&id);
         }
     }
 }

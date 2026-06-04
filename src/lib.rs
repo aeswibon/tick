@@ -37,8 +37,8 @@ use clap::{Parser, Subcommand};
 use config::Config;
 use crossterm::{
     event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind,
-        KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+        self, DisableMouseCapture, EnableMouseCapture, KeyboardEnhancementFlags,
+        PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
     },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -351,11 +351,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         terminal.draw(|f| ui::draw::render(f, &mut app))?;
 
         if event::poll(Duration::from_millis(250))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    should_quit = input::handle_key(&mut app, key).await;
-                }
-            }
+            should_quit = input::handle_event(&mut app, event::read()?).await;
         }
 
         if app.last_refresh.elapsed() >= refresh_interval {

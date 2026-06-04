@@ -42,7 +42,7 @@ pub fn resolve_templates_path(rel: &str) -> Result<PathBuf, String> {
 }
 
 /// Field ids the UI lets users include or clear when exporting a template.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TemplateFieldId {
     Summary,
     Description,
@@ -52,6 +52,8 @@ pub enum TemplateFieldId {
     Parent,
     Sprint,
     DueDate,
+    /// Jira `customfield_*` copied from source issue.
+    Custom(String),
 }
 
 #[derive(Debug, Clone)]
@@ -143,8 +145,9 @@ pub fn exportable_field_rows(
         .map(|(id, label, preview)| {
             let has_value = preview != "(empty)";
             let include = match id {
-                TemplateFieldId::Summary => true,
+                TemplateFieldId::Summary | TemplateFieldId::Labels => true,
                 TemplateFieldId::Assignee | TemplateFieldId::Parent => false,
+                TemplateFieldId::Custom(_) => has_value,
                 _ => has_value,
             };
             TemplateFieldRow {
@@ -156,6 +159,41 @@ pub fn exportable_field_rows(
             }
         })
         .collect()
+}
+
+/// Add rows for custom fields on the draft (`extra_fields`), except the sprint field id (already a Sprint row).
+pub fn append_custom_field_rows(
+    draft: &CreateDraft,
+    rows: &mut Vec<TemplateFieldRow>,
+    sprint_field: Option<&str>,
+) {
+    let mut ids: Vec<_> = draft.extra_fields.keys().cloned().collect();
+    ids.sort();
+    for id in ids {
+        if sprint_field == Some(id.as_str()) {
+            continue;
+        }
+        if rows
+            .iter()
+            .any(|r| matches!(&r.id, TemplateFieldId::Custom(cf) if cf == &id))
+        {
+            continue;
+        }
+        let preview = crate::api::types::format_custom_field_value(
+            draft
+                .extra_fields
+                .get(&id)
+                .unwrap_or(&serde_json::Value::Null),
+        );
+        let has_value = preview != "-";
+        rows.push(TemplateFieldRow {
+            id: TemplateFieldId::Custom(id.clone()),
+            label: id,
+            preview: if has_value { preview } else { "(empty)".into() },
+            include: has_value,
+            clear_value: false,
+        });
+    }
 }
 
 fn preview_line(s: &str, max_chars: usize) -> String {
@@ -270,6 +308,18 @@ pub fn build_issue_template(
                 "duedate".to_string(),
                 toml::Value::String(d.format("%Y-%m-%d").to_string()),
             );
+        }
+    }
+    for row in rows {
+        let TemplateFieldId::Custom(id) = &row.id else {
+            continue;
+        };
+        if row.include && !row.clear_value {
+            if let Some(v) = draft.extra_fields.get(id) {
+                if let Ok(tv) = toml::Value::try_from(v.clone()) {
+                    extra_fields.insert(id.clone(), tv);
+                }
+            }
         }
     }
 
@@ -454,7 +504,7 @@ pub async fn export_issues_to_toml(
     out.push_str(&format!("# Site: {} ({})\n\n", site.name, site.base_url));
 
     for key in keys {
-        let template = export_one_issue(jira, site, key).await?;
+        let template = export_one_issue(jira, site, key, &[]).await?;
         out.push_str(&format_template_block(&template, key, true));
     }
     Ok(out)
@@ -464,10 +514,11 @@ async fn export_one_issue(
     jira: &JiraClient,
     site: &Site,
     key: &str,
+    custom_field_ids: &[&str],
 ) -> Result<IssueTemplate, String> {
     let sprint_field = site.sprint_field.as_deref();
     let issue = jira
-        .fetch_issue_for_clone(&site.base_url, key, sprint_field)
+        .fetch_issue_for_clone(&site.base_url, key, sprint_field, custom_field_ids)
         .await?;
     let fields = issue.get("fields").unwrap_or(&issue);
 
@@ -495,9 +546,17 @@ async fn export_one_issue(
         summary: summary.clone(),
         ..Default::default()
     };
-    crate::api::create::enrich_draft_from_clone(jira, &mut draft, &issue, sprint_field).await;
+    crate::api::create::enrich_draft_from_clone(
+        jira,
+        &mut draft,
+        &issue,
+        sprint_field,
+        custom_field_ids,
+    )
+    .await;
 
-    let rows = exportable_field_rows(&draft, sprint_field);
+    let mut rows = exportable_field_rows(&draft, sprint_field);
+    append_custom_field_rows(&draft, &mut rows, sprint_field);
     let name = template_name_from_key_and_summary(key, &summary);
     Ok(build_issue_template(
         &name,

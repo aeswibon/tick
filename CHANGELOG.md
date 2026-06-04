@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.1.1] - 2026-05-30
+
+### Added
+
+- **Duplicate field picker** (`C`) — Two-step review after duplicate: choose which fields to copy, then which to leave blank for manual entry (labels and custom fields included)
+- **Multiline footer input** — **Shift+Enter** / **Alt+Enter** for new lines; bracketed paste inserts full text; 3-line wrapped footer for comments and descriptions
+
+### Fixed
+
+- **Comment typing lag** — `@` mention search only hits Jira while an active `@mention` is being typed, not on every keystroke
+- **Multiline paste** — Pasted descriptions/comments no longer submit line-by-line or skip to the next wizard field
+- **Clone/export fields** — Duplicate and template export fetch **custom fields** (from `columns` / `[[detail.editable_fields]]`), **components**, and **labels** from the source issue
+
+### Improved
+
+- Template export (`X`) includes custom field rows from the loaded issue
+
+### Documentation
+
+- [comments-and-worklogs.md](docs/features/comments-and-worklogs.md) — multiline, paste, links, footer keys
+- [create-duplicate-templates.md](docs/features/create-duplicate-templates.md) — duplicate field picker and expanded copy list
+
 ## [1.1.0] - 2026-05-30
 
 ### Added

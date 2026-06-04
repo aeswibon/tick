@@ -5,7 +5,7 @@ use crossterm::event::KeyCode;
 use crate::api::create::{enrich_draft_from_clone, seed_draft_from_ticket, CreateDraft};
 use crate::app::{App, InputMode};
 use crate::template_export::{
-    append_issue_template, build_issue_template, exportable_field_rows,
+    append_custom_field_rows, append_issue_template, build_issue_template, exportable_field_rows,
     template_name_from_key_and_summary, TemplateFieldRow,
 };
 
@@ -64,13 +64,23 @@ pub async fn start_template_export_from_selection(app: &mut App) {
     seed_draft_from_ticket(&mut draft, &ticket, "");
 
     let sprint_field = site.sprint_field.as_deref();
+    let custom_ids: Vec<String> = app.config.custom_field_ids_for_fetch();
+    let custom_refs: Vec<&str> = custom_ids.iter().map(String::as_str).collect();
+
     match app
         .jira
-        .fetch_issue_for_clone(&site.base_url, &ticket.key, sprint_field)
+        .fetch_issue_for_clone(&site.base_url, &ticket.key, sprint_field, &custom_refs)
         .await
     {
         Ok(issue) => {
-            enrich_draft_from_clone(app.jira.as_ref(), &mut draft, &issue, sprint_field).await;
+            enrich_draft_from_clone(
+                app.jira.as_ref(),
+                &mut draft,
+                &issue,
+                sprint_field,
+                &custom_refs,
+            )
+            .await;
         }
         Err(e) => {
             app.loading = false;
@@ -86,6 +96,8 @@ pub async fn start_template_export_from_selection(app: &mut App) {
 
     let default_name = template_name_from_key_and_summary(&ticket.key, &draft.summary);
     let rows = exportable_field_rows(&draft, sprint_field);
+    let mut rows = rows;
+    append_custom_field_rows(&draft, &mut rows, sprint_field);
 
     app.template_export = Some(TemplateExportSession {
         step: TemplateExportStep::IncludeFields,
