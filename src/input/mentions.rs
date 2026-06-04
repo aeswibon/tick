@@ -192,10 +192,13 @@ pub(crate) async fn submit_input(app: &mut App) {
     let buffer = app.input_buffer.clone();
     let mode = app.input_mode;
     let mentions = app.input_mentions.clone();
+    let attach_paths = app.comment_attach_paths.clone();
     app.input_mode = InputMode::None;
     app.input_buffer.clear();
     clear_mention_picker(app);
     app.input_mentions.clear();
+    app.comment_attach_paths.clear();
+    app.comment_preview = false;
 
     let Some(sel) = app.selected_ticket() else {
         return;
@@ -208,7 +211,13 @@ pub(crate) async fn submit_input(app: &mut App) {
     let result = match mode {
         InputMode::Comment => {
             app.jira
-                .add_comment(&base_url, &sel.key, &buffer, &mentions)
+                .add_comment_with_attachments(
+                    &base_url,
+                    &sel.key,
+                    &buffer,
+                    &mentions,
+                    &attach_paths,
+                )
                 .await
         }
         InputMode::Worklog => app.jira.add_worklog(&base_url, &sel.key, &buffer).await,
@@ -271,7 +280,7 @@ pub(crate) async fn submit_input(app: &mut App) {
         | InputMode::GlobalSearchQuery => {
             return;
         }
-        InputMode::OpenTicket | InputMode::None => return,
+        InputMode::OpenTicket | InputMode::None | InputMode::CommentAttachPath => return,
     };
 
     match result {

@@ -2,6 +2,7 @@ pub mod adf;
 pub mod adf_export;
 pub mod agile;
 pub mod assignable_users;
+pub mod attachments;
 pub mod create;
 pub mod fields;
 pub mod issue_relations;
@@ -901,12 +902,26 @@ impl JiraClient {
         body: &str,
         mentions: &[(String, String)],
     ) -> Result<(), String> {
+        self.add_comment_with_attachments(base_url, key, body, mentions, &[])
+            .await
+    }
+
+    pub async fn add_comment_with_attachments(
+        &self,
+        base_url: &str,
+        key: &str,
+        body: &str,
+        mentions: &[(String, String)],
+        attach_paths: &[std::path::PathBuf],
+    ) -> Result<(), String> {
         let url = format!(
             "{}/rest/api/3/issue/{}/comment",
             base_url.trim_end_matches('/'),
             key
         );
-        let adf_body = markdown::to_adf(body, mentions);
+        let adf_body = self
+            .build_comment_body(base_url, key, body, mentions, attach_paths)
+            .await?;
         let payload = serde_json::json!({ "body": adf_body });
         let resp = self.send(|| self.post(&url).json(&payload).send()).await?;
 
@@ -1582,6 +1597,54 @@ mod field_updates {
             .await
             .unwrap();
         assert_eq!(again.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn add_comment_with_pdf_attachment_uploads_and_links() {
+        let server = wiremock::MockServer::start().await;
+        let dir = std::env::temp_dir().join(format!("tick-att-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("note.txt");
+        std::fs::write(&path, b"hello").unwrap();
+
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path(
+                "/rest/api/3/issue/DEMO-1/attachments",
+            ))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!([{
+                    "content": "https://jira.example/attachment/1"
+                }])),
+            )
+            .mount(&server)
+            .await;
+
+        let mut expected = crate::api::markdown::to_adf("see file", &[]);
+        expected["content"].as_array_mut().unwrap().push(
+            crate::api::attachments::attachment_link_paragraph(
+                &crate::api::attachments::UploadedAttachment {
+                    filename: "note.txt".into(),
+                    content_url: "https://jira.example/attachment/1".into(),
+                },
+            ),
+        );
+
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/rest/api/3/issue/DEMO-1/comment"))
+            .and(wiremock::matchers::body_json(
+                serde_json::json!({ "body": expected }),
+            ))
+            .respond_with(wiremock::ResponseTemplate::new(201))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new("u@example.com", "token", false);
+        client
+            .add_comment_with_attachments(&server.uri(), "DEMO-1", "see file", &[], std::slice::from_ref(&path))
+            .await
+            .unwrap();
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[tokio::test]

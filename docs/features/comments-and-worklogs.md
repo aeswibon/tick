@@ -10,8 +10,10 @@ Both require the **detail pane** open (`Enter` on a row).
 | Type text | Markdown → ADF on submit (stored locally until **Enter**) |
 | `@` | Open assignable-user picker for this issue |
 | `Shift+Enter` | New line in comment |
+| `Ctrl+P` | Toggle live markdown preview overlay |
+| `Ctrl+U` | Queue a file attachment (path prompt) |
 | `Enter` | Post comment to Jira |
-| `Esc` | Cancel |
+| `Esc` | Cancel (or back from preview / attach path) |
 
 ### @mention workflow
 
@@ -43,11 +45,14 @@ Comment text is held in the footer until you press **Enter** — nothing is sent
 - `-` bullets, `1.` ordered lists  
 - `- [ ]` / `- [x]` task lists  
 - `**bold**`, `*italic*`, `` `code` ``, `[label](https://example.com)` links, blockquotes, `---` rules  
+- Bare `http://` and `https://` URLs are auto-linked on submit  
+- `![alt](https://example.com/image.png)` external images become inline ADF media  
 
-### Links and images
+### Attachments
 
-- **Links:** use markdown `[text](url)` — converted to ADF on submit.
-- **Screenshots / attachments:** not supported in the footer editor yet. Attach files in the Jira web UI, or paste image URLs if your site allows hotlinking in ADF.
+- **Ctrl+U** while composing opens an attachment path prompt. Enter a local file path; it is queued and shown in the footer (and preview). Repeat to queue multiple files.
+- On submit, **images** (`png`, `jpg`, `gif`, `webp`, etc.) upload via Jira media API and render inline in the comment. **Other files** upload as issue attachments with a linked filename in the comment body.
+- **CLI:** `tick issue comment KEY --body "…" --attach /path/to/file.pdf` (repeat `--attach` for multiple files).
 
 ### Footer vs normal mode keys
 

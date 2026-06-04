@@ -151,6 +151,8 @@ pub enum InputMode {
     GlobalSearchQuery,
     /// Configured custom field (`[[detail.editable_fields]]`, type text).
     EditCustomField,
+    /// Comment mode: footer path for `Ctrl+U` attachment.
+    CommentAttachPath,
 }
 
 /// Collecting values for a workflow transition before POST.
@@ -241,6 +243,10 @@ pub struct App {
     pub mention_anchor: Option<usize>,
     /// Resolved @mentions while composing comment or description: (`@Display Name`, account_id).
     pub input_mentions: Vec<(String, String)>,
+    /// Files to upload when posting the current comment (`Ctrl+U`).
+    pub comment_attach_paths: Vec<std::path::PathBuf>,
+    /// Live markdown preview while composing a comment (`Ctrl+P`).
+    pub comment_preview: bool,
     #[allow(dead_code)]
     pub debug: bool,
     /// Rows to jump when pressing `[` / `]` (from config `page_size`).
@@ -349,6 +355,8 @@ impl App {
             mention_options: Vec::new(),
             mention_anchor: None,
             input_mentions: Vec::new(),
+            comment_attach_paths: Vec::new(),
+            comment_preview: false,
             debug,
             page_size,
             scroll_offset: 0,

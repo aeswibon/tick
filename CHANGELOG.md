@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.2.0] - 2026-05-29
+
+### Added
+
+- **Rich comment markdown** — Bare `http(s)://` URLs auto-link; `![alt](url)` renders external images in ADF; `@mentions` combine with links and inline styling on the same line
+- **Comment preview** — **Ctrl+P** live markdown preview while composing (`c`)
+- **Comment attachments** — **Ctrl+U** queues local files; images upload inline via media API, other files as linked issue attachments on submit
+- **CLI attachments** — `tick issue comment KEY --attach PATH` (repeatable)
+
+### Improved
+
+- Comment footer hints show preview/attach shortcuts and pending attachment count
+
+### Documentation
+
+- [comments-and-worklogs.md](docs/features/comments-and-worklogs.md) — preview, attachments, autolink, external images, CLI `--attach`
+
 ## [1.1.1] - 2026-05-30
 
 ### Added

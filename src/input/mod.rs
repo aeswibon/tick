@@ -61,7 +61,6 @@ pub fn load_more_users_key(key: &KeyEvent) -> bool {
         || mods.contains(KeyModifiers::META)
 }
 
-/// Handle bracketed paste (avoids multiline paste firing Enter per line).
 pub fn handle_paste(app: &mut App, pasted: String) {
     if app.input_mode == InputMode::None && !app.filtering {
         return;
@@ -76,6 +75,31 @@ pub fn handle_paste(app: &mut App, pasted: String) {
         app.global_search_hits = crate::global_search::refresh_hits(app, &app.input_buffer);
         app.global_search_selected = 0;
     }
+}
+
+pub fn submit_comment_attach_path(app: &mut App) {
+    let path = std::path::PathBuf::from(app.input_buffer.trim());
+    app.input_buffer.clear();
+    app.input_mode = InputMode::Comment;
+    if path.as_os_str().is_empty() {
+        app.status
+            .set_action_error("Attachment path cannot be empty");
+        return;
+    }
+    if !path.is_file() {
+        app.status
+            .set_action_error(format!("Not a file: {}", path.display()));
+        return;
+    }
+    let name = path
+        .file_name()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string());
+    app.comment_attach_paths.push(path);
+    app.status.set_action_notice(format!(
+        "Queued attachment {name} ({} pending)",
+        app.comment_attach_paths.len()
+    ));
 }
 
 /// Poll and dispatch one terminal event. Returns `true` to quit.
@@ -196,6 +220,39 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
             return false;
         }
 
+        if matches!(code, KeyCode::Char('p') | KeyCode::Char('P'))
+            && key.modifiers.contains(KeyModifiers::CONTROL)
+            && app.input_mode == InputMode::Comment
+        {
+            crate::ui::comment_preview::toggle_comment_preview(app);
+            return false;
+        }
+
+        if matches!(code, KeyCode::Char('u') | KeyCode::Char('U'))
+            && key.modifiers.contains(KeyModifiers::CONTROL)
+            && app.input_mode == InputMode::Comment
+        {
+            app.input_mode = InputMode::CommentAttachPath;
+            app.input_buffer.clear();
+            app.comment_preview = false;
+            clear_mention_picker(app);
+            return false;
+        }
+
+        if crate::ui::comment_preview::comment_preview_active(app) {
+            match code {
+                KeyCode::Esc => {
+                    app.comment_preview = false;
+                    return false;
+                }
+                KeyCode::Enter => {
+                    submit_input(app).await;
+                    return false;
+                }
+                _ => return false,
+            }
+        }
+
         if crate::create_flow::create_description_preview_active(app) {
             match code {
                 KeyCode::Esc => {
@@ -267,6 +324,11 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
             }
             KeyCode::Esc => {
                 clear_mention_picker(app);
+                if app.input_mode == InputMode::CommentAttachPath {
+                    app.input_mode = InputMode::Comment;
+                    app.input_buffer.clear();
+                    return false;
+                }
                 if app.input_mode == InputMode::TransitionField {
                     cancel_transition_collect(app);
                 } else if app.input_mode == InputMode::CreateDescription
@@ -327,12 +389,18 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     app.input_mode = InputMode::None;
                     app.input_buffer.clear();
                     app.input_mentions.clear();
+                    app.comment_attach_paths.clear();
+                    app.comment_preview = false;
                 }
             }
             KeyCode::Enter if text::should_insert_newline_on_enter(&key) => {
                 app.input_buffer.push('\n');
             }
             KeyCode::Enter => {
+                if app.input_mode == InputMode::CommentAttachPath {
+                    submit_comment_attach_path(app);
+                    return false;
+                }
                 if app.input_mode == InputMode::OpenTicket {
                     submit_open_ticket(app).await;
                 } else if matches!(

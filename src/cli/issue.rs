@@ -29,6 +29,9 @@ pub struct IssueCommentArgs {
     /// Comment text (markdown). Omit to read from stdin.
     #[arg(long)]
     pub body: Option<String>,
+    /// Attach a file (repeatable). Images upload inline; other files as issue attachments.
+    #[arg(long = "attach", value_name = "PATH")]
+    attach: Vec<std::path::PathBuf>,
     #[arg(long)]
     pub site: Option<String>,
 }
@@ -139,10 +142,22 @@ async fn run_transition(args: IssueTransitionArgs) -> Result<(), Box<dyn std::er
 async fn run_comment(args: IssueCommentArgs) -> Result<(), Box<dyn std::error::Error>> {
     let body = util::read_body_arg(args.body)?;
     let ctx = load_issue_ctx(&args.key, args.site.as_deref()).await?;
+    for path in &args.attach {
+        if !path.is_file() {
+            return Err(format!("Not a file: {}", path.display()).into());
+        }
+    }
     ctx.jira
-        .add_comment(&ctx.base_url, &ctx.key, &body, &[])
+        .add_comment_with_attachments(&ctx.base_url, &ctx.key, &body, &[], &args.attach)
         .await?;
-    print_issue_ok(&ctx, "comment", serde_json::json!({ "chars": body.len() }));
+    print_issue_ok(
+        &ctx,
+        "comment",
+        serde_json::json!({
+            "chars": body.len(),
+            "attachments": args.attach.len(),
+        }),
+    );
     Ok(())
 }
 

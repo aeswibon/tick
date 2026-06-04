@@ -65,6 +65,12 @@ impl<'a> MdParser<'a> {
             return;
         }
 
+        if let Some((alt, url)) = parse_standalone_image(line.trim()) {
+            self.flush_lists();
+            self.blocks.push(external_media_single(url, alt));
+            return;
+        }
+
         if let Some(rest) = line
             .strip_prefix('>')
             .map(|s| s.strip_prefix(' ').unwrap_or(s))
@@ -320,37 +326,36 @@ fn parse_heading(line: &str) -> Option<(u64, &str)> {
 }
 
 fn parse_inline_markdown(line: &str, mentions: &[(String, String)]) -> Vec<Value> {
-    if mentions.is_empty() {
-        return parse_styled_text(line);
-    }
     let mut nodes = Vec::new();
     let mut rest = line;
     while !rest.is_empty() {
-        let mut best: Option<(usize, &str, &str)> = None;
-        for (label, account_id) in mentions {
-            if let Some(pos) = rest.find(label.as_str()) {
-                if best.map(|(p, _, _)| pos < p).unwrap_or(true) {
-                    best = Some((pos, label.as_str(), account_id.as_str()));
-                }
-            }
-        }
-        match best {
-            Some((0, label, account_id)) => {
-                nodes.push(mention_node(account_id, label));
-                rest = &rest[label.len()..];
-            }
-            Some((pos, label, account_id)) => {
+        if let Some((pos, label, account_id)) = find_earliest_mention(rest, mentions) {
+            if pos > 0 {
                 nodes.extend(parse_styled_text(&rest[..pos]));
-                nodes.push(mention_node(account_id, label));
-                rest = &rest[pos + label.len()..];
             }
-            None => {
-                nodes.extend(parse_styled_text(rest));
-                break;
-            }
+            nodes.push(mention_node(account_id, label));
+            rest = &rest[pos + label.len()..];
+        } else {
+            nodes.extend(parse_styled_text(rest));
+            break;
         }
     }
     nodes
+}
+
+fn find_earliest_mention<'a>(
+    text: &'a str,
+    mentions: &'a [(String, String)],
+) -> Option<(usize, &'a str, &'a str)> {
+    let mut best: Option<(usize, &str, &str)> = None;
+    for (label, account_id) in mentions {
+        if let Some(pos) = text.find(label.as_str()) {
+            if best.map(|(p, _, _)| pos < p).unwrap_or(true) {
+                best = Some((pos, label.as_str(), account_id.as_str()));
+            }
+        }
+    }
+    best
 }
 
 fn parse_styled_text(input: &str) -> Vec<Value> {
@@ -359,6 +364,7 @@ fn parse_styled_text(input: &str) -> Vec<Value> {
     while !rest.is_empty() {
         let mut earliest: Option<(usize, InlineToken)> = None;
         for (pat, token) in [
+            ("![", InlineToken::Image),
             ("**", InlineToken::Bold),
             ("__", InlineToken::Bold),
             ("~~", InlineToken::Strike),
@@ -366,6 +372,8 @@ fn parse_styled_text(input: &str) -> Vec<Value> {
             ("_", InlineToken::Italic),
             ("`", InlineToken::Code),
             ("[", InlineToken::Link),
+            ("<http", InlineToken::AngleLink),
+            ("<https", InlineToken::AngleLink),
         ] {
             if let Some(pos) = rest.find(pat) {
                 if earliest.map(|(p, _)| pos < p).unwrap_or(true) {
@@ -374,13 +382,11 @@ fn parse_styled_text(input: &str) -> Vec<Value> {
             }
         }
         let Some((pos, token)) = earliest else {
-            if !rest.is_empty() {
-                nodes.push(text_node(rest, None));
-            }
+            nodes.extend(autolink_text_nodes(rest, None));
             break;
         };
         if pos > 0 {
-            nodes.push(text_node(&rest[..pos], None));
+            nodes.extend(autolink_text_nodes(&rest[..pos], None));
         }
         rest = &rest[pos..];
         match token {
@@ -433,6 +439,24 @@ fn parse_styled_text(input: &str) -> Vec<Value> {
                     rest = &rest[1..];
                 }
             }
+            InlineToken::Image => {
+                if let Some((alt, href, tail)) = parse_image(rest) {
+                    nodes.push(link_node(alt, href));
+                    rest = tail;
+                } else {
+                    nodes.push(text_node("![", None));
+                    rest = &rest[2..];
+                }
+            }
+            InlineToken::AngleLink => {
+                if let Some((href, tail)) = parse_angle_link(rest) {
+                    nodes.push(link_node(href, href));
+                    rest = tail;
+                } else {
+                    nodes.push(text_node("<", None));
+                    rest = &rest[1..];
+                }
+            }
         }
     }
     nodes
@@ -445,6 +469,8 @@ enum InlineToken {
     Strike,
     Code,
     Link,
+    Image,
+    AngleLink,
 }
 
 fn take_wrapped<'a>(s: &'a str, delim: &str) -> Option<(&'a str, &'a str)> {
@@ -474,6 +500,104 @@ fn parse_link(s: &str) -> Option<(&str, &str, &str)> {
     let href = &url_rest[..url_end];
     let tail = &url_rest[url_end + 1..];
     Some((label, href, tail))
+}
+
+fn parse_image(s: &str) -> Option<(&str, &str, &str)> {
+    if !s.starts_with("![") {
+        return None;
+    }
+    let rest = &s[2..];
+    let alt_end = rest.find(']')?;
+    let alt = &rest[..alt_end];
+    let after = &rest[alt_end + 1..];
+    if !after.starts_with('(') {
+        return None;
+    }
+    let url_rest = &after[1..];
+    let url_end = url_rest.find(')')?;
+    let href = &url_rest[..url_end];
+    let tail = &url_rest[url_end + 1..];
+    Some((alt, href, tail))
+}
+
+fn parse_standalone_image(line: &str) -> Option<(&str, &str)> {
+    parse_image(line).and_then(|(alt, url, tail)| {
+        if tail.trim().is_empty() {
+            Some((alt, url))
+        } else {
+            None
+        }
+    })
+}
+
+fn parse_angle_link(s: &str) -> Option<(&str, &str)> {
+    if !s.starts_with('<') {
+        return None;
+    }
+    let rest = &s[1..];
+    let end = rest.find('>')?;
+    let href = &rest[..end];
+    if !href.starts_with("http://") && !href.starts_with("https://") {
+        return None;
+    }
+    Some((href, &rest[end + 1..]))
+}
+
+fn external_media_single(url: &str, alt: &str) -> Value {
+    json!({
+        "type": "mediaSingle",
+        "attrs": { "layout": "center" },
+        "content": [{
+            "type": "media",
+            "attrs": {
+                "type": "external",
+                "url": url,
+                "alt": alt,
+            }
+        }]
+    })
+}
+
+fn autolink_text_nodes(text: &str, mark: Option<&str>) -> Vec<Value> {
+    if text.is_empty() {
+        return vec![];
+    }
+    let mut nodes = Vec::new();
+    let mut rest = text;
+    while !rest.is_empty() {
+        if let Some(pos) = find_autolink_start(rest) {
+            if pos > 0 {
+                nodes.push(text_node(&rest[..pos], mark));
+            }
+            let url = take_autolink_url(&rest[pos..]);
+            nodes.push(link_node(url, url));
+            rest = &rest[pos + url.len()..];
+        } else {
+            nodes.push(text_node(rest, mark));
+            break;
+        }
+    }
+    nodes
+}
+
+fn find_autolink_start(s: &str) -> Option<usize> {
+    let https = s.find("https://");
+    let http = s.find("http://");
+    match (https, http) {
+        (Some(a), Some(b)) => Some(a.min(b)),
+        (Some(a), None) => Some(a),
+        (None, Some(b)) => Some(b),
+        (None, None) => None,
+    }
+}
+
+fn take_autolink_url(s: &str) -> &str {
+    let end = s
+        .char_indices()
+        .find(|(_, c)| c.is_whitespace() || matches!(*c, ')' | ']' | '>' | '"' | '\'' | ',' | ';'))
+        .map(|(i, _)| i)
+        .unwrap_or(s.len());
+    &s[..end]
 }
 
 fn text_node(text: &str, mark: Option<&str>) -> Value {
@@ -523,6 +647,37 @@ mod tests {
     fn link_inline() {
         let doc = to_adf("see [docs](https://example.com)", &[]);
         let inline = doc["content"][0]["content"].as_array().unwrap();
+        assert!(inline.iter().any(|n| {
+            n["marks"]
+                .as_array()
+                .is_some_and(|m| m[0]["type"] == "link")
+        }));
+    }
+
+    #[test]
+    fn autolink_bare_url() {
+        let doc = to_adf("see https://example.com/page ok", &[]);
+        let inline = doc["content"][0]["content"].as_array().unwrap();
+        assert!(inline.iter().any(|n| {
+            n["marks"]
+                .as_array()
+                .is_some_and(|m| m[0]["attrs"]["href"] == "https://example.com/page")
+        }));
+    }
+
+    #[test]
+    fn standalone_image_becomes_media_single() {
+        let doc = to_adf("![shot](https://example.com/a.png)", &[]);
+        assert_eq!(doc["content"][0]["type"], "mediaSingle");
+        assert_eq!(doc["content"][0]["content"][0]["attrs"]["type"], "external");
+    }
+
+    #[test]
+    fn mention_and_link_together() {
+        let mentions = vec![("@Ada".into(), "acc-1".into())];
+        let doc = to_adf("@Ada see https://x.com", &mentions);
+        let inline = doc["content"][0]["content"].as_array().unwrap();
+        assert!(inline.iter().any(|n| n["type"] == "mention"));
         assert!(inline.iter().any(|n| {
             n["marks"]
                 .as_array()

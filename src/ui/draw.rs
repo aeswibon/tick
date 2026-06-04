@@ -57,6 +57,9 @@ pub fn render(f: &mut Frame, app: &mut App) {
     if crate::create_flow::create_description_preview_active(app) {
         super::create_preview::draw_create_description_preview(f, app, f.area());
     }
+    if crate::ui::comment_preview::comment_preview_active(app) {
+        super::comment_preview::draw_comment_preview(f, app, f.area());
+    }
     if let Some(ref session) = app.template_export {
         if session.step != crate::template_export_flow::TemplateExportStep::Name {
             super::template_export::draw_template_export(f, session, &app.theme, f.area());
@@ -218,13 +221,31 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     let (footer_text, fg_color) = if app.filtering {
         (format!(" Filter: {}_", app.filter), app.theme.accent)
     } else if app.input_mode == crate::app::InputMode::Comment {
-        let hint = if app.showing_mention_picker {
-            " @mention"
+        if crate::ui::comment_preview::comment_preview_active(app) {
+            (
+                " Comment preview — Ctrl+P edit · Ctrl+U attach · Enter post · Esc edit".into(),
+                app.theme.border,
+            )
         } else {
-            " (@ · Shift+Enter newline)"
-        };
+            let mut hint = if app.showing_mention_picker {
+                " @mention".to_string()
+            } else {
+                " (@ · Shift+Enter · Ctrl+P · Ctrl+U)".to_string()
+            };
+            if !app.comment_attach_paths.is_empty() {
+                hint.push_str(&format!(" · {} attach", app.comment_attach_paths.len()));
+            }
+            (
+                format!(" Comment{hint}:\n{}_", app.input_buffer),
+                app.theme.accent,
+            )
+        }
+    } else if app.input_mode == crate::app::InputMode::CommentAttachPath {
         (
-            format!(" Comment{hint}:\n{}_", app.input_buffer),
+            format!(
+                " Attachment path (Enter queue · Esc back): {}_",
+                app.input_buffer
+            ),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::Worklog {
