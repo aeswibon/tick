@@ -307,6 +307,42 @@ pub fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
                     Style::default().fg(app.theme.border),
                 )));
             } else {
+                let mut open_urls = Vec::new();
+                for comment in &ticket.all_comments {
+                    if let Some(ref body) = comment.body {
+                        open_urls.extend(crate::ui::adf::collect_open_urls(body));
+                    }
+                }
+                if !open_urls.is_empty() {
+                    lines.push(Line::from(Span::styled(
+                        "  Links in comments (j/k · o open)",
+                        Style::default().fg(app.theme.border),
+                    )));
+                    let sel = app
+                        .comments_link_selected
+                        .min(open_urls.len().saturating_sub(1));
+                    for (i, url) in open_urls.iter().enumerate() {
+                        let is_sel = i == sel;
+                        let marker = if is_sel { "›" } else { " " };
+                        let row_style = if is_sel {
+                            Style::default()
+                                .fg(app.theme.accent)
+                                .add_modifier(Modifier::BOLD)
+                        } else {
+                            Style::default().fg(dv)
+                        };
+                        let display = if url.len() > 56 {
+                            format!("{}…", &url[..55])
+                        } else {
+                            url.clone()
+                        };
+                        lines.push(Line::from(vec![
+                            Span::styled(format!(" {marker} "), row_style),
+                            Span::styled(display, row_style),
+                        ]));
+                    }
+                    lines.push(Line::from(""));
+                }
                 for (i, comment) in ticket.all_comments.iter().enumerate() {
                     if i > 0 {
                         lines.push(Line::from(""));

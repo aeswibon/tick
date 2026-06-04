@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.2.1] - 2026-05-29
+
+### Added
+
+- **Comments tab links** — `j`/`k` selects attachment and markdown links in loaded comments; **`o`** opens in the browser
+- **Footer cursor** — **←**/**→**, **Home**/**End** move the insertion point in footer prompts (visible `█` cursor)
+
+### Improved
+
+- Comment compose clears attachment/preview state when starting fresh (`c`)
+
+### Documentation
+
+- [comments-and-worklogs.md](docs/features/comments-and-worklogs.md) — open links from Comments tab, footer cursor keys
+
 ## [1.2.0] - 2026-05-29
 
 ### Added

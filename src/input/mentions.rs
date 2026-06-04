@@ -96,6 +96,7 @@ fn confirm_mention_pick(app: &mut App) {
     let label = format!("@{display_name}");
     let prefix = &app.input_buffer[..anchor];
     app.input_buffer = format!("{prefix}{label} ");
+    app.input_cursor = app.input_buffer.len();
     app.input_mentions.push((label, account_id));
     clear_mention_picker(app);
 }
@@ -122,7 +123,7 @@ pub(crate) async fn handle_mention_picker_key(app: &mut App, key: &KeyEvent) {
             }
         }
         KeyCode::Char(c) => {
-            app.input_buffer.push(c);
+            crate::input::text::insert_char(&mut app.input_buffer, &mut app.input_cursor, c);
             if active_mention_query(&app.input_buffer).is_some() {
                 refresh_mention_picker(app).await;
             } else {
@@ -130,7 +131,7 @@ pub(crate) async fn handle_mention_picker_key(app: &mut App, key: &KeyEvent) {
             }
         }
         KeyCode::Backspace => {
-            app.input_buffer.pop();
+            crate::input::text::backspace_at(&mut app.input_buffer, &mut app.input_cursor);
             if active_mention_query(&app.input_buffer).is_some() {
                 refresh_mention_picker(app).await;
             } else {
@@ -162,12 +163,13 @@ pub(crate) async fn start_open_ticket(app: &mut App) {
     }
     app.input_mode = InputMode::OpenTicket;
     app.input_buffer = prefilled;
+    app.sync_input_cursor_end();
 }
 
 pub(crate) async fn submit_open_ticket(app: &mut App) {
     let buffer = app.input_buffer.clone();
     app.input_mode = InputMode::None;
-    app.input_buffer.clear();
+    app.reset_input_buffer();
     app.loading = true;
     if app.config.sites.len() > 1 {
         app.loading_message = Some(format!(
@@ -194,7 +196,7 @@ pub(crate) async fn submit_input(app: &mut App) {
     let mentions = app.input_mentions.clone();
     let attach_paths = app.comment_attach_paths.clone();
     app.input_mode = InputMode::None;
-    app.input_buffer.clear();
+    app.reset_input_buffer();
     clear_mention_picker(app);
     app.input_mentions.clear();
     app.comment_attach_paths.clear();

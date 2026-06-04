@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 use crate::app::App;
-use crate::input::multiline_input_mode;
+use crate::input::{multiline_input_mode, text::format_with_cursor};
 use crate::view_mode::ViewMode;
 
 pub fn render(f: &mut Frame, app: &mut App) {
@@ -218,6 +218,7 @@ fn render_tabs(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
 }
 
 fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    let input = format_with_cursor(&app.input_buffer, app.input_cursor);
     let (footer_text, fg_color) = if app.filtering {
         (format!(" Filter: {}_", app.filter), app.theme.accent)
     } else if app.input_mode == crate::app::InputMode::Comment {
@@ -235,51 +236,39 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             if !app.comment_attach_paths.is_empty() {
                 hint.push_str(&format!(" · {} attach", app.comment_attach_paths.len()));
             }
-            (
-                format!(" Comment{hint}:\n{}_", app.input_buffer),
-                app.theme.accent,
-            )
+            (format!(" Comment{hint}:\n{}", input), app.theme.accent)
         }
     } else if app.input_mode == crate::app::InputMode::CommentAttachPath {
         (
-            format!(
-                " Attachment path (Enter queue · Esc back): {}_",
-                app.input_buffer
-            ),
+            format!(" Attachment path (Enter queue · Esc back): {}", input),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::Worklog {
-        (
-            format!(" Worklog (e.g. 30m): {}_", app.input_buffer),
-            app.theme.accent,
-        )
+        (format!(" Worklog (e.g. 30m): {}", input), app.theme.accent)
     } else if app.input_mode == crate::app::InputMode::EditSummary {
-        (format!(" Summary: {}_", app.input_buffer), app.theme.accent)
+        (format!(" Summary: {}", input), app.theme.accent)
     } else if app.input_mode == crate::app::InputMode::EditLabels {
         (
-            format!(" Labels (comma-separated): {}_", app.input_buffer),
+            format!(" Labels (comma-separated): {}", input),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::GlobalSearchQuery {
         (
-            format!(" Search cached views (Ctrl+g): {}_", app.input_buffer),
+            format!(" Search cached views (Ctrl+g): {}", input),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::BulkEditLabels {
         (
             format!(
-                " Bulk labels for {} issues (comma-separated): {}_",
+                " Bulk labels for {} issues (comma-separated): {}",
                 app.bulk_mark_count(),
-                app.input_buffer
+                input
             ),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::EditDueDate {
         (
-            format!(
-                " Due date (YYYY-MM-DD, empty clears): {}_",
-                app.input_buffer
-            ),
+            format!(" Due date (YYYY-MM-DD, empty clears): {}", input),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::EditCustomField {
@@ -289,25 +278,19 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             .map(|f| f.display_label())
             .unwrap_or_else(|| "Custom field".into());
         (
-            format!(" {label} (empty clears): {}_", app.input_buffer),
+            format!(" {label} (empty clears): {}", input),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::AddIssueLinkTarget {
         (
-            format!(" Link target issue key: {}_", app.input_buffer),
+            format!(" Link target issue key: {}", input),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::CreateSubtaskSummary {
-        (
-            format!(" Subtask summary: {}_", app.input_buffer),
-            app.theme.accent,
-        )
+        (format!(" Subtask summary: {}", input), app.theme.accent)
     } else if app.input_mode == crate::app::InputMode::OpenTicket {
         (
-            format!(
-                " Open ticket (key or URL, paste from clipboard): {}_",
-                app.input_buffer
-            ),
+            format!(" Open ticket (key or URL, paste from clipboard): {}", input),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::CreateField {
@@ -320,7 +303,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         } else {
             "Summary"
         };
-        (format!(" {label}: {}_", app.input_buffer), app.theme.accent)
+        (format!(" {label}: {}", input), app.theme.accent)
     } else if app.input_mode == crate::app::InputMode::CreateDescription {
         if crate::create_flow::create_description_preview_active(app) {
             (
@@ -329,50 +312,38 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             )
         } else {
             (
-                format!(
-                    " Description (markdown, Ctrl+P preview): {}_",
-                    app.input_buffer
-                ),
+                format!(" Description (markdown, Ctrl+P preview): {}", input),
                 app.theme.accent,
             )
         }
     } else if app.input_mode == crate::app::InputMode::TemplateExportName {
         (
-            format!(
-                " Template name (saved to config, Enter): {}_",
-                app.input_buffer
-            ),
+            format!(" Template name (saved to config, Enter): {}", input),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::TemplateEditSummary {
         (
-            format!(" Template summary (Enter): {}_", app.input_buffer),
+            format!(" Template summary (Enter): {}", input),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::TemplateEditProject {
         (
-            format!(" Template project (Enter): {}_", app.input_buffer),
+            format!(" Template project (Enter): {}", input),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::TemplateEditIssueType {
         (
-            format!(" Template issue type (Enter): {}_", app.input_buffer),
+            format!(" Template issue type (Enter): {}", input),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::TemplateEditDescription {
         (
-            format!(
-                " Template description (markdown, Enter save): {}_",
-                app.input_buffer
-            ),
+            format!(" Template description (markdown, Enter save): {}", input),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::TemplateEditLabels {
         (
-            format!(
-                " Template labels (comma-separated, Enter save): {}_",
-                app.input_buffer
-            ),
+            format!(" Template labels (comma-separated, Enter save): {}", input),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::ClosedSearchQuery {
@@ -382,7 +353,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             "closed assignee"
         };
         (
-            format!(" Closed search ({scope}, Enter): {}_", app.input_buffer),
+            format!(" Closed search ({scope}, Enter): {}", input),
             app.theme.accent,
         )
     } else if app.active_view == ViewMode::ClosedSearch
@@ -414,20 +385,14 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             .as_ref()
             .map(|f| (f.name.as_str(), f.input_hint()))
             .unwrap_or(("Field", "text"));
-        (
-            format!(" {label} ({hint}): {}_", app.input_buffer),
-            app.theme.accent,
-        )
+        (format!(" {label} ({hint}): {}", input), app.theme.accent)
     } else if app.input_mode == crate::app::InputMode::EditDescription {
         let hint = if app.showing_mention_picker {
             " @mention"
         } else {
             " (markdown · Shift+Enter newline)"
         };
-        (
-            format!(" Description{hint}:\n{}_", app.input_buffer),
-            app.theme.accent,
-        )
+        (format!(" Description{hint}:\n{}", input), app.theme.accent)
     } else if app.loading && !app.showing_transition_field {
         let msg = app.loading_message.as_deref().unwrap_or(" Loading...");
         (format!(" {msg}"), app.theme.loading_fg)
@@ -463,6 +428,8 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             left.push_str("  S/P/L/M/D fields  h/l tabs");
             if app.detail_tab == crate::app::DetailTab::Links {
                 left.push_str("  Enter jump  o open  Shift+I remove  Shift+N subtask");
+            } else if app.detail_tab == crate::app::DetailTab::Comments {
+                left.push_str("  j/k links  o open");
             }
         }
         let total = app.filtered_count();

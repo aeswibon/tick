@@ -1640,7 +1640,13 @@ mod field_updates {
 
         let client = JiraClient::new("u@example.com", "token", false);
         client
-            .add_comment_with_attachments(&server.uri(), "DEMO-1", "see file", &[], std::slice::from_ref(&path))
+            .add_comment_with_attachments(
+                &server.uri(),
+                "DEMO-1",
+                "see file",
+                &[],
+                std::slice::from_ref(&path),
+            )
             .await
             .unwrap();
 

@@ -377,6 +377,62 @@ fn table_cell_text(cell: &serde_json::Value) -> String {
     parts.join(" ").trim().to_string()
 }
 
+/// Collect browser-openable URLs from ADF (link marks, external media).
+pub fn collect_open_urls(doc: &serde_json::Value) -> Vec<String> {
+    let mut urls = Vec::new();
+    if let Some(content) = doc.get("content").and_then(|c| c.as_array()) {
+        collect_open_urls_nodes(content, &mut urls);
+    }
+    dedup_urls(urls)
+}
+
+fn collect_open_urls_nodes(nodes: &[serde_json::Value], urls: &mut Vec<String>) {
+    for node in nodes {
+        match node.get("type").and_then(|t| t.as_str()) {
+            Some("text") => {
+                if let Some(marks) = node.get("marks").and_then(|m| m.as_array()) {
+                    for mark in marks {
+                        if mark.get("type").and_then(|t| t.as_str()) == Some("link") {
+                            if let Some(href) = mark
+                                .get("attrs")
+                                .and_then(|a| a.get("href"))
+                                .and_then(|h| h.as_str())
+                            {
+                                push_url(urls, href);
+                            }
+                        }
+                    }
+                }
+            }
+            Some("media") => {
+                let attrs = node.get("attrs");
+                if attrs.and_then(|a| a.get("type")).and_then(|t| t.as_str()) == Some("external") {
+                    if let Some(url) = attrs.and_then(|a| a.get("url")).and_then(|u| u.as_str()) {
+                        push_url(urls, url);
+                    }
+                }
+            }
+            _ => {}
+        }
+        if let Some(child) = node.get("content").and_then(|c| c.as_array()) {
+            collect_open_urls_nodes(child, urls);
+        }
+    }
+}
+
+fn push_url(urls: &mut Vec<String>, href: &str) {
+    if !href.is_empty() {
+        urls.push(href.to_string());
+    }
+}
+
+fn dedup_urls(urls: Vec<String>) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    urls.into_iter()
+        .filter(|u| seen.insert(u.clone()))
+        .collect()
+}
+
 pub fn render_doc(doc: &serde_json::Value) -> Vec<Line<'static>> {
     let content = match doc.get("content").and_then(|c| c.as_array()) {
         Some(c) => c,
@@ -395,6 +451,32 @@ mod tests {
             .map(|s| s.content.clone())
             .collect::<Vec<_>>()
             .join("")
+    }
+
+    #[test]
+    fn collects_link_and_external_media_urls() {
+        let doc = serde_json::json!({
+            "type": "doc",
+            "content": [
+                { "type": "paragraph", "content": [{
+                    "type": "text",
+                    "text": "file.pdf",
+                    "marks": [{ "type": "link", "attrs": { "href": "https://jira/a.pdf" } }]
+                }]},
+                { "type": "mediaSingle", "content": [{
+                    "type": "media",
+                    "attrs": { "type": "external", "url": "https://img/x.png" }
+                }]}
+            ]
+        });
+        let urls = collect_open_urls(&doc);
+        assert_eq!(
+            urls,
+            vec![
+                "https://jira/a.pdf".to_string(),
+                "https://img/x.png".to_string()
+            ]
+        );
     }
 
     #[test]

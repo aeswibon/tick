@@ -12,6 +12,8 @@ Both require the **detail pane** open (`Enter` on a row).
 | `Shift+Enter` | New line in comment |
 | `Ctrl+P` | Toggle live markdown preview overlay |
 | `Ctrl+U` | Queue a file attachment (path prompt) |
+| `←` / `→` | Move cursor in footer input |
+| `Home` / `End` | Start / end of current footer line |
 | `Enter` | Post comment to Jira |
 | `Esc` | Cancel (or back from preview / attach path) |
 
@@ -53,6 +55,17 @@ Comment text is held in the footer until you press **Enter** — nothing is sent
 - **Ctrl+U** while composing opens an attachment path prompt. Enter a local file path; it is queued and shown in the footer (and preview). Repeat to queue multiple files.
 - On submit, **images** (`png`, `jpg`, `gif`, `webp`, etc.) upload via Jira media API and render inline in the comment. **Other files** upload as issue attachments with a linked filename in the comment body.
 - **CLI:** `tick issue comment KEY --body "…" --attach /path/to/file.pdf` (repeat `--attach` for multiple files).
+
+### Open links from Comments tab
+
+When comments are loaded, attachment URLs and markdown links appear in a **Links in comments** list at the top of the tab.
+
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Select a link (when the list is shown) |
+| `o` | Open selected link in the browser |
+
+Table row selection still uses `j`/`k` when there are no openable links in comments.
 
 ### Footer vs normal mode keys
 

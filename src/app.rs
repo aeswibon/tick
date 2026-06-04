@@ -213,6 +213,8 @@ pub struct App {
     pub issue_relations_key: Option<(String, String)>,
     /// Combined links + subtasks row index on Links tab.
     pub links_selected: usize,
+    /// Openable URL index on Comments tab (`j`/`k`, `o`).
+    pub comments_link_selected: usize,
     pub showing_add_link: bool,
     pub add_link_selected: usize,
     pub showing_priorities: bool,
@@ -234,6 +236,8 @@ pub struct App {
     pub sort_order: SortOrder,
     pub input_mode: InputMode,
     pub input_buffer: String,
+    /// Byte index of the text cursor in `input_buffer` (always on a char boundary).
+    pub input_cursor: usize,
     /// `@` mention picker while composing a comment.
     pub showing_mention_picker: bool,
     pub mention_selected: usize,
@@ -331,6 +335,7 @@ impl App {
             issue_relations: None,
             issue_relations_key: None,
             links_selected: 0,
+            comments_link_selected: 0,
             showing_add_link: false,
             add_link_selected: 0,
             showing_priorities: false,
@@ -350,6 +355,7 @@ impl App {
             sort_order: SortOrder::default(),
             input_mode: InputMode::None,
             input_buffer: String::new(),
+            input_cursor: 0,
             showing_mention_picker: false,
             mention_selected: 0,
             mention_options: Vec::new(),
@@ -666,6 +672,47 @@ impl App {
     pub fn invalidate_issue_relations_cache(&mut self) {
         self.issue_relations_key = None;
         self.links_selected = 0;
+        self.comments_link_selected = 0;
+    }
+
+    pub fn comment_open_urls(&self) -> Vec<String> {
+        let Some(idx) = self.selected_ticket_index() else {
+            return Vec::new();
+        };
+        let tickets = crate::ticket_lock::read_tickets(&self.tickets);
+        let ticket = &tickets[idx];
+        let mut urls = Vec::new();
+        for comment in &ticket.all_comments {
+            if let Some(ref body) = comment.body {
+                urls.extend(crate::ui::adf::collect_open_urls(body));
+            }
+        }
+        urls
+    }
+
+    pub fn comment_open_link_count(&self) -> usize {
+        self.comment_open_urls().len()
+    }
+
+    pub fn clamp_comments_link_selection(&mut self) {
+        let max = self.comment_open_link_count().saturating_sub(1);
+        if self.comments_link_selected > max {
+            self.comments_link_selected = max;
+        }
+    }
+
+    pub fn selected_comment_open_url(&self) -> Option<String> {
+        let urls = self.comment_open_urls();
+        urls.get(self.comments_link_selected).cloned()
+    }
+
+    pub fn reset_input_buffer(&mut self) {
+        self.input_buffer.clear();
+        self.input_cursor = 0;
+    }
+
+    pub fn sync_input_cursor_end(&mut self) {
+        self.input_cursor = self.input_buffer.len();
     }
 
     pub fn links_row_count(&self) -> usize {

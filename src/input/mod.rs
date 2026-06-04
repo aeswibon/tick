@@ -5,7 +5,7 @@ use crate::app::{App, InputMode};
 mod detail_actions;
 mod mentions;
 mod normal;
-mod text;
+pub mod text;
 pub use text::{buffer_for_submit, insert_paste, multiline_input_mode};
 mod transitions;
 
@@ -70,7 +70,7 @@ pub fn handle_paste(app: &mut App, pasted: String) {
         app.invalidate_filter_cache();
         return;
     }
-    text::insert_paste(&mut app.input_buffer, &pasted);
+    text::insert_paste_at(&mut app.input_buffer, &mut app.input_cursor, &pasted);
     if app.input_mode == InputMode::GlobalSearchQuery {
         app.global_search_hits = crate::global_search::refresh_hits(app, &app.input_buffer);
         app.global_search_selected = 0;
@@ -79,7 +79,7 @@ pub fn handle_paste(app: &mut App, pasted: String) {
 
 pub fn submit_comment_attach_path(app: &mut App) {
     let path = std::path::PathBuf::from(app.input_buffer.trim());
-    app.input_buffer.clear();
+    app.reset_input_buffer();
     app.input_mode = InputMode::Comment;
     if path.as_os_str().is_empty() {
         app.status
@@ -233,7 +233,7 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
             && app.input_mode == InputMode::Comment
         {
             app.input_mode = InputMode::CommentAttachPath;
-            app.input_buffer.clear();
+            app.reset_input_buffer();
             app.comment_preview = false;
             clear_mention_picker(app);
             return false;
@@ -270,8 +270,20 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         }
 
         match code {
+            KeyCode::Left => {
+                app.input_cursor = text::cursor_left(&app.input_buffer, app.input_cursor);
+            }
+            KeyCode::Right => {
+                app.input_cursor = text::cursor_right(&app.input_buffer, app.input_cursor);
+            }
+            KeyCode::Home => {
+                app.input_cursor = text::cursor_home(&app.input_buffer, app.input_cursor);
+            }
+            KeyCode::End => {
+                app.input_cursor = text::cursor_end(&app.input_buffer, app.input_cursor);
+            }
             KeyCode::Char(c) => {
-                app.input_buffer.push(c);
+                text::insert_char(&mut app.input_buffer, &mut app.input_cursor, c);
                 if app.input_mode == InputMode::GlobalSearchQuery {
                     app.global_search_hits =
                         crate::global_search::refresh_hits(app, &app.input_buffer);
@@ -297,7 +309,7 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                 }
             }
             KeyCode::Backspace => {
-                app.input_buffer.pop();
+                text::backspace_at(&mut app.input_buffer, &mut app.input_cursor);
                 if app.input_mode == InputMode::GlobalSearchQuery {
                     app.global_search_hits =
                         crate::global_search::refresh_hits(app, &app.input_buffer);
@@ -326,7 +338,7 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                 clear_mention_picker(app);
                 if app.input_mode == InputMode::CommentAttachPath {
                     app.input_mode = InputMode::Comment;
-                    app.input_buffer.clear();
+                    app.reset_input_buffer();
                     return false;
                 }
                 if app.input_mode == InputMode::TransitionField {
@@ -394,7 +406,7 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                 }
             }
             KeyCode::Enter if text::should_insert_newline_on_enter(&key) => {
-                app.input_buffer.push('\n');
+                text::insert_char(&mut app.input_buffer, &mut app.input_cursor, '\n');
             }
             KeyCode::Enter => {
                 if app.input_mode == InputMode::CommentAttachPath {

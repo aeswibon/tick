@@ -23,6 +23,11 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Up | KeyCode::Char('k') => {
             if app.detail_open && app.detail_tab == crate::app::DetailTab::Links {
                 app.links_selected = app.links_selected.saturating_sub(1);
+            } else if app.detail_open
+                && app.detail_tab == crate::app::DetailTab::Comments
+                && app.comment_open_link_count() > 0
+            {
+                app.comments_link_selected = app.comments_link_selected.saturating_sub(1);
             } else {
                 app.move_selection_up();
                 if app.detail_open && app.detail_tab != crate::app::DetailTab::Links {
@@ -35,6 +40,14 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             if app.detail_open && app.detail_tab == crate::app::DetailTab::Links {
                 if app.links_selected + 1 < app.links_row_count() {
                     app.links_selected += 1;
+                }
+            } else if app.detail_open
+                && app.detail_tab == crate::app::DetailTab::Comments
+                && app.comment_open_link_count() > 0
+            {
+                let max = app.comment_open_link_count().saturating_sub(1);
+                if app.comments_link_selected < max {
+                    app.comments_link_selected += 1;
                 }
             } else {
                 app.move_selection_down();
@@ -136,6 +149,7 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
                 crate::app::DetailTab::Description | crate::app::DetailTab::Comments
             ) {
                 app.ensure_selected_issue_detail().await;
+                app.clamp_comments_link_selection();
             }
         }
         KeyCode::Char('l') if app.detail_open => {
@@ -147,6 +161,7 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
                 crate::app::DetailTab::Description | crate::app::DetailTab::Comments
             ) {
                 app.ensure_selected_issue_detail().await;
+                app.clamp_comments_link_selection();
             }
         }
         KeyCode::Right => app.switch_to(app.active_view.next()).await,
@@ -166,6 +181,15 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         }
         KeyCode::Char('o') if app.detail_open && app.detail_tab == crate::app::DetailTab::Links => {
             crate::issue_relations_flow::open_selected_link_in_browser(app).await;
+        }
+        KeyCode::Char('o')
+            if app.detail_open && app.detail_tab == crate::app::DetailTab::Comments =>
+        {
+            if let Some(url) = app.selected_comment_open_url() {
+                if crate::platform::open_url(&url).is_err() {
+                    app.status.set_action_error("Could not open browser");
+                }
+            }
         }
         KeyCode::Char('o') if !app.detail_open => {
             if let Some(sel) = app.selected_ticket() {
@@ -214,13 +238,15 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         }
         KeyCode::Char('c') if app.detail_open => {
             app.input_mode = InputMode::Comment;
-            app.input_buffer.clear();
+            app.reset_input_buffer();
             app.input_mentions.clear();
+            app.comment_attach_paths.clear();
+            app.comment_preview = false;
             clear_mention_picker(app);
         }
         KeyCode::Char('w') if app.detail_open => {
             app.input_mode = InputMode::Worklog;
-            app.input_buffer.clear();
+            app.reset_input_buffer();
         }
         KeyCode::Char('a') if app.bulk_mark_count() > 0 && !app.detail_open => {
             crate::bulk::bulk_assign_to_me(app).await;
@@ -235,6 +261,7 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             if let Some(ticket) = app.selected_ticket_entry() {
                 app.input_mode = InputMode::EditSummary;
                 app.input_buffer = ticket.summary;
+                app.sync_input_cursor_end();
             }
         }
         KeyCode::Char('P') if app.detail_open => {
