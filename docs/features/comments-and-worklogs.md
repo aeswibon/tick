@@ -13,6 +13,12 @@ Both require the **detail pane** open (`Enter` on a row).
 | `Ctrl+P` | Toggle live markdown preview overlay |
 | `Ctrl+U` | Queue a file attachment (path prompt) |
 | `←` / `→` | Move cursor in footer input |
+| `Alt+←` / `Alt+→` | Move by word |
+| `Ctrl+Backspace` | Delete word before cursor |
+| `Delete` | Delete character after cursor |
+| `Ctrl+A` / `Ctrl+E` | Start / end of footer buffer |
+| `Ctrl+V` | Paste text from clipboard |
+| `Ctrl+Shift+V` | Paste clipboard image as attachment (comment mode) |
 | `Home` / `End` | Start / end of current footer line |
 | `Enter` | Post comment to Jira |
 | `Esc` | Cancel (or back from preview / attach path) |

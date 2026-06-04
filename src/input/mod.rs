@@ -102,6 +102,70 @@ pub fn submit_comment_attach_path(app: &mut App) {
     ));
 }
 
+fn clipboard_image_path() -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join("tick-clipboard");
+    let _ = std::fs::create_dir_all(&dir);
+    let name = format!(
+        "paste-{}-{}.png",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0)
+    );
+    dir.join(name)
+}
+
+async fn refresh_footer_input_side_effects(app: &mut App) {
+    if app.input_mode == InputMode::GlobalSearchQuery {
+        app.global_search_hits = crate::global_search::refresh_hits(app, &app.input_buffer);
+        app.global_search_selected = 0;
+    } else if mentions_enabled(app.input_mode)
+        && mentions::active_mention_query(&app.input_buffer).is_some()
+    {
+        refresh_mention_picker(app).await;
+    } else if mentions_enabled(app.input_mode) {
+        clear_mention_picker(app);
+    } else if app.input_mode == InputMode::TransitionField && app.transition_field_user_search {
+        refresh_transition_user_search(app, false).await;
+    } else if app.input_mode == InputMode::CreateField
+        && app
+            .create_session
+            .as_ref()
+            .is_some_and(|s| s.showing_required_field)
+        && app.transition_field_user_search
+    {
+        crate::create_flow::refresh_create_user_search(app, false).await;
+    }
+}
+
+async fn paste_clipboard_text(app: &mut App) {
+    let Some(text) = crate::platform::read_from_clipboard() else {
+        app.status
+            .set_action_error("Clipboard empty or unavailable");
+        return;
+    };
+    text::insert_paste_at(&mut app.input_buffer, &mut app.input_cursor, &text);
+    refresh_footer_input_side_effects(app).await;
+}
+
+async fn paste_clipboard_image_attachment(app: &mut App) {
+    let path = clipboard_image_path();
+    if crate::platform::save_clipboard_image(&path) {
+        let name = path
+            .file_name()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.display().to_string());
+        app.comment_attach_paths.push(path);
+        app.status.set_action_notice(format!(
+            "Queued clipboard image {name} ({} pending)",
+            app.comment_attach_paths.len()
+        ));
+        return;
+    }
+    paste_clipboard_text(app).await;
+}
+
 /// Poll and dispatch one terminal event. Returns `true` to quit.
 pub async fn handle_event(app: &mut App, event: Event) -> bool {
     match event {
@@ -270,6 +334,33 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         }
 
         match code {
+            KeyCode::Char('v') | KeyCode::Char('V')
+                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
+                if key.modifiers.contains(KeyModifiers::SHIFT)
+                    && app.input_mode == InputMode::Comment
+                {
+                    paste_clipboard_image_attachment(app).await;
+                } else {
+                    paste_clipboard_text(app).await;
+                }
+            }
+            KeyCode::Char('a') | KeyCode::Char('A')
+                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
+                app.input_cursor = 0;
+            }
+            KeyCode::Char('e') | KeyCode::Char('E')
+                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
+                app.input_cursor = app.input_buffer.len();
+            }
+            KeyCode::Left if key.modifiers.contains(KeyModifiers::ALT) => {
+                app.input_cursor = text::cursor_word_left(&app.input_buffer, app.input_cursor);
+            }
+            KeyCode::Right if key.modifiers.contains(KeyModifiers::ALT) => {
+                app.input_cursor = text::cursor_word_right(&app.input_buffer, app.input_cursor);
+            }
             KeyCode::Left => {
                 app.input_cursor = text::cursor_left(&app.input_buffer, app.input_cursor);
             }
@@ -284,55 +375,19 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
             }
             KeyCode::Char(c) => {
                 text::insert_char(&mut app.input_buffer, &mut app.input_cursor, c);
-                if app.input_mode == InputMode::GlobalSearchQuery {
-                    app.global_search_hits =
-                        crate::global_search::refresh_hits(app, &app.input_buffer);
-                    app.global_search_selected = 0;
-                } else if mentions_enabled(app.input_mode)
-                    && mentions::active_mention_query(&app.input_buffer).is_some()
-                {
-                    refresh_mention_picker(app).await;
-                } else if mentions_enabled(app.input_mode) {
-                    clear_mention_picker(app);
-                } else if app.input_mode == InputMode::TransitionField
-                    && app.transition_field_user_search
-                {
-                    refresh_transition_user_search(app, false).await;
-                } else if app.input_mode == InputMode::CreateField
-                    && app
-                        .create_session
-                        .as_ref()
-                        .is_some_and(|s| s.showing_required_field)
-                    && app.transition_field_user_search
-                {
-                    crate::create_flow::refresh_create_user_search(app, false).await;
-                }
+                refresh_footer_input_side_effects(app).await;
+            }
+            KeyCode::Backspace if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                text::delete_word_backward(&mut app.input_buffer, &mut app.input_cursor);
+                refresh_footer_input_side_effects(app).await;
             }
             KeyCode::Backspace => {
                 text::backspace_at(&mut app.input_buffer, &mut app.input_cursor);
-                if app.input_mode == InputMode::GlobalSearchQuery {
-                    app.global_search_hits =
-                        crate::global_search::refresh_hits(app, &app.input_buffer);
-                    app.global_search_selected = 0;
-                } else if mentions_enabled(app.input_mode)
-                    && mentions::active_mention_query(&app.input_buffer).is_some()
-                {
-                    refresh_mention_picker(app).await;
-                } else if mentions_enabled(app.input_mode) {
-                    clear_mention_picker(app);
-                } else if app.input_mode == InputMode::TransitionField
-                    && app.transition_field_user_search
-                {
-                    refresh_transition_user_search(app, false).await;
-                } else if app.input_mode == InputMode::CreateField
-                    && app
-                        .create_session
-                        .as_ref()
-                        .is_some_and(|s| s.showing_required_field)
-                    && app.transition_field_user_search
-                {
-                    crate::create_flow::refresh_create_user_search(app, false).await;
-                }
+                refresh_footer_input_side_effects(app).await;
+            }
+            KeyCode::Delete => {
+                text::delete_forward(&mut app.input_buffer, &mut app.input_cursor);
+                refresh_footer_input_side_effects(app).await;
             }
             KeyCode::Esc => {
                 clear_mention_picker(app);

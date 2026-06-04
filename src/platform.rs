@@ -63,6 +63,91 @@ pub fn read_from_clipboard() -> Option<String> {
     }
 }
 
+/// Save a PNG/JPEG image from the clipboard to `path`. Returns true when a file was written.
+pub fn save_clipboard_image(path: &Path) -> bool {
+    if path.exists() {
+        let _ = std::fs::remove_file(path);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        if Command::new("pngpaste")
+            .arg(path)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+            && path.is_file()
+        {
+            return true;
+        }
+        let path_arg = path
+            .to_string_lossy()
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"");
+        let script = format!(
+            r#"try
+                set imageData to (the clipboard as «class PNGf»)
+                if imageData is missing value then return "NO"
+                set f to open for access POSIX file "{path_arg}" with write permission
+                write imageData to f
+                close access f
+                return "OK"
+            on error
+                return "NO"
+            end try"#
+        );
+        read_stdout("osascript", &["-e", &script]).as_deref() == Some("OK") && path.is_file()
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(output) = Command::new("wl-paste")
+            .args(["--type", "image/png"])
+            .output()
+        {
+            if output.status.success() && !output.stdout.is_empty() {
+                if std::fs::write(path, &output.stdout).is_ok() {
+                    return path.is_file();
+                }
+            }
+        }
+        if let Ok(output) = Command::new("xclip")
+            .args(["-selection", "clipboard", "-t", "image/png", "-o"])
+            .output()
+        {
+            if output.status.success() && !output.stdout.is_empty() {
+                if std::fs::write(path, &output.stdout).is_ok() {
+                    return path.is_file();
+                }
+            }
+        }
+        false
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let path_arg = path.to_string_lossy().replace('\'', "''");
+        let script = format!(
+            r#"$img = Get-Clipboard -Format Image
+if ($null -eq $img) {{ exit 1 }}
+$img.Save('{path_arg}', [System.Drawing.Imaging.ImageFormat]::Png)
+exit 0"#
+        );
+        Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+            && path.is_file()
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        let _ = path;
+        false
+    }
+}
+
 /// Copy text to the system clipboard. Returns false if no clipboard tool is available.
 pub fn copy_to_clipboard(text: &str) -> bool {
     #[cfg(target_os = "macos")]

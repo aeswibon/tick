@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.2.2] - 2026-05-29
+
+### Added
+
+- **Footer word motion** — **Alt+←/→** by word, **Ctrl+Backspace** delete word, **Delete** forward delete, **Ctrl+A/E** buffer start/end
+- **Clipboard paste in footer** — **Ctrl+V** inserts text; **Ctrl+Shift+V** in comment mode queues a clipboard **image** as an attachment (macOS/Linux/Windows when supported)
+
+### Documentation
+
+- [comments-and-worklogs.md](docs/features/comments-and-worklogs.md) — word motion and clipboard paste keys
+
 ## [1.2.1] - 2026-05-29
 
 ### Added

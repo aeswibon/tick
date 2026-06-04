@@ -77,6 +77,79 @@ pub fn cursor_end(buffer: &str, cursor: usize) -> usize {
         .unwrap_or(buffer.len())
 }
 
+fn is_word_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
+}
+
+pub fn cursor_word_left(buffer: &str, cursor: usize) -> usize {
+    let mut i = clamp_cursor(buffer, cursor);
+    if i == 0 {
+        return 0;
+    }
+    while i > 0 {
+        let prev = cursor_left(buffer, i);
+        if is_word_char(buffer[prev..i].chars().next().unwrap_or(' ')) {
+            break;
+        }
+        i = prev;
+    }
+    while i > 0 {
+        let prev = cursor_left(buffer, i);
+        if !is_word_char(buffer[prev..i].chars().next().unwrap_or(' ')) {
+            break;
+        }
+        i = prev;
+    }
+    i
+}
+
+pub fn cursor_word_right(buffer: &str, cursor: usize) -> usize {
+    let len = buffer.len();
+    let mut i = clamp_cursor(buffer, cursor);
+    if i >= len {
+        return len;
+    }
+    if buffer
+        .get(i..)
+        .and_then(|s| s.chars().next())
+        .map(is_word_char)
+        .unwrap_or(false)
+    {
+        while i < len {
+            let next = cursor_right(buffer, i);
+            let c = buffer[i..next].chars().next().unwrap_or(' ');
+            if !is_word_char(c) {
+                break;
+            }
+            i = next;
+        }
+    }
+    while i < len {
+        let c = buffer[i..].chars().next().unwrap_or(' ');
+        if is_word_char(c) {
+            return i;
+        }
+        i = cursor_right(buffer, i);
+    }
+    len
+}
+
+pub fn delete_word_backward(buffer: &mut String, cursor: &mut usize) {
+    let target = cursor_word_left(buffer, *cursor);
+    *cursor = clamp_cursor(buffer, *cursor);
+    buffer.drain(target..*cursor);
+    *cursor = target;
+}
+
+pub fn delete_forward(buffer: &mut String, cursor: &mut usize) {
+    *cursor = clamp_cursor(buffer, *cursor);
+    if *cursor >= buffer.len() {
+        return;
+    }
+    let next = cursor_right(buffer, *cursor);
+    buffer.drain(*cursor..next);
+}
+
 pub fn insert_char(buffer: &mut String, cursor: &mut usize, c: char) {
     *cursor = clamp_cursor(buffer, *cursor);
     let s = c.to_string();
@@ -184,6 +257,33 @@ mod tests {
         backspace_at(&mut b, &mut c);
         assert_eq!(b, "helo");
         assert_eq!(c, 2);
+    }
+
+    #[test]
+    fn word_motion_skips_tokens() {
+        let s = "hello world-test";
+        assert_eq!(cursor_word_left(s, 16), 12);
+        assert_eq!(cursor_word_left(s, 12), 6);
+        assert_eq!(cursor_word_right(s, 0), 6);
+        assert_eq!(cursor_word_right(s, 6), 12);
+    }
+
+    #[test]
+    fn delete_word_backward_removes_prior_token() {
+        let mut b = "one two".to_string();
+        let mut c = b.len();
+        delete_word_backward(&mut b, &mut c);
+        assert_eq!(b, "one ");
+        assert_eq!(c, 4);
+    }
+
+    #[test]
+    fn delete_forward_removes_next_char() {
+        let mut b = "abcd".to_string();
+        let mut c = 1;
+        delete_forward(&mut b, &mut c);
+        assert_eq!(b, "acd");
+        assert_eq!(c, 1);
     }
 
     #[test]

@@ -231,7 +231,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             let mut hint = if app.showing_mention_picker {
                 " @mention".to_string()
             } else {
-                " (@ · Shift+Enter · Ctrl+P · Ctrl+U)".to_string()
+                " (@ · Shift+Enter · Ctrl+P · Ctrl+U · Ctrl+V · Alt+←/→)".to_string()
             };
             if !app.comment_attach_paths.is_empty() {
                 hint.push_str(&format!(" · {} attach", app.comment_attach_paths.len()));

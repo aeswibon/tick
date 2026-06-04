@@ -45,7 +45,7 @@ pub fn draw_comment_preview(f: &mut Frame, app: &App, area: Rect) {
     }
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        "  Ctrl+P edit  Ctrl+U attach  Enter post  Esc back",
+        "  Ctrl+P edit  Ctrl+U attach  Ctrl+Shift+V paste image  Enter post  Esc back",
         border,
     )));
 
