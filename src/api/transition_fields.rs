@@ -155,11 +155,19 @@ fn classify_field(
     id: &str,
     field_type: &str,
     system: &str,
+    custom: &str,
     options: &[(String, String)],
 ) -> TransitionFieldKind {
     if matches!(id, "components" | "fixVersions")
         || matches!(system, "components" | "fixVersions")
         || (field_type == "array" && matches!(system, "components" | "fixVersions"))
+    {
+        return TransitionFieldKind::MultiPicker;
+    }
+    if field_type == "array"
+        && (custom.contains("multiselect")
+            || custom.contains("checkbox")
+            || custom.contains("multicheckboxes"))
     {
         return TransitionFieldKind::MultiPicker;
     }
@@ -236,6 +244,11 @@ pub fn parse_transition_screen_fields(fields_obj: Option<&Value>) -> Vec<Transit
                 .and_then(|t| t.as_str())
                 .unwrap_or("")
                 .to_string();
+            let custom = schema
+                .and_then(|s| s.get("custom"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .to_string();
             let mut options = meta
                 .get("allowedValues")
                 .and_then(|a| a.as_array())
@@ -245,7 +258,7 @@ pub fn parse_transition_screen_fields(fields_obj: Option<&Value>) -> Vec<Transit
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
-            let kind = classify_field(id, &field_type, &system, &options);
+            let kind = classify_field(id, &field_type, &system, &custom, &options);
             if kind == TransitionFieldKind::Boolean && options.is_empty() {
                 options = BOOLEAN_OPTIONS
                     .iter()
@@ -477,6 +490,29 @@ mod tests {
         assert_eq!(req[0].kind, TransitionFieldKind::Boolean);
         assert_eq!(req[0].options.len(), 2);
         assert_eq!(req[0].value_from_choice("true", "Yes"), json!(true));
+    }
+
+    #[test]
+    fn parses_multiselect_custom_field() {
+        let fields = json!({
+            "customfield_10050": {
+                "required": false,
+                "name": "Tags",
+                "schema": {
+                    "type": "array",
+                    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:multiselect",
+                    "customId": 10050
+                },
+                "allowedValues": [
+                    { "id": "10001", "value": "Alpha" },
+                    { "id": "10002", "value": "Beta" }
+                ]
+            }
+        });
+        let req = parse_transition_screen_fields(Some(&fields));
+        assert_eq!(req.len(), 1);
+        assert_eq!(req[0].kind, TransitionFieldKind::MultiPicker);
+        assert_eq!(req[0].options.len(), 2);
     }
 
     #[test]

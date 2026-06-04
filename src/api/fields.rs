@@ -15,7 +15,7 @@ pub struct FieldCatalogEntry {
     pub schema_type: String,
     pub schema_custom: String,
     pub system: String,
-    /// Suggested `[[detail.editable_fields]]` type: `text`, `select`, `user`, `auto`, or `unsupported`.
+    /// Suggested `[[detail.editable_fields]]` type: `text`, `select`, `user`, `number`, `date`, `multiselect`, `auto`, or `unsupported`.
     pub suggested_type: String,
 }
 
@@ -141,8 +141,11 @@ pub fn suggest_tick_type(
     match schema_type {
         "user" => "user".into(),
         "option" => "select".into(),
-        "array" if schema_custom.contains("multiselect") || schema_custom.contains("checkbox") => {
-            "unsupported".into()
+        "array" if schema_custom.contains("multiselect")
+            || schema_custom.contains("checkbox")
+            || schema_custom.contains("multicheckboxes") =>
+        {
+            "multiselect".into()
         }
         "string"
             if schema_custom.contains("select")
@@ -151,11 +154,14 @@ pub fn suggest_tick_type(
         {
             "select".into()
         }
-        "number" | "string" => "text".into(),
-        "date" | "datetime" => "auto".into(),
+        "number" => "number".into(),
+        "string" => "text".into(),
+        "date" | "datetime" => "date".into(),
         _ => {
             if schema_custom.contains(":userpicker") {
                 "user".into()
+            } else if schema_custom.contains("multiselect") || schema_custom.contains("checkbox") {
+                "multiselect".into()
             } else if schema_custom.contains("select") {
                 "select".into()
             } else {
@@ -170,9 +176,10 @@ pub fn tick_type_from_transition_field(tf: &TransitionField) -> &'static str {
     match tf.kind {
         TransitionFieldKind::User => "user",
         TransitionFieldKind::Picker | TransitionFieldKind::Boolean => "select",
-        TransitionFieldKind::Text | TransitionFieldKind::Number => "text",
-        TransitionFieldKind::Date | TransitionFieldKind::DateTime => "text",
-        TransitionFieldKind::MultiPicker => "unsupported",
+        TransitionFieldKind::Text => "text",
+        TransitionFieldKind::Number => "number",
+        TransitionFieldKind::Date | TransitionFieldKind::DateTime => "date",
+        TransitionFieldKind::MultiPicker => "multiselect",
     }
 }
 
@@ -218,7 +225,7 @@ mod tests {
             .unwrap();
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].id, "customfield_10042");
-        assert_eq!(list[0].suggested_type, "text");
+        assert_eq!(list[0].suggested_type, "number");
     }
 
     #[test]
@@ -230,7 +237,25 @@ mod tests {
                 "com.atlassian.jira.plugin.system.customfieldtypes:float",
                 true
             ),
-            "text"
+            "number"
+        );
+        assert_eq!(
+            suggest_tick_type(
+                "date",
+                "",
+                "com.atlassian.jira.plugin.system.customfieldtypes:datepicker",
+                true
+            ),
+            "date"
+        );
+        assert_eq!(
+            suggest_tick_type(
+                "array",
+                "",
+                "com.atlassian.jira.plugin.system.customfieldtypes:multiselect",
+                true
+            ),
+            "multiselect"
         );
         assert_eq!(
             suggest_tick_type(

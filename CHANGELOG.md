@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.3.0] - 2026-05-29
+
+### Added
+
+- **Custom fields phase 3** — Edit **number**, **date**, and **multiselect** fields from the detail pane (`F`)
+- **Number/date footer** — Validated entry with type-specific hints; empty input clears the field
+- **Multiselect checklist** — **Space** toggles options, **Enter** confirms (empty clears)
+- **`tick fields list`** — Suggests `number`, `date`, and `multiselect` types; config snippets include multiselect `options`
+
+### Improved
+
+- **`type = "auto"`** — Resolves number, date, and multiselect from Jira edit metadata (not just text/select/user)
+- **Editmeta parsing** — Multiselect custom fields with `allowedValues` classify as multi-picker
+
+### Documentation
+
+- [custom-fields.md](docs/features/custom-fields.md) — number, date, multiselect types and UX
+
 ## [1.2.2] - 2026-05-29
 
 ### Added

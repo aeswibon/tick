@@ -83,6 +83,23 @@ pub fn render(f: &mut Frame, app: &mut App) {
     if app.showing_custom_field_select {
         super::editable_fields::draw_custom_field_select(f, app, f.area());
     }
+    if app.showing_custom_field_multi {
+        let title = app
+            .custom_field_editing
+            .as_ref()
+            .map(|f| f.display_label())
+            .unwrap_or_else(|| "Custom field".into());
+        super::field_picker::draw_multi_field_picker(
+            f,
+            &title,
+            &app.custom_field_multi_options,
+            &app.custom_field_multi_picked,
+            app.custom_field_select_selected,
+            &app.theme,
+            f.area(),
+            true,
+        );
+    }
     if app.showing_sprints {
         super::sprints::draw_sprints(f, app, f.area());
     }
@@ -112,6 +129,7 @@ pub fn render(f: &mut Frame, app: &mut App) {
                 app.transition_field_selected,
                 &app.theme,
                 f.area(),
+                false,
             );
         } else {
             let modal_title = if app
@@ -277,8 +295,13 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             .as_ref()
             .map(|f| f.display_label())
             .unwrap_or_else(|| "Custom field".into());
+        let hint = app
+            .custom_field_meta
+            .as_ref()
+            .map(|m| m.input_hint())
+            .unwrap_or("empty clears");
         (
-            format!(" {label} (empty clears): {}", input),
+            format!(" {label} ({hint}): {}", input),
             app.theme.accent,
         )
     } else if app.input_mode == crate::app::InputMode::AddIssueLinkTarget {

@@ -544,6 +544,11 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         return false;
     }
 
+    if app.showing_custom_field_multi {
+        crate::editable_fields::handle_custom_field_multi_key(app, code).await;
+        return false;
+    }
+
     if app.showing_sprints {
         handle_sprint_key(app, code).await;
         return false;

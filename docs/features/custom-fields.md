@@ -19,13 +19,24 @@ JSON includes `id`, `name`, `suggested_type`, optional `options` (with `--projec
 [[detail.editable_fields]]
 id = "customfield_10042"
 label = "Story points"
-type = "text"
+type = "number"
+
+[[detail.editable_fields]]
+id = "customfield_10015"
+label = "Start date"
+type = "date"
 
 [[detail.editable_fields]]
 id = "customfield_10001"
 label = "Environment"
 type = "select"
 options = ["Dev", "Staging", "Prod"]
+
+[[detail.editable_fields]]
+id = "customfield_10010"
+label = "Tags"
+type = "multiselect"
+options = ["Frontend", "Backend", "Ops"]
 
 [[detail.editable_fields]]
 id = "customfield_10002"
@@ -42,9 +53,12 @@ type = "auto"
 | `type` | Edit UX |
 |--------|---------|
 | `text` | Footer prompt; empty clears the field |
+| `number` | Footer prompt; validates as a number; empty clears |
+| `date` | Footer prompt (`YYYY-MM-DD`); empty clears |
 | `select` | Picker from `options` (or from Jira when `options` omitted / `auto`) |
+| `multiselect` | Checklist — **Space** toggles, **Enter** confirms; empty clears |
 | `user` | User search picker (same as transition user fields) |
-| `auto` | Fetches **editmeta** for the selected issue; supports text, select, and user |
+| `auto` | Fetches **editmeta** for the selected issue; supports text, number, date, select, multiselect, and user |
 
 Field ids must be `customfield_<digits>`.
 

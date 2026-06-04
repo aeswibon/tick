@@ -67,7 +67,8 @@ async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
     };
 
     let needs_meta = matches!(kind, EditableFieldKind::Auto)
-        || (matches!(kind, EditableFieldKind::Select) && field.options.is_empty());
+        || (matches!(kind, EditableFieldKind::Select) && field.options.is_empty())
+        || (matches!(kind, EditableFieldKind::MultiSelect) && field.options.is_empty());
 
     let mut resolved_kind = kind;
     let mut options = field.options.clone();
@@ -93,6 +94,9 @@ async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
                         "user" => EditableFieldKind::User,
                         "select" => EditableFieldKind::Select,
                         "text" => EditableFieldKind::Text,
+                        "number" => EditableFieldKind::Number,
+                        "date" => EditableFieldKind::Date,
+                        "multiselect" => EditableFieldKind::MultiSelect,
                         _ => {
                             app.status.set_action_error(format!(
                                 "{} cannot be edited from the detail pane",
@@ -111,6 +115,13 @@ async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
                         ));
                         return;
                     }
+                }
+                if matches!(resolved_kind, EditableFieldKind::MultiSelect) && tf.options.is_empty() {
+                    app.status.set_action_error(format!(
+                        "No options for {} on this issue",
+                        field.display_label()
+                    ));
+                    return;
                 }
                 meta = Some(tf);
             }
@@ -141,6 +152,24 @@ async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
             app.input_mode = InputMode::EditCustomField;
             app.input_buffer = current;
         }
+        EditableFieldKind::Number | EditableFieldKind::Date => {
+            if app.custom_field_meta.is_none() {
+                app.custom_field_meta = Some(synthetic_field(
+                    &field,
+                    match resolved_kind {
+                        EditableFieldKind::Number => TransitionFieldKind::Number,
+                        EditableFieldKind::Date => TransitionFieldKind::Date,
+                        _ => unreachable!(),
+                    },
+                ));
+            }
+            app.input_mode = InputMode::EditCustomField;
+            app.input_buffer = if current == "-" {
+                String::new()
+            } else {
+                current
+            };
+        }
         EditableFieldKind::Select => {
             app.custom_field_select_options = options;
             app.custom_field_select_selected = app
@@ -149,6 +178,14 @@ async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
                 .position(|o| o == &current)
                 .unwrap_or(0);
             app.showing_custom_field_select = true;
+        }
+        EditableFieldKind::MultiSelect => {
+            let multi_options = multi_options_for_field(&field, app.custom_field_meta.as_ref());
+            app.custom_field_multi_options = multi_options;
+            app.custom_field_multi_picked =
+                prefill_multi_picks(&current, &app.custom_field_multi_options);
+            app.custom_field_select_selected = 0;
+            app.showing_custom_field_multi = true;
         }
         EditableFieldKind::User => {
             let transition_field =
@@ -168,6 +205,48 @@ async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
     }
 }
 
+fn synthetic_field(field: &EditableFieldConfig, kind: TransitionFieldKind) -> TransitionField {
+    let field_type = match kind {
+        TransitionFieldKind::Number => "number",
+        TransitionFieldKind::Date => "date",
+        TransitionFieldKind::DateTime => "datetime",
+        _ => "string",
+    };
+    TransitionField {
+        id: field.id.clone(),
+        name: field.display_label(),
+        field_type: field_type.into(),
+        system: String::new(),
+        kind,
+        options: Vec::new(),
+    }
+}
+
+fn multi_options_for_field(
+    field: &EditableFieldConfig,
+    meta: Option<&TransitionField>,
+) -> Vec<(String, String)> {
+    if let Some(tf) = meta {
+        return tf.options.clone();
+    }
+    field
+        .options
+        .iter()
+        .map(|o| (o.clone(), o.clone()))
+        .collect()
+}
+
+fn prefill_multi_picks(current: &str, options: &[(String, String)]) -> Vec<bool> {
+    if current.is_empty() || current == "-" {
+        return vec![false; options.len()];
+    }
+    let selected: Vec<&str> = current.split(", ").map(str::trim).collect();
+    options
+        .iter()
+        .map(|(_, label)| selected.contains(&label.as_str()))
+        .collect()
+}
+
 fn start_user_field_editor(app: &mut App, transition_field: TransitionField) {
     app.transition_field_heading = transition_field.name.clone();
     app.transition_field_current = Some(transition_field);
@@ -184,7 +263,9 @@ pub async fn submit_custom_field_text(app: &mut App, buffer: String) {
     let Some(field) = app.custom_field_editing.clone() else {
         return;
     };
-    let value = if let Some(meta) = app.custom_field_meta.as_ref() {
+    let value = if buffer.trim().is_empty() {
+        Value::Null
+    } else if let Some(meta) = app.custom_field_meta.as_ref() {
         match meta.value_from_text(&buffer) {
             Ok(v) => v,
             Err(e) => {
@@ -193,12 +274,7 @@ pub async fn submit_custom_field_text(app: &mut App, buffer: String) {
             }
         }
     } else {
-        let trimmed = buffer.trim();
-        if trimmed.is_empty() {
-            Value::Null
-        } else {
-            json!({ "value": trimmed })
-        }
+        json!({ "value": buffer.trim() })
     };
     apply_custom_field_value(app, &field, value).await;
 }
@@ -219,6 +295,37 @@ pub async fn apply_custom_field_select(app: &mut App, idx: usize) {
         }
     } else {
         json!({ "value": option })
+    };
+    apply_custom_field_value(app, &field, value).await;
+}
+
+pub async fn apply_custom_field_multi(app: &mut App) {
+    let Some(field) = app.custom_field_editing.clone() else {
+        return;
+    };
+    let picks: Vec<_> = app
+        .custom_field_multi_options
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| {
+            app.custom_field_multi_picked
+                .get(*i)
+                .copied()
+                .unwrap_or(false)
+        })
+        .map(|(_, pair)| pair.clone())
+        .collect();
+    let value = if picks.is_empty() {
+        Value::Null
+    } else if let Some(meta) = app.custom_field_meta.as_ref() {
+        meta.value_from_multi_choices(&picks)
+    } else {
+        json!(
+            picks
+                .into_iter()
+                .map(|(_, label)| json!({ "value": label }))
+                .collect::<Vec<_>>()
+        )
     };
     apply_custom_field_value(app, &field, value).await;
 }
@@ -265,6 +372,9 @@ pub fn cancel_custom_field_edit(app: &mut App) {
     app.showing_editable_field_picker = false;
     app.showing_custom_field_select = false;
     app.custom_field_select_options.clear();
+    app.showing_custom_field_multi = false;
+    app.custom_field_multi_options.clear();
+    app.custom_field_multi_picked.clear();
     if app.input_mode == InputMode::EditCustomField || app.input_mode == InputMode::TransitionField
     {
         app.input_mode = InputMode::None;
@@ -300,5 +410,77 @@ pub async fn handle_custom_field_select_key(app: &mut App, code: KeyCode) {
         }
         KeyCode::Esc => cancel_custom_field_edit(app),
         _ => {}
+    }
+}
+
+pub async fn handle_custom_field_multi_key(app: &mut App, code: KeyCode) {
+    let len = app.custom_field_multi_options.len();
+    match code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.custom_field_select_selected = app.custom_field_select_selected.saturating_sub(1);
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if app.custom_field_select_selected + 1 < len {
+                app.custom_field_select_selected += 1;
+            }
+        }
+        KeyCode::Char(' ') => {
+            let i = app.custom_field_select_selected;
+            if let Some(slot) = app.custom_field_multi_picked.get_mut(i) {
+                *slot = !*slot;
+            }
+        }
+        KeyCode::Enter => apply_custom_field_multi(app).await,
+        KeyCode::Esc => cancel_custom_field_edit(app),
+        _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prefill_multi_picks_from_display() {
+        let options = vec![
+            ("1".into(), "Alpha".into()),
+            ("2".into(), "Beta".into()),
+            ("3".into(), "Gamma".into()),
+        ];
+        let picked = prefill_multi_picks("Alpha, Gamma", &options);
+        assert_eq!(picked, vec![true, false, true]);
+    }
+
+    #[test]
+    fn tick_type_maps_number_date_multiselect() {
+        let number = TransitionField {
+            id: "customfield_1".into(),
+            name: "Points".into(),
+            field_type: "number".into(),
+            system: String::new(),
+            kind: TransitionFieldKind::Number,
+            options: vec![],
+        };
+        assert_eq!(tick_type_from_transition_field(&number), "number");
+
+        let date = TransitionField {
+            id: "customfield_2".into(),
+            name: "Start".into(),
+            field_type: "date".into(),
+            system: String::new(),
+            kind: TransitionFieldKind::Date,
+            options: vec![],
+        };
+        assert_eq!(tick_type_from_transition_field(&date), "date");
+
+        let multi = TransitionField {
+            id: "customfield_3".into(),
+            name: "Tags".into(),
+            field_type: "array".into(),
+            system: String::new(),
+            kind: TransitionFieldKind::MultiPicker,
+            options: vec![("1".into(), "A".into())],
+        };
+        assert_eq!(tick_type_from_transition_field(&multi), "multiselect");
     }
 }

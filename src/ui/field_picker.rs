@@ -97,6 +97,7 @@ pub fn draw_field_picker(
     f.render_widget(popup_widget, popup);
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn draw_multi_field_picker(
     f: &mut Frame,
     heading: &str,
@@ -105,6 +106,7 @@ pub fn draw_multi_field_picker(
     selected: usize,
     theme: &crate::theme::Theme,
     area: Rect,
+    allow_empty: bool,
 ) {
     let height = (options.len() as u16).saturating_add(9);
     let popup = centered_rect(58, height.min(area.height.saturating_sub(2)), area);
@@ -112,15 +114,17 @@ pub fn draw_multi_field_picker(
 
     let dl = theme.detail_label;
     let dv = theme.detail_value;
+    let hint = if allow_empty {
+        " Space toggles · Enter confirms (empty clears)"
+    } else {
+        " Space toggles · Enter confirms (at least one)"
+    };
     let mut lines = vec![
         Line::from(Span::styled(
             format!(" {heading}"),
             Style::default().fg(dl).add_modifier(Modifier::BOLD),
         )),
-        Line::from(Span::styled(
-            " Space toggles · Enter confirms (at least one)",
-            Style::default().fg(theme.border),
-        )),
+        Line::from(Span::styled(hint, Style::default().fg(theme.border))),
         Line::from(""),
     ];
 

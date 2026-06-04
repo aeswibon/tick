@@ -282,6 +282,10 @@ pub struct App {
     pub showing_custom_field_select: bool,
     pub custom_field_select_options: Vec<String>,
     pub custom_field_select_selected: usize,
+    /// Multi-select checklist overlay for configured multiselect fields.
+    pub showing_custom_field_multi: bool,
+    pub custom_field_multi_options: Vec<(String, String)>,
+    pub custom_field_multi_picked: Vec<bool>,
     pub custom_field_editing: Option<crate::config::EditableFieldConfig>,
     /// Jira editmeta for `type = "auto"` or select without options.
     pub custom_field_meta: Option<crate::api::transition_fields::TransitionField>,
@@ -385,6 +389,9 @@ impl App {
             showing_custom_field_select: false,
             custom_field_select_options: Vec::new(),
             custom_field_select_selected: 0,
+            showing_custom_field_multi: false,
+            custom_field_multi_options: Vec::new(),
+            custom_field_multi_picked: Vec::new(),
             custom_field_editing: None,
             custom_field_meta: None,
             detail_loading: false,

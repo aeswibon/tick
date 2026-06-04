@@ -313,6 +313,9 @@ pub enum EditableFieldKind {
     Text,
     Select,
     User,
+    Number,
+    Date,
+    MultiSelect,
     /// Resolve type and options from Jira edit metadata for the selected issue.
     Auto,
 }
@@ -332,6 +335,9 @@ impl EditableFieldConfig {
             "text" | "string" => Ok(EditableFieldKind::Text),
             "select" | "option" => Ok(EditableFieldKind::Select),
             "user" => Ok(EditableFieldKind::User),
+            "number" | "float" => Ok(EditableFieldKind::Number),
+            "date" | "datetime" => Ok(EditableFieldKind::Date),
+            "multiselect" | "multi" => Ok(EditableFieldKind::MultiSelect),
             "auto" => Ok(EditableFieldKind::Auto),
             other => Err(format!("unknown editable field type '{other}'")),
         }
@@ -735,6 +741,12 @@ impl Config {
             if kind == EditableFieldKind::Select && field.options.is_empty() {
                 return Err(format!(
                     "config: editable field '{}' (select) needs options = [...]",
+                    field.display_label()
+                ));
+            }
+            if kind == EditableFieldKind::MultiSelect && field.options.is_empty() {
+                return Err(format!(
+                    "config: editable field '{}' (multiselect) needs options = [...] or type = \"auto\"",
                     field.display_label()
                 ));
             }

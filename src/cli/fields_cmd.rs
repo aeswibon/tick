@@ -113,7 +113,8 @@ fn enrich_options(createmeta_fields: &serde_json::Value, field_id: &str) -> Opti
 fn format_config_snippet(entry: &FieldCatalogEntry, options: Option<&[String]>) -> String {
     let label = entry.name.replace('"', "\\\"");
     let ty = if entry.suggested_type == "unsupported"
-        || (entry.suggested_type == "select" && options.is_none())
+        || ((entry.suggested_type == "select" || entry.suggested_type == "multiselect")
+            && options.is_none())
     {
         "auto"
     } else {
@@ -125,7 +126,7 @@ fn format_config_snippet(entry: &FieldCatalogEntry, options: Option<&[String]>) 
         format!("label = \"{label}\""),
         format!("type = \"{ty}\""),
     ];
-    if ty == "select" {
+    if ty == "select" || ty == "multiselect" {
         if let Some(opts) = options {
             if !opts.is_empty() {
                 let joined = opts

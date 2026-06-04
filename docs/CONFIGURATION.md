@@ -250,13 +250,24 @@ Runs when **Space** adds a bulk mark (not unmark or mark-all). See [features/aut
 [[detail.editable_fields]]
 id = "customfield_10042"
 label = "Story points"
-type = "text"          # text | select | user
+type = "text"          # text | number | date | select | multiselect | user | auto
+
+[[detail.editable_fields]]
+id = "customfield_10015"
+label = "Start date"
+type = "date"
 
 [[detail.editable_fields]]
 id = "customfield_10001"
 label = "Environment"
 type = "select"
 options = ["Dev", "Staging", "Prod"]
+
+[[detail.editable_fields]]
+id = "customfield_10010"
+label = "Tags"
+type = "multiselect"
+options = ["Frontend", "Backend"]
 
 [[detail.editable_fields]]
 id = "customfield_10002"
