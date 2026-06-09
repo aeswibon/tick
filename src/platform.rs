@@ -105,20 +105,22 @@ pub fn save_clipboard_image(path: &Path) -> bool {
             .args(["--type", "image/png"])
             .output()
         {
-            if output.status.success() && !output.stdout.is_empty() {
-                if std::fs::write(path, &output.stdout).is_ok() {
-                    return path.is_file();
-                }
+            if output.status.success()
+                && !output.stdout.is_empty()
+                && std::fs::write(path, &output.stdout).is_ok()
+            {
+                return path.is_file();
             }
         }
         if let Ok(output) = Command::new("xclip")
             .args(["-selection", "clipboard", "-t", "image/png", "-o"])
             .output()
         {
-            if output.status.success() && !output.stdout.is_empty() {
-                if std::fs::write(path, &output.stdout).is_ok() {
-                    return path.is_file();
-                }
+            if output.status.success()
+                && !output.stdout.is_empty()
+                && std::fs::write(path, &output.stdout).is_ok()
+            {
+                return path.is_file();
             }
         }
         false
