@@ -323,9 +323,9 @@ mod tests {
         app.bulk_marked.insert(("b".into(), "Y-1".into()));
         assert!(app.bulk_same_site().is_none());
         app.bulk_marked.clear();
-        app.bulk_marked.insert(("zeta".into(), "Z-1".into()));
-        app.bulk_marked.insert(("zeta".into(), "Z-2".into()));
-        assert_eq!(app.bulk_same_site().as_deref(), Some("zeta"));
+        app.bulk_marked.insert(("northwind".into(), "NW-1".into()));
+        app.bulk_marked.insert(("northwind".into(), "NW-2".into()));
+        assert_eq!(app.bulk_same_site().as_deref(), Some("northwind"));
     }
 
     fn test_app_with_bulk() -> App {

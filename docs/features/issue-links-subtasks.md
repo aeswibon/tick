@@ -23,8 +23,8 @@ If add-link fails with “link type not found”, override names in config:
 
 ```toml
 [[sites]]
-name = "zeta"
-base_url = "https://zeta-tm.atlassian.net"
+name = "northwind"
+base_url = "https://northwind-labs.atlassian.net"
 link_types = { relates = "Relates", blocks = "Blocks", blocked_by = "Blocks", epic = "Epic-Story Link" }
 ```
 

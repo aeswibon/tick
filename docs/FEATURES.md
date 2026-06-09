@@ -154,7 +154,7 @@ Custom: `~/.config/tick/themes/<name>.toml` — see [themes/README.md](../themes
 ## Limitations
 
 - Cloud REST only  
-- Some transition/create custom fields need Jira UI  
+- Some transition/create custom fields still need Jira UI (rich text, cascades, etc.)  
 - Transition pickers: numeric shortcuts `1`–`9` only  
 - Description: exotic ADF via ` ```adf-json` fences  
 

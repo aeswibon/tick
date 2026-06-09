@@ -4,7 +4,7 @@ use crossterm::event::KeyCode;
 use serde_json::{json, Value};
 
 use crate::api::fields::{select_options_from_transition_field, tick_type_from_transition_field};
-use crate::api::transition_fields::{TransitionField, TransitionFieldKind};
+use crate::api::transition_fields::{TransitionField, TransitionFieldKind, BOOLEAN_OPTIONS};
 use crate::app::{App, InputMode};
 use crate::config::{EditableFieldConfig, EditableFieldKind};
 
@@ -96,6 +96,8 @@ async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
                         "text" => EditableFieldKind::Text,
                         "number" => EditableFieldKind::Number,
                         "date" => EditableFieldKind::Date,
+                        "datetime" => EditableFieldKind::DateTime,
+                        "boolean" => EditableFieldKind::Boolean,
                         "multiselect" => EditableFieldKind::MultiSelect,
                         _ => {
                             app.status.set_action_error(format!(
@@ -152,13 +154,16 @@ async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
             app.input_mode = InputMode::EditCustomField;
             app.input_buffer = current;
         }
-        EditableFieldKind::Number | EditableFieldKind::Date => {
+        EditableFieldKind::Number
+            | EditableFieldKind::Date
+            | EditableFieldKind::DateTime => {
             if app.custom_field_meta.is_none() {
                 app.custom_field_meta = Some(synthetic_field(
                     &field,
                     match resolved_kind {
                         EditableFieldKind::Number => TransitionFieldKind::Number,
                         EditableFieldKind::Date => TransitionFieldKind::Date,
+                        EditableFieldKind::DateTime => TransitionFieldKind::DateTime,
                         _ => unreachable!(),
                     },
                 ));
@@ -170,14 +175,25 @@ async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
                 current
             };
         }
-        EditableFieldKind::Select => {
-            app.custom_field_select_options = options;
-            app.custom_field_select_selected = app
-                .custom_field_select_options
-                .iter()
-                .position(|o| o == &current)
-                .unwrap_or(0);
-            app.showing_custom_field_select = true;
+        EditableFieldKind::Select | EditableFieldKind::Boolean => {
+            let select_options = if matches!(resolved_kind, EditableFieldKind::Boolean)
+                && options.is_empty()
+            {
+                boolean_select_options()
+            } else {
+                options
+            };
+            if app.custom_field_meta.is_none()
+                && matches!(resolved_kind, EditableFieldKind::Boolean)
+            {
+                app.custom_field_meta = Some(synthetic_boolean_field(&field));
+            }
+            start_select_editor(
+                app,
+                select_options,
+                &current,
+                matches!(resolved_kind, EditableFieldKind::Boolean),
+            );
         }
         EditableFieldKind::MultiSelect => {
             let multi_options = multi_options_for_field(&field, app.custom_field_meta.as_ref());
@@ -203,6 +219,50 @@ async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
         }
         EditableFieldKind::Auto => unreachable!("resolved before match"),
     }
+}
+
+fn synthetic_boolean_field(field: &EditableFieldConfig) -> TransitionField {
+    TransitionField {
+        id: field.id.clone(),
+        name: field.display_label(),
+        field_type: "boolean".into(),
+        system: String::new(),
+        kind: TransitionFieldKind::Boolean,
+        options: BOOLEAN_OPTIONS
+            .iter()
+            .map(|(id, label)| (id.to_string(), label.to_string()))
+            .collect(),
+    }
+}
+
+fn boolean_select_options() -> Vec<String> {
+    BOOLEAN_OPTIONS
+        .iter()
+        .map(|(_, label)| label.to_string())
+        .collect()
+}
+
+fn start_select_editor(app: &mut App, options: Vec<String>, current: &str, is_boolean: bool) {
+    app.custom_field_select_options = options;
+    app.custom_field_select_selected = if is_boolean {
+        prefill_boolean_select(current, &app.custom_field_select_options)
+    } else {
+        app.custom_field_select_options
+            .iter()
+            .position(|o| o == current)
+            .unwrap_or(0)
+    };
+    app.showing_custom_field_select = true;
+}
+
+fn prefill_boolean_select(current: &str, options: &[String]) -> usize {
+    let label = match current {
+        "true" | "Yes" => "Yes",
+        "false" | "No" => "No",
+        "-" => return 0,
+        other => other,
+    };
+    options.iter().position(|o| o == label).unwrap_or(0)
 }
 
 fn synthetic_field(field: &EditableFieldConfig, kind: TransitionFieldKind) -> TransitionField {
@@ -290,13 +350,25 @@ pub async fn apply_custom_field_select(app: &mut App, idx: usize) {
     let value = if let Some(meta) = app.custom_field_meta.as_ref() {
         if let Some((id, _)) = meta.options.iter().find(|(_, label)| label == &option) {
             meta.value_from_choice(id, &option)
+        } else if meta.kind == TransitionFieldKind::Boolean {
+            boolean_value_from_label(&option)
         } else {
             json!({ "value": option })
         }
+    } else if field.parsed_kind() == Ok(EditableFieldKind::Boolean) {
+        boolean_value_from_label(&option)
     } else {
         json!({ "value": option })
     };
     apply_custom_field_value(app, &field, value).await;
+}
+
+fn boolean_value_from_label(label: &str) -> Value {
+    match label {
+        "Yes" => json!(true),
+        "No" => json!(false),
+        other => json!({ "value": other }),
+    }
 }
 
 pub async fn apply_custom_field_multi(app: &mut App) {
@@ -452,6 +524,14 @@ mod tests {
     }
 
     #[test]
+    fn prefill_boolean_select_maps_true_false() {
+        let options = boolean_select_options();
+        assert_eq!(prefill_boolean_select("true", &options), 0);
+        assert_eq!(prefill_boolean_select("false", &options), 1);
+        assert_eq!(prefill_boolean_select("Yes", &options), 0);
+    }
+
+    #[test]
     fn tick_type_maps_number_date_multiselect() {
         let number = TransitionField {
             id: "customfield_1".into(),
@@ -472,6 +552,26 @@ mod tests {
             options: vec![],
         };
         assert_eq!(tick_type_from_transition_field(&date), "date");
+
+        let datetime = TransitionField {
+            id: "customfield_4".into(),
+            name: "Due at".into(),
+            field_type: "datetime".into(),
+            system: String::new(),
+            kind: TransitionFieldKind::DateTime,
+            options: vec![],
+        };
+        assert_eq!(tick_type_from_transition_field(&datetime), "datetime");
+
+        let boolean = TransitionField {
+            id: "customfield_5".into(),
+            name: "Approved".into(),
+            field_type: "boolean".into(),
+            system: String::new(),
+            kind: TransitionFieldKind::Boolean,
+            options: vec![("true".into(), "Yes".into()), ("false".into(), "No".into())],
+        };
+        assert_eq!(tick_type_from_transition_field(&boolean), "boolean");
 
         let multi = TransitionField {
             id: "customfield_3".into(),

@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4.0] - 2026-05-29
+
+### Added
+
+- **Custom fields phase 4** — Edit **boolean** (Yes/No picker) and **datetime** fields from the detail pane (`F`)
+- **`tick fields list`** — Suggests `boolean` and `datetime` types separately from `date`
+
+### Improved
+
+- **`type = "auto"`** — Resolves boolean and datetime from Jira edit metadata with distinct UX
+- **Docs/examples** — Example site renamed to **northwind** (`northwind-labs.atlassian.net`)
+
+### Documentation
+
+- [custom-fields.md](docs/features/custom-fields.md) — boolean and datetime types
+
 ## [1.3.0] - 2026-05-29
 
 ### Added

@@ -54,14 +54,14 @@ Env: `TICK_KEY`, `TICK_SITE`, `TICK_JSON_PATH` (single issue). Not fired for unm
 ## Cron
 
 ```cron
-0 8 * * 1-5  /home/you/.local/bin/cron-assignee-report.sh --site zeta >> ~/tick-standup.txt 2>&1
+0 8 * * 1-5  /home/you/.local/bin/cron-assignee-report.sh --site northwind >> ~/tick-standup.txt 2>&1
 ```
 
 ## CI
 
 ```bash
 export TICK_CONFIG=/path/to/config.toml
-./examples/automation/ci-transition.sh HIN-123 "Done" zeta
+./examples/automation/ci-transition.sh HIN-123 "Done" northwind
 ```
 
 Or use the GitHub Actions workflow snippet as a starting point.

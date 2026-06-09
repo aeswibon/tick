@@ -15,7 +15,7 @@ pub struct FieldCatalogEntry {
     pub schema_type: String,
     pub schema_custom: String,
     pub system: String,
-    /// Suggested `[[detail.editable_fields]]` type: `text`, `select`, `user`, `number`, `date`, `multiselect`, `auto`, or `unsupported`.
+    /// Suggested `[[detail.editable_fields]]` type: `text`, `select`, `user`, `number`, `date`, `datetime`, `boolean`, `multiselect`, `auto`, or `unsupported`.
     pub suggested_type: String,
 }
 
@@ -156,7 +156,9 @@ pub fn suggest_tick_type(
         }
         "number" => "number".into(),
         "string" => "text".into(),
-        "date" | "datetime" => "date".into(),
+        "date" => "date".into(),
+        "datetime" => "datetime".into(),
+        "boolean" => "boolean".into(),
         _ => {
             if schema_custom.contains(":userpicker") {
                 "user".into()
@@ -175,10 +177,12 @@ pub fn suggest_tick_type(
 pub fn tick_type_from_transition_field(tf: &TransitionField) -> &'static str {
     match tf.kind {
         TransitionFieldKind::User => "user",
-        TransitionFieldKind::Picker | TransitionFieldKind::Boolean => "select",
+        TransitionFieldKind::Picker => "select",
+        TransitionFieldKind::Boolean => "boolean",
         TransitionFieldKind::Text => "text",
         TransitionFieldKind::Number => "number",
-        TransitionFieldKind::Date | TransitionFieldKind::DateTime => "date",
+        TransitionFieldKind::Date => "date",
+        TransitionFieldKind::DateTime => "datetime",
         TransitionFieldKind::MultiPicker => "multiselect",
     }
 }
@@ -256,6 +260,24 @@ mod tests {
                 true
             ),
             "multiselect"
+        );
+        assert_eq!(
+            suggest_tick_type(
+                "datetime",
+                "",
+                "com.atlassian.jira.plugin.system.customfieldtypes:datetime",
+                true
+            ),
+            "datetime"
+        );
+        assert_eq!(
+            suggest_tick_type(
+                "boolean",
+                "",
+                "com.atlassian.jira.plugin.system.customfieldtypes:checkbox",
+                true
+            ),
+            "boolean"
         );
         assert_eq!(
             suggest_tick_type(

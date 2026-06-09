@@ -207,8 +207,8 @@ mod tests {
     #[test]
     fn empty_bulk_hook_command_is_error() {
         let mut config = minimal_config(vec![crate::config::Site {
-            name: "zeta".into(),
-            base_url: "https://zeta.atlassian.net".into(),
+            name: "northwind".into(),
+            base_url: "https://northwind-labs.atlassian.net".into(),
             ..Default::default()
         }]);
         config
@@ -226,8 +226,8 @@ mod tests {
     #[test]
     fn clean_minimal_config_ok() {
         let config = minimal_config(vec![crate::config::Site {
-            name: "zeta".into(),
-            base_url: "https://zeta.atlassian.net".into(),
+            name: "northwind".into(),
+            base_url: "https://northwind-labs.atlassian.net".into(),
             ..Default::default()
         }]);
         assert!(validate_config(&config).is_empty());

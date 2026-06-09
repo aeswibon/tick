@@ -27,7 +27,7 @@ key = 7
 [[views.custom]]
 name = "Team backlog"
 jql = "project = HIN AND status = Backlog ORDER BY rank"
-site = "zeta"          # only query this [[sites]].name
+site = "northwind"          # only query this [[sites]].name
 key = 8
 ```
 

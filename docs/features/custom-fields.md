@@ -27,6 +27,16 @@ label = "Start date"
 type = "date"
 
 [[detail.editable_fields]]
+id = "customfield_10016"
+label = "Review by"
+type = "datetime"
+
+[[detail.editable_fields]]
+id = "customfield_10040"
+label = "Approved"
+type = "boolean"
+
+[[detail.editable_fields]]
 id = "customfield_10001"
 label = "Environment"
 type = "select"
@@ -55,10 +65,12 @@ type = "auto"
 | `text` | Footer prompt; empty clears the field |
 | `number` | Footer prompt; validates as a number; empty clears |
 | `date` | Footer prompt (`YYYY-MM-DD`); empty clears |
+| `datetime` | Footer (`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`); empty clears |
+| `boolean` | Yes/No picker |
 | `select` | Picker from `options` (or from Jira when `options` omitted / `auto`) |
 | `multiselect` | Checklist — **Space** toggles, **Enter** confirms; empty clears |
 | `user` | User search picker (same as transition user fields) |
-| `auto` | Fetches **editmeta** for the selected issue; supports text, number, date, select, multiselect, and user |
+| `auto` | Fetches **editmeta** for the selected issue; supports all types above |
 
 Field ids must be `customfield_<digits>`.
 

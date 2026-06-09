@@ -72,8 +72,8 @@ boards = { MOBILE = 12 }
 
 # Per-site link type names (optional)
 [[sites]]
-name = "zeta"
-base_url = "https://zeta-tm.atlassian.net"
+name = "northwind"
+base_url = "https://northwind-labs.atlassian.net"
 link_types = { relates = "Relates", blocks = "Blocks", blocked_by = "Blocks", epic = "Epic-Story Link" }
 ```
 
@@ -108,9 +108,9 @@ jql = "project = ENG AND assignee = currentUser() ORDER BY updated DESC"
 key = 7
 
 [[views.custom]]
-name = "Zeta backlog"
+name = "Northwind backlog"
 jql = "project = HIN AND status = Backlog ORDER BY rank"
-site = "zeta"
+site = "northwind"
 key = 8
 ```
 
@@ -250,12 +250,22 @@ Runs when **Space** adds a bulk mark (not unmark or mark-all). See [features/aut
 [[detail.editable_fields]]
 id = "customfield_10042"
 label = "Story points"
-type = "text"          # text | number | date | select | multiselect | user | auto
+type = "text"          # text | number | date | datetime | boolean | select | multiselect | user | auto
 
 [[detail.editable_fields]]
 id = "customfield_10015"
 label = "Start date"
 type = "date"
+
+[[detail.editable_fields]]
+id = "customfield_10016"
+label = "Review by"
+type = "datetime"
+
+[[detail.editable_fields]]
+id = "customfield_10040"
+label = "Approved"
+type = "boolean"
 
 [[detail.editable_fields]]
 id = "customfield_10001"

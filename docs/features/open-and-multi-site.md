@@ -34,8 +34,8 @@ Copies the selected issue key to the system clipboard (platform-dependent on Win
 
 ```toml
 [[sites]]
-name = "zeta"
-base_url = "https://zeta-tm.atlassian.net"
+name = "northwind"
+base_url = "https://northwind-labs.atlassian.net"
 
 [[sites]]
 name = "corp"

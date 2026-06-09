@@ -30,8 +30,8 @@ Create and duplicate work from the **table** (detail pane can be open or closed)
 
 ```toml
 [[sites]]
-name = "zeta"
-base_url = "https://zeta-tm.atlassian.net"
+name = "northwind"
+base_url = "https://northwind-labs.atlassian.net"
 create_project = "ENG"
 create_issue_type = "Task"
 ```
@@ -47,7 +47,7 @@ templates_file = "templates/local.toml"   # optional; merged at load
 
 [[create.templates]]
 name = "hin-bug"
-site = "zeta"
+site = "northwind"
 project = "HIN"
 issue_type = "Bug"
 summary = "Bug: "
@@ -113,7 +113,7 @@ Save the selected issue into config for reuse with **`N`**.
 Saved to:
 
 - `[[create.templates]]` in `config.toml`, or  
-- `create.templates_file` if set (e.g. `templates/zeta.toml`)
+- `create.templates_file` if set (e.g. `templates/northwind.toml`)
 
 Footer confirms path; template is available immediately via **`N`**.
 
@@ -135,18 +135,18 @@ Enter
 Bootstrap templates without the TUI:
 
 ```bash
-tick template export zeta HIN-471632 CSJR-25019 HUAT-18652 \
-  -o ~/.config/tick/templates/zeta.toml
+tick template export northwind HIN-471632 CSJR-25019 HUAT-18652 \
+  -o ~/.config/tick/templates/northwind.toml
 
 # Append to an existing file
-tick template export zeta HIN-100 --output templates/more.toml --append
+tick template export northwind HIN-100 --output templates/more.toml --append
 ```
 
 Then reference the file in config:
 
 ```toml
 [create]
-templates_file = "templates/zeta.toml"
+templates_file = "templates/northwind.toml"
 ```
 
 Or paste blocks into `[[create.templates]]` in `config.toml`.

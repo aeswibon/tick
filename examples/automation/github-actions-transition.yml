@@ -30,4 +30,4 @@ jobs:
           TICK_CONFIG: ${{ github.workspace }}/.tick/config.toml
           JIRA_KEY: HIN-123
         run: |
-          tick issue transition "$JIRA_KEY" --to "Done" --site zeta
+          tick issue transition "$JIRA_KEY" --to "Done" --site northwind
