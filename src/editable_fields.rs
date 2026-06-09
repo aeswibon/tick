@@ -118,7 +118,8 @@ async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
                         return;
                     }
                 }
-                if matches!(resolved_kind, EditableFieldKind::MultiSelect) && tf.options.is_empty() {
+                if matches!(resolved_kind, EditableFieldKind::MultiSelect) && tf.options.is_empty()
+                {
                     app.status.set_action_error(format!(
                         "No options for {} on this issue",
                         field.display_label()
@@ -154,9 +155,7 @@ async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
             app.input_mode = InputMode::EditCustomField;
             app.input_buffer = current;
         }
-        EditableFieldKind::Number
-            | EditableFieldKind::Date
-            | EditableFieldKind::DateTime => {
+        EditableFieldKind::Number | EditableFieldKind::Date | EditableFieldKind::DateTime => {
             if app.custom_field_meta.is_none() {
                 app.custom_field_meta = Some(synthetic_field(
                     &field,
@@ -176,13 +175,12 @@ async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
             };
         }
         EditableFieldKind::Select | EditableFieldKind::Boolean => {
-            let select_options = if matches!(resolved_kind, EditableFieldKind::Boolean)
-                && options.is_empty()
-            {
-                boolean_select_options()
-            } else {
-                options
-            };
+            let select_options =
+                if matches!(resolved_kind, EditableFieldKind::Boolean) && options.is_empty() {
+                    boolean_select_options()
+                } else {
+                    options
+                };
             if app.custom_field_meta.is_none()
                 && matches!(resolved_kind, EditableFieldKind::Boolean)
             {
@@ -392,12 +390,10 @@ pub async fn apply_custom_field_multi(app: &mut App) {
     } else if let Some(meta) = app.custom_field_meta.as_ref() {
         meta.value_from_multi_choices(&picks)
     } else {
-        json!(
-            picks
-                .into_iter()
-                .map(|(_, label)| json!({ "value": label }))
-                .collect::<Vec<_>>()
-        )
+        json!(picks
+            .into_iter()
+            .map(|(_, label)| json!({ "value": label }))
+            .collect::<Vec<_>>())
     };
     apply_custom_field_value(app, &field, value).await;
 }

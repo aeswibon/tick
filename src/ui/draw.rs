@@ -300,10 +300,7 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             .as_ref()
             .map(|m| m.input_hint())
             .unwrap_or("empty clears");
-        (
-            format!(" {label} ({hint}): {}", input),
-            app.theme.accent,
-        )
+        (format!(" {label} ({hint}): {}", input), app.theme.accent)
     } else if app.input_mode == crate::app::InputMode::AddIssueLinkTarget {
         (
             format!(" Link target issue key: {}", input),

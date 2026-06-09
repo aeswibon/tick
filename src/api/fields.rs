@@ -141,9 +141,10 @@ pub fn suggest_tick_type(
     match schema_type {
         "user" => "user".into(),
         "option" => "select".into(),
-        "array" if schema_custom.contains("multiselect")
-            || schema_custom.contains("checkbox")
-            || schema_custom.contains("multicheckboxes") =>
+        "array"
+            if schema_custom.contains("multiselect")
+                || schema_custom.contains("checkbox")
+                || schema_custom.contains("multicheckboxes") =>
         {
             "multiselect".into()
         }
