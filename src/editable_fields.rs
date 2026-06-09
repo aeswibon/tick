@@ -153,7 +153,7 @@ async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
     match resolved_kind {
         EditableFieldKind::Text => {
             app.input_mode = InputMode::EditCustomField;
-            app.input_buffer = current;
+            app.set_footer_input(current);
         }
         EditableFieldKind::Number | EditableFieldKind::Date | EditableFieldKind::DateTime => {
             if app.custom_field_meta.is_none() {
@@ -168,11 +168,11 @@ async fn begin_edit_field(app: &mut App, field: EditableFieldConfig) {
                 ));
             }
             app.input_mode = InputMode::EditCustomField;
-            app.input_buffer = if current == "-" {
+            app.set_footer_input(if current == "-" {
                 String::new()
             } else {
                 current
-            };
+            });
         }
         EditableFieldKind::Select | EditableFieldKind::Boolean => {
             let select_options =

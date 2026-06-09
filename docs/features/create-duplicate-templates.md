@@ -86,8 +86,8 @@ Copies from the **selected** row (re-fetches full issue from Jira):
 
 After **`C`**, before editing summary:
 
-1. **Fields to copy** — `Space` toggles each field (labels included by default). `Enter` continues.
-2. **Leave blank** — for included fields, `Space` marks fields you will fill in manually during the wizard. `Enter` continues to summary/description.
+1. **Fields to copy** — `Space` toggles each field (labels included by default). **`e`** edits the selected field inline. `Enter` continues.
+2. **Leave blank** — for included fields, `Space` marks fields you will fill in manually; **`e`** edits the value. `Enter` continues to summary/description.
 
 Then edit summary and description as usual (`Shift+Enter` for multiline description; paste supported).
 

@@ -3,6 +3,7 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use crate::app::{App, InputMode};
 
 mod detail_actions;
+pub(crate) use detail_actions::parse_due_date_input;
 mod mentions;
 mod normal;
 pub mod text;
@@ -225,18 +226,32 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         .create_session
         .as_ref()
         .is_some_and(|s| s.step == crate::create_flow::CreateStep::DuplicateReview)
+        && app.input_mode != InputMode::DuplicateFieldEdit
     {
         crate::create_flow::handle_duplicate_review_key(app, code);
         return false;
     }
 
-    if app.showing_create_picker {
-        crate::create_flow::handle_create_picker_key(app, code).await;
+    if app.showing_global_search && app.input_mode == InputMode::GlobalSearchQuery {
+        if matches!(
+            code,
+            KeyCode::Esc
+                | KeyCode::Enter
+                | KeyCode::Up
+                | KeyCode::Down
+                | KeyCode::Char('j')
+                | KeyCode::Char('k')
+        ) {
+            handle_global_search_key(app, code).await;
+            return false;
+        }
+    } else if app.showing_global_search {
+        handle_global_search_key(app, code).await;
         return false;
     }
 
-    if app.showing_global_search {
-        handle_global_search_key(app, code).await;
+    if app.showing_create_picker {
+        crate::create_flow::handle_create_picker_key(app, code).await;
         return false;
     }
 
@@ -428,6 +443,8 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                     }
                 } else if app.input_mode == InputMode::TemplateExportName {
                     crate::template_export_flow::cancel_template_export(app);
+                } else if app.input_mode == InputMode::DuplicateFieldEdit {
+                    crate::create_flow::cancel_duplicate_field_edit(app);
                 } else if app.input_mode == InputMode::EditCustomField {
                     crate::editable_fields::cancel_custom_field_edit(app);
                 } else if matches!(
@@ -470,6 +487,8 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> bool {
                 }
                 if app.input_mode == InputMode::OpenTicket {
                     submit_open_ticket(app).await;
+                } else if app.input_mode == InputMode::DuplicateFieldEdit {
+                    crate::create_flow::submit_duplicate_field_edit(app);
                 } else if matches!(
                     app.input_mode,
                     InputMode::CreateField | InputMode::CreateDescription

@@ -67,95 +67,164 @@ pub fn start_template_manage(app: &mut App) {
 }
 
 pub async fn handle_template_manage_key(app: &mut App, code: KeyCode) {
-    let Some(session) = app.template_manage.as_mut() else {
-        return;
+    let step = match app.template_manage.as_ref() {
+        Some(session) => session.step,
+        None => return,
     };
-    match session.step {
-        TemplateManageStep::List => match code {
-            KeyCode::Esc => cancel_template_manage(app),
-            KeyCode::Char('j') | KeyCode::Down => {
-                if session.selected + 1 < session.names.len() {
-                    session.selected += 1;
+    match step {
+        TemplateManageStep::List => {
+            let Some(session) = app.template_manage.as_mut() else {
+                return;
+            };
+            match code {
+                KeyCode::Esc => cancel_template_manage(app),
+                KeyCode::Char('j') | KeyCode::Down => {
+                    if session.selected + 1 < session.names.len() {
+                        session.selected += 1;
+                    }
                 }
-            }
-            KeyCode::Char('k') | KeyCode::Up => {
-                if session.selected > 0 {
-                    session.selected -= 1;
+                KeyCode::Char('k') | KeyCode::Up => {
+                    if session.selected > 0 {
+                        session.selected -= 1;
+                    }
                 }
-            }
-            KeyCode::Enter => {
-                session.editing_name = session.names[session.selected].clone();
-                session.step = TemplateManageStep::Actions;
-            }
-            _ => {}
-        },
-        TemplateManageStep::Actions => match code {
-            KeyCode::Esc => {
-                session.step = TemplateManageStep::List;
-            }
-            KeyCode::Char('e') => {
-                let name = session.editing_name.clone();
-                if let Some(t) = app.config.create.templates.iter().find(|t| t.name == name) {
-                    app.input_buffer = t.summary.clone();
+                KeyCode::Enter => {
+                    session.editing_name = session.names[session.selected].clone();
+                    session.step = TemplateManageStep::Actions;
                 }
-                app.input_mode = InputMode::TemplateEditSummary;
-                session.step = TemplateManageStep::EditSummary;
+                _ => {}
             }
-            KeyCode::Char('p') => {
-                let name = session.editing_name.clone();
-                if let Some(t) = app.config.create.templates.iter().find(|t| t.name == name) {
-                    app.input_buffer = t.project.clone();
+        }
+        TemplateManageStep::Actions => handle_template_manage_actions(app, code),
+        TemplateManageStep::ConfirmDelete => {
+            let editing_name = app
+                .template_manage
+                .as_ref()
+                .map(|s| s.editing_name.clone())
+                .unwrap_or_default();
+            match code {
+                KeyCode::Esc => {
+                    if let Some(session) = app.template_manage.as_mut() {
+                        session.step = TemplateManageStep::Actions;
+                    }
                 }
-                app.input_mode = InputMode::TemplateEditProject;
-                session.step = TemplateManageStep::EditProject;
-            }
-            KeyCode::Char('i') => {
-                let name = session.editing_name.clone();
-                if let Some(t) = app.config.create.templates.iter().find(|t| t.name == name) {
-                    app.input_buffer = t.issue_type.clone();
-                }
-                app.input_mode = InputMode::TemplateEditIssueType;
-                session.step = TemplateManageStep::EditIssueType;
-            }
-            KeyCode::Char('b') => {
-                let name = session.editing_name.clone();
-                if let Some(t) = app.config.create.templates.iter().find(|t| t.name == name) {
-                    app.input_buffer = t.description.clone();
-                }
-                app.input_mode = InputMode::TemplateEditDescription;
-                session.step = TemplateManageStep::EditDescription;
-            }
-            KeyCode::Char('l') => {
-                let name = session.editing_name.clone();
-                if let Some(t) = app.config.create.templates.iter().find(|t| t.name == name) {
-                    app.input_buffer = t.labels.join(", ");
-                }
-                app.input_mode = InputMode::TemplateEditLabels;
-                session.step = TemplateManageStep::EditLabels;
-            }
-            KeyCode::Char('d') => session.step = TemplateManageStep::ConfirmDelete,
-            _ => {}
-        },
-        TemplateManageStep::ConfirmDelete => match code {
-            KeyCode::Esc => session.step = TemplateManageStep::Actions,
-            KeyCode::Enter => {
-                let name = session.editing_name.clone();
-                match remove_template(&mut app.config, &name) {
+                KeyCode::Enter => match remove_template(&mut app.config, &editing_name) {
                     Ok(()) => {
                         app.status
-                            .set_action_notice(format!("Deleted template '{name}'"));
+                            .set_action_notice(format!("Deleted template '{editing_name}'"));
                         cancel_template_manage(app);
                     }
                     Err(e) => app.status.set_action_error(e),
-                }
+                },
+                _ => {}
             }
-            _ => {}
-        },
+        }
         TemplateManageStep::EditSummary
         | TemplateManageStep::EditProject
         | TemplateManageStep::EditIssueType
         | TemplateManageStep::EditDescription
         | TemplateManageStep::EditLabels => {}
+    }
+}
+
+fn handle_template_manage_actions(app: &mut App, code: KeyCode) {
+    let editing_name = app
+        .template_manage
+        .as_ref()
+        .map(|s| s.editing_name.clone())
+        .unwrap_or_default();
+    match code {
+        KeyCode::Esc => {
+            if let Some(session) = app.template_manage.as_mut() {
+                session.step = TemplateManageStep::List;
+            }
+        }
+        KeyCode::Char('e') => {
+            let footer = app
+                .config
+                .create
+                .templates
+                .iter()
+                .find(|t| t.name == editing_name)
+                .map(|t| t.summary.clone());
+            if let Some(session) = app.template_manage.as_mut() {
+                session.step = TemplateManageStep::EditSummary;
+            }
+            app.input_mode = InputMode::TemplateEditSummary;
+            if let Some(text) = footer {
+                app.set_footer_input(text);
+            }
+        }
+        KeyCode::Char('p') => {
+            let footer = app
+                .config
+                .create
+                .templates
+                .iter()
+                .find(|t| t.name == editing_name)
+                .map(|t| t.project.clone());
+            if let Some(session) = app.template_manage.as_mut() {
+                session.step = TemplateManageStep::EditProject;
+            }
+            app.input_mode = InputMode::TemplateEditProject;
+            if let Some(text) = footer {
+                app.set_footer_input(text);
+            }
+        }
+        KeyCode::Char('i') => {
+            let footer = app
+                .config
+                .create
+                .templates
+                .iter()
+                .find(|t| t.name == editing_name)
+                .map(|t| t.issue_type.clone());
+            if let Some(session) = app.template_manage.as_mut() {
+                session.step = TemplateManageStep::EditIssueType;
+            }
+            app.input_mode = InputMode::TemplateEditIssueType;
+            if let Some(text) = footer {
+                app.set_footer_input(text);
+            }
+        }
+        KeyCode::Char('b') => {
+            let footer = app
+                .config
+                .create
+                .templates
+                .iter()
+                .find(|t| t.name == editing_name)
+                .map(|t| t.description.clone());
+            if let Some(session) = app.template_manage.as_mut() {
+                session.step = TemplateManageStep::EditDescription;
+            }
+            app.input_mode = InputMode::TemplateEditDescription;
+            if let Some(text) = footer {
+                app.set_footer_input(text);
+            }
+        }
+        KeyCode::Char('l') => {
+            let footer = app
+                .config
+                .create
+                .templates
+                .iter()
+                .find(|t| t.name == editing_name)
+                .map(|t| t.labels.join(", "));
+            if let Some(session) = app.template_manage.as_mut() {
+                session.step = TemplateManageStep::EditLabels;
+            }
+            app.input_mode = InputMode::TemplateEditLabels;
+            if let Some(text) = footer {
+                app.set_footer_input(text);
+            }
+        }
+        KeyCode::Char('d') => {
+            if let Some(session) = app.template_manage.as_mut() {
+                session.step = TemplateManageStep::ConfirmDelete;
+            }
+        }
+        _ => {}
     }
 }
 

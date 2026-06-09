@@ -151,6 +151,8 @@ pub enum InputMode {
     GlobalSearchQuery,
     /// Configured custom field (`[[detail.editable_fields]]`, type text).
     EditCustomField,
+    /// Duplicate review: edit selected field value (`e`).
+    DuplicateFieldEdit,
     /// Comment mode: footer path for `Ctrl+U` attachment.
     CommentAttachPath,
 }
@@ -716,6 +718,11 @@ impl App {
     pub fn reset_input_buffer(&mut self) {
         self.input_buffer.clear();
         self.input_cursor = 0;
+    }
+
+    pub fn set_footer_input(&mut self, text: String) {
+        self.input_buffer = text;
+        self.sync_input_cursor_end();
     }
 
     pub fn sync_input_cursor_end(&mut self) {

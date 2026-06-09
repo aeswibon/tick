@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4.1] - 2026-06-09
+
+### Added
+
+- **Duplicate field edit** — Press **`e`** during duplicate review (`C`) to edit a selected field inline before continuing
+- **Footer cursor polish** — Pre-filled footer prompts place the cursor at end; **Ctrl+g** global search accepts typing and cursor motion
+
+### Improved
+
+- Duplicate review hints show **`e` edit** on both picker steps
+- Edit-summary/labels/due-date/description, custom fields, template flows, and closed-search footer use consistent cursor placement
+
+### Documentation
+
+- [create-duplicate-templates.md](docs/features/create-duplicate-templates.md) — inline field edit during duplicate review
+
 ## [1.4.0] - 2026-05-29
 
 ### Added

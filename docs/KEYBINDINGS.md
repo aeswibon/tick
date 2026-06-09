@@ -183,6 +183,16 @@ Active after `c`, `w`, `S`, `L`, `D`, `O`, create wizard, template name, Closed 
 | `t` | Re-open issue type picker |
 | `Esc` | Cancel entire wizard |
 
+### Duplicate review (`C`, steps 1–2)
+
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Move selection |
+| `Space` | Toggle include / clear |
+| `e` | Edit selected field in footer |
+| `Enter` | Next step |
+| `Esc` | Cancel wizard |
+
 ---
 
 ## Template export wizard (`X`)

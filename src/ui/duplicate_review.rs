@@ -14,11 +14,11 @@ pub fn draw_duplicate_review(f: &mut Frame, session: &CreateSession, theme: &The
     let (title, hint) = match session.duplicate_review_phase {
         DuplicateReviewPhase::IncludeFields => (
             "Duplicate — fields to copy",
-            "Space toggle · Enter next · Esc cancel",
+            "Space toggle · e edit · Enter next · Esc cancel",
         ),
         DuplicateReviewPhase::ClearValues => (
             "Duplicate — leave blank for manual entry",
-            "Space toggle clear · Enter continue · Esc cancel",
+            "Space toggle clear · e edit · Enter continue · Esc cancel",
         ),
     };
 

@@ -301,6 +301,32 @@ fn render_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             .map(|m| m.input_hint())
             .unwrap_or("empty clears");
         (format!(" {label} ({hint}): {}", input), app.theme.accent)
+    } else if app.input_mode == crate::app::InputMode::DuplicateFieldEdit {
+        let label = app
+            .create_session
+            .as_ref()
+            .and_then(|session| {
+                session.duplicate_edit_row.and_then(|idx| {
+                    session
+                        .duplicate_field_rows
+                        .get(idx)
+                        .map(|row| row.label.as_str())
+                })
+            })
+            .unwrap_or("Field");
+        let hint = if app
+            .create_session
+            .as_ref()
+            .is_some_and(|s| s.duplicate_edit_multiline)
+        {
+            "Shift+Enter newline"
+        } else {
+            "Enter saves"
+        };
+        (
+            format!(" Edit {label} ({hint}): {}", input),
+            app.theme.accent,
+        )
     } else if app.input_mode == crate::app::InputMode::AddIssueLinkTarget {
         (
             format!(" Link target issue key: {}", input),

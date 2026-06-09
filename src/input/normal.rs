@@ -63,7 +63,7 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
             app.detail_open = false;
             if app.active_view == ViewMode::ClosedSearch && !app.is_custom_view_active() {
                 app.input_mode = InputMode::ClosedSearchQuery;
-                app.input_buffer = app.closed_search_query.clone();
+                app.set_footer_input(app.closed_search_query.clone());
             } else {
                 app.filtering = true;
                 app.filter.clear();
@@ -260,8 +260,7 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('S') if app.detail_open => {
             if let Some(ticket) = app.selected_ticket_entry() {
                 app.input_mode = InputMode::EditSummary;
-                app.input_buffer = ticket.summary;
-                app.sync_input_cursor_end();
+                app.set_footer_input(ticket.summary);
             }
         }
         KeyCode::Char('P') if app.detail_open => {
@@ -273,7 +272,7 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('L') if app.detail_open => {
             if let Some(ticket) = app.selected_ticket_entry() {
                 app.input_mode = InputMode::EditLabels;
-                app.input_buffer = ticket.labels.join(", ");
+                app.set_footer_input(ticket.labels.join(", "));
             }
         }
         KeyCode::Char('M') if app.detail_open => {
@@ -282,10 +281,12 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('d') if app.detail_open => {
             if let Some(ticket) = app.selected_ticket_entry() {
                 app.input_mode = InputMode::EditDueDate;
-                app.input_buffer = ticket
-                    .due_date
-                    .map(|d| d.format("%Y-%m-%d").to_string())
-                    .unwrap_or_default();
+                app.set_footer_input(
+                    ticket
+                        .due_date
+                        .map(|d| d.format("%Y-%m-%d").to_string())
+                        .unwrap_or_default(),
+                );
             }
         }
         KeyCode::Char('F') if app.detail_open && !app.config.detail.editable_fields.is_empty() => {
@@ -301,7 +302,7 @@ pub(crate) async fn handle_normal_key(app: &mut App, code: KeyCode) -> bool {
                     .or(ticket.description.clone())
                     .unwrap_or_default();
                 app.input_mode = InputMode::EditDescription;
-                app.input_buffer = text;
+                app.set_footer_input(text);
                 app.input_mentions = ticket
                     .description_adf
                     .as_ref()

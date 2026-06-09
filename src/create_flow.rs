@@ -43,6 +43,10 @@ pub struct CreateSession {
     pub duplicate_field_selected: usize,
     /// Which pass of the duplicate field picker is active.
     pub duplicate_review_phase: DuplicateReviewPhase,
+    /// Row being edited inline (`e`); `None` when browsing the checklist.
+    pub duplicate_edit_row: Option<usize>,
+    /// Description edits allow Shift+Enter newlines.
+    pub duplicate_edit_multiline: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,6 +69,11 @@ pub fn cancel_create(app: &mut App) {
         app.input_mode = InputMode::None;
         app.input_buffer.clear();
         app.input_mentions.clear();
+    }
+    if app.input_mode == InputMode::DuplicateFieldEdit {
+        app.input_mode = InputMode::None;
+        app.input_buffer.clear();
+        app.input_cursor = 0;
     }
 }
 
@@ -89,6 +98,8 @@ fn new_create_session(draft: CreateDraft, step: CreateStep) -> CreateSession {
         duplicate_field_rows: Vec::new(),
         duplicate_field_selected: 0,
         duplicate_review_phase: DuplicateReviewPhase::IncludeFields,
+        duplicate_edit_row: None,
+        duplicate_edit_multiline: false,
     }
 }
 
@@ -258,6 +269,7 @@ pub fn handle_duplicate_review_key(app: &mut App, code: KeyCode) {
                 }
             }
         }
+        KeyCode::Char('e') => start_duplicate_field_edit(app),
         KeyCode::Enter => advance_duplicate_review(app),
         _ => {}
     }
@@ -295,6 +307,108 @@ fn advance_duplicate_review(app: &mut App) {
             session.step = CreateStep::Summary;
             begin_summary_input(app);
         }
+    }
+}
+
+fn sprint_field_for_session(app: &App, site_name: &str) -> Option<String> {
+    app.config
+        .sites
+        .iter()
+        .find(|s| s.name == site_name)
+        .and_then(|s| s.sprint_field.clone())
+}
+
+pub fn start_duplicate_field_edit(app: &mut App) {
+    let Some(session) = app.create_session.as_ref() else {
+        return;
+    };
+    if session.step != CreateStep::DuplicateReview {
+        return;
+    }
+    let row_idx = session.duplicate_field_selected;
+    let Some(row) = session.duplicate_field_rows.get(row_idx) else {
+        return;
+    };
+    if matches!(
+        session.duplicate_review_phase,
+        DuplicateReviewPhase::ClearValues
+    ) && !row.include
+    {
+        return;
+    }
+    if !crate::duplicate_field_edit::duplicate_field_is_editable(&row.id) {
+        app.status.set_action_error(format!(
+            "{} cannot be edited here — adjust after create",
+            row.label
+        ));
+        return;
+    }
+    let site_name = session.draft.site_name.clone();
+    let sprint_field = sprint_field_for_session(app, &site_name);
+    let text = crate::duplicate_field_edit::draft_text_for_row(
+        &session.draft,
+        &row.id,
+        sprint_field.as_deref(),
+    );
+    let multiline = crate::duplicate_field_edit::duplicate_field_uses_multiline(&row.id);
+    if let Some(session) = app.create_session.as_mut() {
+        session.duplicate_edit_row = Some(row_idx);
+        session.duplicate_edit_multiline = multiline;
+    }
+    app.input_mode = InputMode::DuplicateFieldEdit;
+    app.set_footer_input(text);
+}
+
+pub fn cancel_duplicate_field_edit(app: &mut App) {
+    if let Some(session) = app.create_session.as_mut() {
+        session.duplicate_edit_row = None;
+        session.duplicate_edit_multiline = false;
+    }
+    if app.input_mode == InputMode::DuplicateFieldEdit {
+        app.input_mode = InputMode::None;
+        app.input_buffer.clear();
+        app.input_cursor = 0;
+    }
+}
+
+pub fn submit_duplicate_field_edit(app: &mut App) {
+    let (row_idx, buffer, row_id, site_name) = {
+        let Some(session) = app.create_session.as_ref() else {
+            return;
+        };
+        let Some(row_idx) = session.duplicate_edit_row else {
+            return;
+        };
+        let multiline = session.duplicate_edit_multiline;
+        let buffer = if multiline {
+            app.input_buffer.trim_end().to_string()
+        } else {
+            app.input_buffer.trim().to_string()
+        };
+        let row_id = session.duplicate_field_rows[row_idx].id.clone();
+        let site_name = session.draft.site_name.clone();
+        (row_idx, buffer, row_id, site_name)
+    };
+    let sprint_field = sprint_field_for_session(app, &site_name);
+    let Some(session) = app.create_session.as_mut() else {
+        return;
+    };
+    match crate::duplicate_field_edit::apply_duplicate_row_edit(
+        &mut session.draft,
+        &row_id,
+        sprint_field.as_deref(),
+        &buffer,
+    ) {
+        Ok(preview) => {
+            let row = &mut session.duplicate_field_rows[row_idx];
+            crate::duplicate_field_edit::touch_row_after_edit(row, preview);
+            session.duplicate_edit_row = None;
+            session.duplicate_edit_multiline = false;
+            app.input_mode = InputMode::None;
+            app.input_buffer.clear();
+            app.input_cursor = 0;
+        }
+        Err(e) => app.status.set_action_error(e),
     }
 }
 
@@ -439,20 +553,30 @@ async fn load_issue_type_picker(app: &mut App) {
 
 fn begin_summary_input(app: &mut App) {
     app.showing_create_picker = false;
-    if let Some(session) = app.create_session.as_mut() {
-        session.step = CreateStep::Summary;
-        app.input_buffer = session.draft.summary.clone();
-    }
+    let summary = app
+        .create_session
+        .as_mut()
+        .map(|s| {
+            s.step = CreateStep::Summary;
+            s.draft.summary.clone()
+        })
+        .unwrap_or_default();
+    app.set_footer_input(summary);
     app.input_mode = InputMode::CreateField;
 }
 
 fn begin_description_input(app: &mut App) {
-    if let Some(session) = app.create_session.as_mut() {
-        session.step = CreateStep::Description;
-        session.description_preview = false;
-        app.input_buffer = session.draft.description.clone();
-        app.input_mentions.clear();
-    }
+    let (description, _) = app
+        .create_session
+        .as_mut()
+        .map(|s| {
+            s.step = CreateStep::Description;
+            s.description_preview = false;
+            (s.draft.description.clone(), ())
+        })
+        .unwrap_or_default();
+    app.set_footer_input(description);
+    app.input_mentions.clear();
     app.input_mode = InputMode::CreateDescription;
 }
 

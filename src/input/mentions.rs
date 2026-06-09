@@ -242,6 +242,7 @@ pub(crate) async fn submit_input(app: &mut App) {
             Err(e) => {
                 app.input_mode = InputMode::EditDueDate;
                 app.input_buffer = buffer;
+                app.sync_input_cursor_end();
                 app.status.set_action_error(e);
                 return;
             }
@@ -282,7 +283,10 @@ pub(crate) async fn submit_input(app: &mut App) {
         | InputMode::GlobalSearchQuery => {
             return;
         }
-        InputMode::OpenTicket | InputMode::None | InputMode::CommentAttachPath => return,
+        InputMode::OpenTicket
+        | InputMode::None
+        | InputMode::CommentAttachPath
+        | InputMode::DuplicateFieldEdit => return,
     };
 
     match result {

@@ -205,8 +205,9 @@ fn advance_template_export_step(app: &mut App) {
         }
         TemplateExportStep::ClearValues => {
             session.step = TemplateExportStep::Name;
+            let default_name = session.default_name.clone();
             app.input_mode = InputMode::TemplateExportName;
-            app.input_buffer = session.default_name.clone();
+            app.set_footer_input(default_name);
         }
         TemplateExportStep::Name => {}
     }
@@ -241,7 +242,7 @@ pub async fn submit_template_export_name(app: &mut App) {
     if let Err(e) = template.validate_fields() {
         app.template_export = Some(session);
         app.input_mode = InputMode::TemplateExportName;
-        app.input_buffer = name;
+        app.set_footer_input(name);
         app.status.set_action_error(e);
         return;
     }
@@ -257,7 +258,7 @@ pub async fn submit_template_export_name(app: &mut App) {
         Err(e) => {
             app.template_export = Some(session);
             app.input_mode = InputMode::TemplateExportName;
-            app.input_buffer = name;
+            app.set_footer_input(name);
             app.status.set_action_error(e);
         }
     }
